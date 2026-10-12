@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { CalendarX2, FileHeart, PartyPopper } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,8 @@ export function ReportAbsenceButton({
   variant?: "outline" | "secondary" | "primary";
 }) {
   const t = useTranslations("attendance");
+  const td = useTranslations("documents");
+  const [sentFor, setSentFor] = React.useState("");
   const [open, setOpen] = React.useState(false);
   const [done, setDone] = React.useState<AbsenceReason | null>(null);
   const [mode, setMode] = React.useState<"day" | "period">("day");
@@ -65,7 +68,14 @@ export function ReportAbsenceButton({
             {done === "sick" ? (
               <div className="flex items-start gap-3 rounded-2xl bg-sky-soft p-4 text-sky-strong" data-testid="absence-sick-hint">
                 <FileHeart className="mt-0.5 size-5 shrink-0" aria-hidden />
-                <p className="text-sm">{t("sickHint")}</p>
+                <p className="text-sm">
+                  {t("sickHint")}{" "}
+                  {sentFor ? (
+                    <Link href={`/documents/child/${sentFor}?category=medical`} className="font-semibold underline" data-testid="absence-upload-certificate">
+                      {td("uploadCertificate")}
+                    </Link>
+                  ) : null}
+                </p>
               </div>
             ) : null}
             <Button className="w-full" onClick={() => setOpen(false)}>
@@ -78,6 +88,7 @@ export function ReportAbsenceButton({
             onSubmit={(e) => {
               e.preventDefault();
               const f = new FormData(e.currentTarget);
+              setSentFor(String(f.get("child") ?? childId ?? kids[0]?.id ?? ""));
               run({
                 childId: String(f.get("child") ?? childId ?? kids[0]?.id),
                 from,

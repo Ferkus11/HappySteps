@@ -12,6 +12,7 @@ import { formatDate } from "@/lib/format";
 import { canManageRole } from "@/lib/auth/roles";
 import { PersonActions } from "@/components/common/person-actions";
 import { EditPerson, TeacherGroups } from "./client";
+import { StaffDocumentsCard } from "@/components/documents/cards";
 
 export default async function StaffCard({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -81,6 +82,7 @@ export default async function StaffCard({ params }: { params: Promise<{ id: stri
             />
           </div>
         </Card>
+        <StaffDocumentsCard ctx={ctx} userId={p.userId} />
         {isTeacher ? (
           <Card>
             <CardHeader title={t("groups")} />
