@@ -14,6 +14,9 @@ export class ActionError extends Error {
 export function dbErrorCode(e: PostgrestError | { code?: string; message?: string } | null | undefined): string {
   if (!e) return "generic";
   const msg = e.message ?? "";
+  // Module SQL raises business errors as `raise exception 'hs:<errorKey>'` (key from messages/*/errors.json).
+  const custom = /^hs:([A-Za-z_]+)/.exec(msg);
+  if (custom) return custom[1];
   if (["last_owner", "group_has_children", "owner_only", "superadmin_only", "kindergarten mismatch"].some((k) => msg.includes(k))) {
     return msg.includes("kindergarten mismatch") ? "forbidden" : msg.split(" ")[0];
   }

@@ -33,6 +33,23 @@
     "child.restore": "Бала қалпына келтірілді",
     "child.fee_change": "Төлем сомасы өзгертілді",
     "guardian.link": "Ата-ана байланыстырылды",
-    "guardian.unlink": "Ата-ана ажыратылды"
+    "guardian.unlink": "Ата-ана ажыратылды",
+    "worktime.session_edit": "Табельді түзету",
+    "worktime.schedule": "Кесте өзгертілді",
+    "worktime.override": "Кесте күні өзгертілді",
+    "worktime.absence": "Қызметкердің болмауы белгіленді",
+    "worktime.auto_close": "Күн автоматты түрде жабылды",
+    "attendance.edit_past": "Өткен күндердің келу есебін түзету",
+    "holidays.update": "Демалыс және мереке күндері өзгертілді",
+    "announcement.delete": "Хабарландыру жойылды",
+    "invoice.adjust": "Шот сомасы өзгертілді",
+    "receipt.confirm": "Түбіртек расталды",
+    "receipt.reject": "Түбіртек қабылданбады",
+    "chat.message_delete": "Хабарлама жойылды",
+    "chat.lock": "Топ чаты ата-аналар үшін жабылды",
+    "chat.unlock": "Топ чаты ашылды",
+    "club.exclude": "Бала үйірмеден шығарылды",
+    "waitlist.accept": "Өтінім қабылданды",
+    "document.delete": "Құжат жойылды"
   }
 }

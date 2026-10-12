@@ -13,7 +13,10 @@ import { attachRealtime } from "./realtime.mjs";
 const PORT = Number(process.env.GATEWAY_PORT ?? 54321);
 const SECRET = new TextEncoder().encode(process.env.LOCAL_JWT_SECRET);
 const STORAGE_DIR = process.env.STORAGE_DIR ?? ".local-supabase/storage";
-const upstreams = { "/auth/v1": "http://127.0.0.1:9999", "/rest/v1": "http://127.0.0.1:3001" };
+const upstreams = {
+  "/auth/v1": process.env.AUTH_UPSTREAM ?? "http://127.0.0.1:9999",
+  "/rest/v1": process.env.REST_UPSTREAM ?? "http://127.0.0.1:3001",
+};
 
 const cors = {
   "access-control-allow-origin": "*",

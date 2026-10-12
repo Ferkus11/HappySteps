@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ageOn, todayIn } from "@/lib/format";
 import { signedUrls } from "@/lib/kg-assets";
 import { Greeting } from "./greeting";
+import { DashboardWidgets } from "./widgets";
 
 export async function myChildren(ctx: KgContext) {
   const supabase = await createClient();
@@ -32,6 +33,7 @@ export async function ParentDashboard({ ctx }: { ctx: KgContext }) {
   return (
     <>
       <Greeting name={ctx.profile.full_name} timezone={ctx.settings.timezone} />
+      <DashboardWidgets ctx={ctx} slot="top" />
       <Card>
         <CardHeader title={t("myChildren")} />
         {kids.length === 0 ? (
@@ -55,6 +57,7 @@ export async function ParentDashboard({ ctx }: { ctx: KgContext }) {
           </ul>
         )}
       </Card>
+      <DashboardWidgets ctx={ctx} slot="main" />
     </>
   );
 }

@@ -33,6 +33,23 @@
     "child.restore": "Ребёнок восстановлен",
     "child.fee_change": "Изменена сумма оплаты",
     "guardian.link": "Родитель привязан",
-    "guardian.unlink": "Родитель отвязан"
+    "guardian.unlink": "Родитель отвязан",
+    "worktime.session_edit": "Правка табеля",
+    "worktime.schedule": "Изменён график",
+    "worktime.override": "Изменён день графика",
+    "worktime.absence": "Отмечено отсутствие сотрудника",
+    "worktime.auto_close": "День закрыт автоматически",
+    "attendance.edit_past": "Правка посещаемости задним числом",
+    "holidays.update": "Изменены выходные и праздники",
+    "announcement.delete": "Удалено объявление",
+    "invoice.adjust": "Изменена сумма счёта",
+    "receipt.confirm": "Чек подтверждён",
+    "receipt.reject": "Чек отклонён",
+    "chat.message_delete": "Удалено сообщение",
+    "chat.lock": "Чат группы закрыт для родителей",
+    "chat.unlock": "Чат группы открыт",
+    "club.exclude": "Ребёнок исключён из кружка",
+    "waitlist.accept": "Заявка принята",
+    "document.delete": "Удалён документ"
   }
 }

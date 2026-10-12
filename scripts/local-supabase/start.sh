@@ -5,6 +5,9 @@
 #
 # Usage: scripts/local-supabase/start.sh [--reset]
 # If you have Docker, prefer `npx supabase start` — it uses the same migrations.
+#
+# STACK_SLOT=N (0..9) runs an independent stack next to the default one (used by parallel
+# git worktrees): database happysteps_sN, GoTrue :9999-N, PostgREST :3001+10N, gateway :54321+N.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -13,7 +16,13 @@ BIN="$STACK/bin"
 LOGS="$STACK/logs"
 mkdir -p "$BIN" "$LOGS" "$STACK/storage"
 
-DB_NAME="${LOCAL_DB_NAME:-happysteps}"
+SLOT="${STACK_SLOT:-0}"
+if [ "$SLOT" = "0" ]; then DEFAULT_DB=happysteps; else DEFAULT_DB="happysteps_s$SLOT"; fi
+DB_NAME="${LOCAL_DB_NAME:-$DEFAULT_DB}"
+AUTH_PORT=$((9999 - SLOT))
+PGRST_PORT=$((3001 + 10 * SLOT))
+GATEWAY_PORT=$((54321 + SLOT))
+export DB_NAME GATEWAY_PORT
 PGHOST="${PGHOST:-127.0.0.1}"
 PGPORT="${PGPORT:-5432}"
 export PGPASSWORD="${PGPASSWORD:-postgres}"
@@ -23,6 +32,10 @@ AUTH_VERSION="v2.180.0"
 PGRST_VERSION="v12.2.3"
 
 download() {
+  # Worktrees reuse the binaries of the main checkout when available.
+  if [ ! -x "$BIN/auth" ] && [ -n "${STACK_BIN_FROM:-}" ] && [ -x "$STACK_BIN_FROM/auth" ]; then
+    cp "$STACK_BIN_FROM"/* "$BIN/"
+  fi
   if [ ! -x "$BIN/auth" ]; then
     echo "→ downloading supabase/auth $AUTH_VERSION"
     curl -fsSL -o "$STACK/auth.tgz" "https://github.com/supabase/auth/releases/download/$AUTH_VERSION/auth-$AUTH_VERSION-x86.tar.gz"
@@ -89,8 +102,8 @@ auth_env() {
   export GOTRUE_DB_DRIVER=postgres
   export DATABASE_URL="postgres://supabase_auth_admin:postgres@$PGHOST:$PGPORT/$DB_NAME?search_path=auth&sslmode=disable"
   export GOTRUE_API_HOST=127.0.0.1
-  export PORT=9999
-  export API_EXTERNAL_URL="http://127.0.0.1:54321/auth/v1"
+  export PORT=$AUTH_PORT
+  export API_EXTERNAL_URL="http://127.0.0.1:$GATEWAY_PORT/auth/v1"
   export GOTRUE_SITE_URL="${SITE_URL:-http://localhost:3000}"
   export GOTRUE_JWT_SECRET="$JWT_SECRET"
   export GOTRUE_JWT_EXP=3600
@@ -108,9 +121,9 @@ auth_env() {
 }
 
 start_services() {
-  echo "→ starting GoTrue :9999"
+  echo "→ starting GoTrue :$AUTH_PORT"
   (auth_env && cd "$BIN" && setsid nohup "$BIN/auth" serve >"$LOGS/auth.log" 2>&1 </dev/null & echo $! >"$STACK/auth.pid")
-  echo "→ starting PostgREST :3001"
+  echo "→ starting PostgREST :$PGRST_PORT"
   cat >"$STACK/postgrest.conf" <<EOF
 db-uri = "postgres://authenticator:postgres@$PGHOST:$PGPORT/$DB_NAME"
 db-schemas = "public"
@@ -118,16 +131,16 @@ db-anon-role = "anon"
 db-extra-search-path = "public, extensions"
 jwt-secret = "$JWT_SECRET"
 server-host = "127.0.0.1"
-server-port = 3001
+server-port = $PGRST_PORT
 db-max-rows = 5000
 EOF
   (setsid nohup "$BIN/postgrest" "$STACK/postgrest.conf" >"$LOGS/postgrest.log" 2>&1 </dev/null & echo $! >"$STACK/postgrest.pid")
-  echo "→ starting gateway :54321"
-  (LOCAL_JWT_SECRET="$JWT_SECRET" LOCAL_DB_URL="postgres://postgres:$PGPASSWORD@$PGHOST:$PGPORT/$DB_NAME" STORAGE_DIR="$STACK/storage" \
+  echo "→ starting gateway :$GATEWAY_PORT"
+  (AUTH_UPSTREAM="http://127.0.0.1:$AUTH_PORT" REST_UPSTREAM="http://127.0.0.1:$PGRST_PORT" LOCAL_JWT_SECRET="$JWT_SECRET" LOCAL_DB_URL="postgres://postgres:$PGPASSWORD@$PGHOST:$PGPORT/$DB_NAME" STORAGE_DIR="$STACK/storage" \
     setsid nohup node "$ROOT/scripts/local-supabase/gateway.mjs" >"$LOGS/gateway.log" 2>&1 </dev/null & echo $! >"$STACK/gateway.pid")
   for _ in $(seq 1 60); do
-    if curl -fsS http://127.0.0.1:54321/auth/v1/health >/dev/null 2>&1 && curl -fsS http://127.0.0.1:54321/rest/v1/ >/dev/null 2>&1; then
-      echo "✓ local supabase is up at http://127.0.0.1:54321"
+    if curl -fsS http://127.0.0.1:$GATEWAY_PORT/auth/v1/health >/dev/null 2>&1 && curl -fsS http://127.0.0.1:$GATEWAY_PORT/rest/v1/ >/dev/null 2>&1; then
+      echo "✓ local supabase is up at http://127.0.0.1:$GATEWAY_PORT (db $DB_NAME)"
       return 0
     fi
     sleep 0.5

@@ -1,0 +1,22 @@
+{
+  "title": "Уведомления",
+  "empty": "Уведомлений пока нет",
+  "markAllRead": "Прочитать все",
+  "types": {
+    "message.new": { "title": "Новое сообщение", "body": "{from}: {text}" },
+    "announcement.new": { "title": "Новое объявление", "body": "{title}" },
+    "announcement.reminder": { "title": "Напоминание об объявлении", "body": "Прочитайте, пожалуйста: {title}" },
+    "event.reminder": { "title": "Завтра: {title}", "body": "{date} {time} · {place}" },
+    "absence.reported": { "title": "{child} не придёт", "body": "{reason}, {period}" },
+    "attendance.not_marked": { "title": "Посещаемость не отмечена", "body": "Группа «{group}» ещё не отмечена сегодня" },
+    "receipt.new": { "title": "Новый чек на проверку", "body": "{child}: {amount}" },
+    "receipt.accepted": { "title": "Оплата подтверждена", "body": "{month}: {amount}" },
+    "receipt.rejected": { "title": "Чек отклонён", "body": "{month}: {reason}. Загрузите чек заново." },
+    "club.request": { "title": "Заявка в кружок", "body": "{child} → {club}" },
+    "club.spot_free": { "title": "В кружке освободилось место", "body": "{club}: в очереди {count}" },
+    "club.decision": { "title": "Кружок «{club}»", "body": "{child}: {status}" },
+    "waitlist.new": { "title": "Новая заявка в лист ожидания", "body": "{child}, {parent}" },
+    "document.expiring": { "title": "Истекает документ", "body": "{person}: {document} — до {date}" },
+    "worktime.auto_closed": { "title": "Рабочий день закрыт автоматически", "body": "{date}: время окончания — {time}" }
+  }
+}

@@ -26,7 +26,12 @@ export async function ensureUser(db: SupabaseClient, phone: string, fullName: st
     return existing.id as string;
   }
   const email = `${phone.replace(/\D/g, "")}@${EMAIL_DOMAIN}`;
-  const created = await db.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { full_name: fullName, phone } });
+  let created = await db.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { full_name: fullName, phone } });
+  // A freshly started GoTrue occasionally fails its first DB query; retry a few times.
+  for (let i = 0; i < 5 && created.error?.status === 500; i++) {
+    await new Promise((r) => setTimeout(r, 500 * (i + 1)));
+    created = await db.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { full_name: fullName, phone } });
+  }
   if (created.error || !created.data.user) throw new Error(`createUser ${phone}: ${created.error?.message}`);
   const id = created.data.user.id;
   must(

@@ -22,10 +22,12 @@ const add = (k, v) => {
   if (!has(k)) lines.push(`${k}=${v}`);
 };
 
-add("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:54321");
+const gatewayPort = process.env.GATEWAY_PORT ?? "54321";
+const dbName = process.env.DB_NAME ?? "happysteps";
+add("NEXT_PUBLIC_SUPABASE_URL", `http://127.0.0.1:${gatewayPort}`);
 add("NEXT_PUBLIC_SUPABASE_ANON_KEY", await sign("anon"));
 add("SUPABASE_SERVICE_ROLE_KEY", await sign("service_role"));
-add("SUPABASE_DB_URL", "postgres://postgres:postgres@127.0.0.1:5432/happysteps");
+add("SUPABASE_DB_URL", `postgres://postgres:postgres@127.0.0.1:5432/${dbName}`);
 add("APP_URL", "http://localhost:3000");
 add("AUTH_EMAIL_DOMAIN", "users.happysteps.local");
 add("CRON_SECRET", randomBytes(16).toString("hex"));

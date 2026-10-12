@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Stat } from "@/components/ui/stat";
 import { Ring } from "@/components/ui/ring";
 import { Greeting } from "./greeting";
+import { DashboardWidgets } from "./widgets";
 
 export async function AdminDashboard({ ctx }: { ctx: KgContext }) {
   const t = await getTranslations("dashboard");
@@ -20,6 +21,7 @@ export async function AdminDashboard({ ctx }: { ctx: KgContext }) {
   return (
     <>
       <Greeting name={ctx.profile.full_name} timezone={ctx.settings.timezone} />
+      <DashboardWidgets ctx={ctx} slot="top" />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Link href="/children">
           <Card className="h-full hover:shadow-md">
@@ -37,7 +39,9 @@ export async function AdminDashboard({ ctx }: { ctx: KgContext }) {
             <Stat value={staffCount ?? 0} label={t("staff")} />
           </Card>
         </Link>
+        <DashboardWidgets ctx={ctx} slot="stat" />
       </div>
+      <DashboardWidgets ctx={ctx} slot="main" />
     </>
   );
 }
