@@ -30,6 +30,8 @@ export interface NotifyInput {
   type: NotificationType;
   params?: Record<string, string | number | null>;
   url?: string | null;
+  /** Push only after this moment (e.g. the end of quiet hours); the in-app row appears at once. */
+  deliverAfter?: string | null;
 }
 
 /**
@@ -45,14 +47,15 @@ export async function notify(input: NotifyInput): Promise<void> {
     type: input.type,
     params: input.params ?? {},
     url: input.url ?? null,
+    deliver_after: input.deliverAfter ?? null,
   }));
   const { error } = await createServiceClient().from("notifications").insert(rows);
   if (error) console.error("notify failed", input.type, error.message);
   await deliver(rows);
 }
 
-/** Push delivery hook — implemented in stage 6 (lib/push.ts). */
-async function deliver(_rows: { user_id: string; type: string }[]): Promise<void> {}
+/** Push delivery hook — implemented in stage 6 (lib/push.ts); must skip rows whose `deliver_after` is in the future. */
+async function deliver(_rows: { user_id: string; type: string; deliver_after: string | null }[]): Promise<void> {}
 
 /** Active members of a kindergarten with given roles (for fan-out). */
 export async function memberIds(kindergartenId: string, roles: string[]): Promise<string[]> {

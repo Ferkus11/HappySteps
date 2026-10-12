@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deletedKind, inQuietHours, localDay, localTime, mergeMessages, sortChats, type ChatMessage } from "@/lib/chats-logic";
+import { deletedKind, inQuietHours, withinEditWindow, localDay, localTime, mergeMessages, sortChats, type ChatMessage } from "@/lib/chats-logic";
 
 describe("chats · quiet hours (composer hint)", () => {
   it("overnight window 21:00–08:00", () => {
@@ -54,5 +54,16 @@ describe("chats · list and messages", () => {
     expect(deletedKind(msg("x", "2026-10-12T10:00:00Z"))).toBe("none");
     expect(deletedKind(msg("x", "2026-10-12T10:00:00Z", { deleted_at: "2026-10-12T11:00:00Z", deleted_by: "a" }))).toBe("self");
     expect(deletedKind(msg("x", "2026-10-12T10:00:00Z", { deleted_at: "2026-10-12T11:00:00Z", deleted_by: "head" }))).toBe("admin");
+  });
+});
+
+describe("withinEditWindow", () => {
+  const sent = "2026-10-12T10:00:00Z";
+  const at = (min: number) => Date.parse(sent) + min * 60_000;
+  it("allows edits for (just under) 15 minutes after sending", () => {
+    expect(withinEditWindow(sent, at(0))).toBe(true);
+    expect(withinEditWindow(sent, at(14))).toBe(true);
+    expect(withinEditWindow(sent, at(14.6))).toBe(false); // margin for the round trip
+    expect(withinEditWindow(sent, at(16))).toBe(false);
   });
 });

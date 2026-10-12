@@ -264,6 +264,31 @@ describe("chats · writing, editing, moderation", () => {
     });
   });
 
+  it("edits are allowed only within 15 minutes of sending; «изменено» is set", async () => {
+    await inTx(async (c, become) => {
+      // (inserted as superuser before any `become`: with a user's claims the trigger stamps now())
+      const old = (
+        await c.query("insert into messages (kindergarten_id, chat_id, author_id, body, created_at) values ($1, $2, $3, 'Давнее', now() - interval '16 minutes') returning id", [
+          F.A, chat.sun, F.users.parent,
+        ])
+      ).rows[0].id as string;
+      const edge = (
+        await c.query("insert into messages (kindergarten_id, chat_id, author_id, body, created_at) values ($1, $2, $3, 'Почти', now() - interval '14 minutes') returning id", [
+          F.A, chat.sun, F.users.parent,
+        ])
+      ).rows[0].id as string;
+      const fresh = await post(c, become, "parent", chat.sun, "Свежее");
+      expect((await c.query("update messages set body = 'Свежее, исправлено' where id = $1", [fresh])).rowCount).toBe(1);
+      expect((await c.query("update messages set body = 'Почти, исправлено' where id = $1", [edge])).rowCount).toBe(1);
+      expect((await c.query("select edited_at from messages where id = $1", [edge])).rows[0].edited_at).not.toBeNull();
+      expect(await rejects(c, "update messages set body = 'Поздно' where id = $1", [old])).toBe(true);
+      expect((await c.query("select body, edited_at from messages where id = $1", [old])).rows[0]).toEqual({ body: "Давнее", edited_at: null });
+      // deleting an old message is still possible
+      await c.query("select public.delete_chat_message($1)", [old]);
+      expect((await c.query("select deleted_at from messages where id = $1", [old])).rows[0].deleted_at).not.toBeNull();
+    });
+  });
+
   it("files are written by the server only", async () => {
     await inTx(async (c, become) => {
       const id = await post(c, become, "parent", chat.sun, "Фото");
@@ -299,6 +324,12 @@ describe("chats · writing, editing, moderation", () => {
       expect(row.deleted_at).not.toBeNull();
       expect(row.deleted_by).toBe(F.users.head);
       expect((await c.query("select 1 from message_files where message_id = $1", [p])).rowCount).toBe(0);
+      // soft delete: the row stays (Realtime DELETE events are not RLS-filtered), hidden from everyone
+      await c.query("reset role");
+      expect((await c.query("select deleted_at from message_files where message_id = $1", [p])).rows[0].deleted_at).not.toBeNull();
+      // deleting again returns nothing (the storage object was already handed back)
+      await become(F.users.head);
+      expect((await c.query("select public.delete_chat_message($1) as path", [p])).rowCount).toBe(0);
       expect((await c.query("select 1 from audit_log where action = 'chat.message_delete' and entity_id = $1", [p])).rowCount).toBe(1);
       // the parent still sees the (empty) placeholder row
       await become(F.users.parent);
@@ -380,6 +411,81 @@ describe("chats · unread counters", () => {
   });
 });
 
+describe("chats · history and unread counts start when a member joins", () => {
+  // Солнышко without other messages; a message from 10 days ago and one from now (both by the head).
+  async function setup(c: PoolClient) {
+    await c.query("delete from messages where chat_id = $1", [chat.sun]);
+    await c.query("delete from chat_reads where chat_id = $1", [chat.sun]);
+    const ins = async (body: string, ago: string) =>
+      (await c.query(`insert into messages (kindergarten_id, chat_id, author_id, body, created_at) values ($1, $2, $3, $4, now() - interval '${ago}') returning id`, [
+        F.A, chat.sun, F.users.head, body,
+      ])).rows[0].id as string;
+    const old = await ins("Старое сообщение", "10 days");
+    const fresh = await ins("Новое сообщение", "1 minute");
+    await c.query("insert into message_files (kindergarten_id, chat_id, message_id, kind, path, name, mime, size) values ($1, $2, $3, 'pdf', $4, 'old.pdf', 'application/pdf', 10)", [
+      F.A, chat.sun, old, `${F.A}/${chat.sun}/old.pdf`,
+    ]);
+    // Алихан (parent's child) joined Солнышко two days ago; the teacher was hired yesterday
+    await c.query("update child_group_history set from_date = current_date - 2 where child_id = $1 and to_date is null", [F.children["Алихан"]]);
+    await c.query("update memberships set created_at = now() - interval '1 day' where user_id = $1 and kindergarten_id = $2 and role = 'teacher'", [F.users.teacher, F.A]);
+    await c.query("update memberships set created_at = now() - interval '1 year' where user_id = $1 and kindergarten_id = $2", [F.users.owner, F.A]);
+    return { old, fresh };
+  }
+  const unread = async (c: PoolClient) => (await c.query("select unread, last_body from public.chat_list($1) where id = $2", [F.A, chat.sun])).rows[0];
+
+  it("a parent who joined late cannot read the group's older messages or their files", async () => {
+    await inTx(async (c, become) => {
+      const { old, fresh } = await setup(c);
+      await become(F.users.parent);
+      expect((await c.query("select id from messages where chat_id = $1", [chat.sun])).rows.map((r) => r.id)).toEqual([fresh]);
+      expect((await c.query("select 1 from messages where id = $1", [old])).rowCount).toBe(0);
+      expect((await c.query("select 1 from message_files where message_id = $1", [old])).rowCount).toBe(0);
+      // cannot quote it either
+      expect(await rejects(c, "insert into messages (kindergarten_id, chat_id, author_id, body, reply_to) values ($1, $2, $3, 'Ответ', $4)", [F.A, chat.sun, F.users.parent, old])).toBe(true);
+      // staff of the chat (teacher, owner) keep the whole history
+      for (const w of ["teacher", "owner", "head"] as Who[]) {
+        await become(F.users[w]);
+        expect((await c.query("select 1 from messages where id = $1", [old])).rowCount, w).toBe(1);
+        expect((await c.query("select 1 from message_files where message_id = $1", [old])).rowCount, w).toBe(1);
+      }
+    });
+  });
+
+  it("unread counts start from the join date: the child's group date for parents, the membership for staff", async () => {
+    await inTx(async (c, become) => {
+      await setup(c);
+      await become(F.users.parent);
+      expect(await unread(c)).toEqual({ unread: 1, last_body: "Новое сообщение" });
+      await become(F.users.teacher);
+      expect((await unread(c)).unread).toBe(1);
+      await become(F.users.owner);
+      expect((await unread(c)).unread).toBe(2);
+      // moving the join date back makes the old message visible (and unread) for the parent
+      await c.query("reset role");
+      await c.query("update child_group_history set from_date = current_date - 30 where child_id = $1 and to_date is null", [F.children["Алихан"]]);
+      await become(F.users.parent);
+      expect((await unread(c)).unread).toBe(2);
+      // a read marker still wins over the join date
+      await c.query("select public.mark_chat_read($1)", [chat.sun]);
+      expect((await unread(c)).unread).toBe(0);
+    });
+  });
+
+  it("a child transferred into a group: the parent sees that group's messages from the transfer date", async () => {
+    await inTx(async (c, become) => {
+      await c.query("delete from messages where chat_id = $1", [chat.stars]);
+      await c.query(`insert into messages (kindergarten_id, chat_id, author_id, body, created_at) values ($1, $2, $3, 'До перевода', now() - interval '3 days')`, [F.A, chat.stars, F.users.head]);
+      await c.query(`insert into messages (kindergarten_id, chat_id, author_id, body, created_at) values ($1, $2, $3, 'После перевода', now())`, [F.A, chat.stars, F.users.head]);
+      await become(F.users.owner);
+      await c.query("select public.transfer_child($1, $2, current_date)", [F.children["Алихан"], F.gA2]);
+      await become(F.users.parent);
+      expect((await c.query("select body from messages where chat_id = $1", [chat.stars])).rows.map((r) => r.body)).toEqual(["После перевода"]);
+      expect(await unread(c)).toBeUndefined(); // no longer in Солнышко
+      expect((await c.query("select unread from public.chat_list($1) where id = $2", [F.A, chat.stars])).rows[0].unread).toBe(1);
+    });
+  });
+});
+
 describe("chats · quiet hours and notification targets", () => {
   const at = (hhmm: string) => `2026-10-14T${hhmm}:00+05:00`; // Asia/Almaty
 
@@ -418,22 +524,63 @@ describe("chats · quiet hours and notification targets", () => {
   });
 
   it("chat_notify_targets: other members, not the author, not current readers, one unread notification per chat", async () => {
-    await inTx(async (c) => {
+    await inTx(async (c, become) => {
       // outside quiet hours for "now": a window that never matches
       await c.query("update kindergarten_settings set quiet_hours_start = '10:00', quiet_hours_end = '10:00' where kindergarten_id = $1", [F.A]);
       await c.query("delete from notifications where url = $1", [`/chats/${chat.sun}`]);
       await c.query("delete from chat_reads where chat_id = $1", [chat.sun]);
-      const targets = async (author: Who) => (await c.query("select public.chat_notify_targets($1, $2) as u", [chat.sun, F.users[author]])).rows.map((r) => r.u).sort();
+      const rows = async (author: Who) => (await c.query("select user_id, deliver_after from public.chat_notify_targets($1, $2)", [chat.sun, F.users[author]])).rows;
+      const targets = async (author: Who) => (await rows(author)).map((r) => r.user_id).sort();
       expect(await targets("teacher")).toEqual([F.users.owner, F.users.head, F.users.parent, F.users.teacherParent].sort());
       await c.query("insert into chat_reads (chat_id, user_id, kindergarten_id, last_read_at) values ($1, $2, $3, now())", [chat.sun, F.users.parent, F.A]);
       await c.query("insert into notifications (kindergarten_id, user_id, type, url) values ($1, $2, 'message.new', $3)", [F.A, F.users.owner, `/chats/${chat.sun}`]);
       expect(await targets("teacher")).toEqual([F.users.head, F.users.teacherParent].sort());
-      // quiet hours all day: parent writes → staff are skipped, the other parent is not
+      expect((await rows("teacher")).every((r) => r.deliver_after === null)).toBe(true);
+      // quiet hours all day: parent writes → staff still get the bell row, but its push waits for the
+      // end of the quiet hours; the other parent is notified at once
       await c.query("update kindergarten_settings set quiet_hours_start = '00:00', quiet_hours_end = '23:59' where kindergarten_id = $1", [F.A]);
       await c.query("delete from chat_reads where chat_id = $1", [chat.sun]);
       await c.query("delete from notifications where url = $1", [`/chats/${chat.sun}`]);
-      const late = await targets("parent");
-      expect(late).toEqual([F.users.teacherParent]);
+      const end = (await c.query("select public.chat_quiet_ends($1, now()) as e", [F.A])).rows[0].e as Date;
+      expect(end).not.toBeNull();
+      const late = Object.fromEntries((await rows("parent")).map((r) => [r.user_id, r.deliver_after as Date | null]));
+      expect(Object.keys(late).sort()).toEqual([F.users.owner, F.users.head, F.users.teacher, F.users.teacherParent].sort());
+      for (const staff of [F.users.owner, F.users.head, F.users.teacher]) expect(late[staff]?.getTime(), staff).toBe(end.getTime());
+      expect(late[F.users.teacherParent]).toBeNull();
+      // the deferred notification is written like the action does it, and still counts as "one unread per chat"
+      await c.query("insert into notifications (kindergarten_id, user_id, type, url, deliver_after) values ($1, $2, 'message.new', $3, $4)", [
+        F.A, F.users.teacher, `/chats/${chat.sun}`, end,
+      ]);
+      expect(await targets("parent")).not.toContain(F.users.teacher);
+      await become(F.users.teacher);
+      const bell = (await c.query("select deliver_after, read_at from notifications where url = $1", [`/chats/${chat.sun}`])).rows;
+      expect(bell).toHaveLength(1);
+      expect((bell[0].deliver_after as Date).getTime()).toBe(end.getTime());
+    });
+  });
+
+  it("chat_quiet_ends: the next local end of the quiet hours, null outside them", async () => {
+    await inTx(async (c) => {
+      await c.query("update kindergarten_settings set quiet_hours_start = '21:00', quiet_hours_end = '08:00', timezone = 'Asia/Almaty' where kindergarten_id = $1", [F.A]);
+      const e = async (t: string) => {
+        const v = (await c.query("select public.chat_quiet_ends($1, $2) as e", [F.A, t])).rows[0].e as Date | null;
+        return v ? v.toISOString() : null;
+      };
+      expect(await e(at("22:30"))).toBe("2026-10-15T03:00:00.000Z"); // 08:00 next day, Almaty (+05)
+      expect(await e(at("03:00"))).toBe("2026-10-14T03:00:00.000Z"); // 08:00 the same day
+      expect(await e(at("12:00"))).toBeNull();
+    });
+  });
+
+  it("kg_in_quiet_hours answers only members of that garden", async () => {
+    await inTx(async (c, become) => {
+      await become(F.users.parent);
+      expect(typeof (await c.query("select public.kg_in_quiet_hours($1) as q", [F.A])).rows[0].q).toBe("boolean");
+      expect(await rejects(c, "select public.kg_in_quiet_hours($1)", [F.B])).toBe(true);
+      await become(F.users.ownerB);
+      expect(await rejects(c, "select public.kg_in_quiet_hours($1)", [F.A])).toBe(true);
+      await become(null);
+      expect(await rejects(c, "select public.kg_in_quiet_hours($1)", [F.A])).toBe(true);
     });
   });
 
@@ -443,6 +590,9 @@ describe("chats · quiet hours and notification targets", () => {
       expect(await rejects(c, "select public.chat_member($1, $2)", [chat.staffA, F.users.teacher])).toBe(true);
       expect(await rejects(c, "select public.chat_member_ids($1)", [chat.sun])).toBe(true);
       expect(await rejects(c, "select public.chat_may_start($1, $2, $3)", [F.A, F.users.teacher, F.users.parent])).toBe(true);
+      expect(await rejects(c, "select public.chat_quiet_ends($1, now())", [F.A])).toBe(true);
+      expect(await rejects(c, "select public.chat_member_since($1, $2)", [chat.sun, F.users.teacher])).toBe(true);
+      expect(await rejects(c, "select public.chat_history_from($1, $2)", [chat.sun, F.users.teacher])).toBe(true);
     });
   });
 });

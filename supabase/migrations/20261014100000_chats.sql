@@ -9,8 +9,11 @@
 --   'direct' — two people (user_a < user_b). Parent ↔ parent is impossible: a direct chat needs at
 --              least one staff member, and a parent may START one only with a teacher of their child's
 --              group, a head or an owner (start_direct_chat). Staff may start one with anyone of the garden.
--- Messages are never hard-deleted by the app (Realtime DELETE events are not RLS-filtered):
--- removal is a soft delete that also clears the text and drops the attachments.
+-- Messages and attachments are never hard-deleted by the app (Realtime DELETE events are not
+-- RLS-filtered): removal is a soft delete that also clears the text and soft-deletes the attachments
+-- (their storage objects are removed by the server).
+-- History: parents see a group chat from the day their child joined the group; authors may edit a
+-- message for 15 minutes.
 
 -- ───────────────────────────── Tables ─────────────────────────────
 create table public.chats (
@@ -63,7 +66,9 @@ create table public.message_files (
   name text not null check (length(name) between 1 and 200),
   mime text not null,
   size int not null check (size > 0 and size <= 15 * 1024 * 1024),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- soft delete (Realtime DELETE events are not RLS-filtered); the server removes the storage object
+  deleted_at timestamptz
 );
 create index message_files_message_idx on public.message_files (message_id);
 create index message_files_chat_idx on public.message_files (chat_id);
@@ -174,6 +179,44 @@ create or replace function public.chat_can_write_uid(p_chat uuid, uid uuid) retu
       end)
 $$;
 
+-- Since when has `uid` been a member of the chat? (start of unread counting; history limit for parents)
+--   group:  owner/head — their membership; teacher — the teacher membership (group_teachers has no
+--           timestamp of its own); parent — the day their child joined this group in the garden's time
+--           zone (child_group_history.from_date of the child's current stay, else the guardian link).
+--   staff:  their first staff membership.   direct: their first membership in the garden.
+create or replace function public.chat_member_since(p_chat uuid, uid uuid) returns timestamptz
+  language sql stable security definer set search_path = public as $$
+  select coalesce(case c.kind
+    when 'group' then least(
+      (select min(m.created_at) from memberships m where m.user_id = uid and m.kindergarten_id = c.kindergarten_id
+        and m.status = 'active' and m.role in ('owner', 'head')),
+      (select min(m.created_at) from memberships m where m.user_id = uid and m.kindergarten_id = c.kindergarten_id
+        and m.status = 'active' and m.role = 'teacher' and public.chat_teaches_uid(c.group_id, uid)),
+      (select min(coalesce(
+          (select h.from_date::timestamp at time zone coalesce((select ks.timezone from kindergarten_settings ks where ks.kindergarten_id = c.kindergarten_id), 'Asia/Almaty')
+             from child_group_history h where h.child_id = ch.id and h.group_id = c.group_id and h.to_date is null
+             order by h.from_date desc limit 1),
+          cg.created_at))
+        from child_guardians cg
+        join children ch on ch.id = cg.child_id and ch.status = 'active' and ch.group_id = c.group_id
+        join memberships m on m.user_id = cg.user_id and m.kindergarten_id = cg.kindergarten_id and m.role = 'parent' and m.status = 'active'
+        where cg.user_id = uid))
+    when 'staff' then (select min(m.created_at) from memberships m where m.user_id = uid and m.kindergarten_id = c.kindergarten_id
+        and m.status = 'active' and m.role <> 'parent')
+    else (select min(m.created_at) from memberships m where m.user_id = uid and m.kindergarten_id = c.kindergarten_id and m.status = 'active')
+  end, now())
+  from chats c where c.id = p_chat
+$$;
+
+-- Oldest message `uid` may read: parents (the parent side of a group chat) see the group's messages
+-- from the day their child joined it; staff of the chat and other chat kinds see the whole history.
+create or replace function public.chat_history_from(p_chat uuid, uid uuid) returns timestamptz
+  language sql stable security definer set search_path = public as $$
+  select case when c.kind = 'group' and not public.chat_staff_side(c.id, uid)
+              then public.chat_member_since(c.id, uid) else '-infinity'::timestamptz end
+  from chats c where c.id = p_chat
+$$;
+
 revoke execute on function public.chat_is_staff_uid(uuid, uuid) from public, anon, authenticated;
 revoke execute on function public.chat_has_role_uid(uuid, uuid, public.app_role[]) from public, anon, authenticated;
 revoke execute on function public.chat_teaches_uid(uuid, uuid) from public, anon, authenticated;
@@ -182,6 +225,8 @@ revoke execute on function public.chat_member(uuid, uuid) from public, anon, aut
 revoke execute on function public.chat_staff_side(uuid, uuid) from public, anon, authenticated;
 revoke execute on function public.chat_may_start(uuid, uuid, uuid) from public, anon, authenticated;
 revoke execute on function public.chat_can_write_uid(uuid, uuid) from public, anon, authenticated;
+revoke execute on function public.chat_member_since(uuid, uuid) from public, anon, authenticated;
+revoke execute on function public.chat_history_from(uuid, uuid) from public, anon, authenticated;
 grant execute on function public.chat_member(uuid, uuid) to service_role;
 grant execute on function public.chat_can_write_uid(uuid, uuid) to service_role;
 
@@ -194,6 +239,13 @@ create or replace function public.can_write_chat(p_chat uuid) returns boolean
   language sql stable security definer set search_path = public as $$
   select public.chat_can_write_uid(p_chat, auth.uid())
 $$;
+-- Oldest readable message time for the current user (used by messages/message_files RLS).
+create or replace function public.chat_visible_from(p_chat uuid) returns timestamptz
+  language sql stable security definer set search_path = public as $$
+  select public.chat_history_from(p_chat, auth.uid())
+$$;
+revoke execute on function public.chat_visible_from(uuid) from public, anon;
+grant execute on function public.chat_visible_from(uuid) to authenticated, service_role;
 revoke execute on function public.can_access_chat(uuid) from public, anon;
 revoke execute on function public.can_write_chat(uuid) from public, anon;
 grant execute on function public.can_access_chat(uuid) to authenticated, service_role;
@@ -210,8 +262,12 @@ revoke execute on function public.chat_member_ids(uuid) from public, anon, authe
 grant execute on function public.chat_member_ids(uuid) to service_role;
 
 -- ───────────────────────────── Quiet hours (SPEC §5.7) ─────────────────────────────
--- Is local time of `at` inside [start, end) in the garden's time zone? Handles the overnight window.
-create or replace function public.kg_in_quiet_hours(kg uuid, p_at timestamptz default now()) returns boolean
+-- Push delivery of a bell notification may be deferred (stage 6 sends a push only once
+-- `deliver_after` has passed). The in-app row exists at once, so nothing is lost.
+alter table public.notifications add column if not exists deliver_after timestamptz;
+
+-- Internal: is local time of `at` inside [start, end) in the garden's time zone? Handles the overnight window.
+create or replace function public.chat_quiet_at(kg uuid, p_at timestamptz) returns boolean
   language sql stable security definer set search_path = public as $$
   select case
     when s.quiet_hours_start = s.quiet_hours_end then false
@@ -222,31 +278,59 @@ create or replace function public.kg_in_quiet_hours(kg uuid, p_at timestamptz de
                (p_at at time zone coalesce(ks.timezone, 'Asia/Almaty'))::time as t
         from (select 1) one left join kindergarten_settings ks on ks.kindergarten_id = kg) s
 $$;
+
+-- Internal: the moment the current quiet period ends (next local `quiet_hours_end` after `at`),
+-- or null when `at` is outside quiet hours.
+create or replace function public.chat_quiet_ends(kg uuid, p_at timestamptz) returns timestamptz
+  language sql stable security definer set search_path = public as $$
+  select case when public.chat_quiet_at(kg, p_at) then
+      (case when s.loc::date + s.qe > s.loc then s.loc::date + s.qe else (s.loc::date + 1) + s.qe end) at time zone s.tz
+    end
+  from (select coalesce(ks.quiet_hours_end, '08:00'::time) as qe, coalesce(ks.timezone, 'Asia/Almaty') as tz,
+               p_at at time zone coalesce(ks.timezone, 'Asia/Almaty') as loc
+        from (select 1) one left join kindergarten_settings ks on ks.kindergarten_id = kg) s
+$$;
+revoke execute on function public.chat_quiet_at(uuid, timestamptz) from public, anon, authenticated;
+revoke execute on function public.chat_quiet_ends(uuid, timestamptz) from public, anon, authenticated;
+grant execute on function public.chat_quiet_ends(uuid, timestamptz) to service_role;
+
+-- Public answer, only for members of that garden (and the server).
+create or replace function public.kg_in_quiet_hours(kg uuid, p_at timestamptz default now()) returns boolean
+  language plpgsql stable security definer set search_path = public as $$
+begin
+  if auth.uid() is not null and not public.is_member(kg) then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  return public.chat_quiet_at(kg, p_at);
+end $$;
 revoke execute on function public.kg_in_quiet_hours(uuid, timestamptz) from public, anon;
 grant execute on function public.kg_in_quiet_hours(uuid, timestamptz) to authenticated, service_role;
 
--- Should a "new message" notification from `p_author` to `p_recipient` be suppressed at `p_at`?
--- Only messages written from the parent side to staff during quiet hours (they wait for the morning).
+-- Should push delivery of a "new message" notification from `p_author` to `p_recipient` wait for the
+-- morning? Only messages written from the parent side to staff during quiet hours.
 create or replace function public.chat_quiet_suppressed(p_chat uuid, p_author uuid, p_recipient uuid, p_at timestamptz default now()) returns boolean
   language sql stable security definer set search_path = public as $$
   select not public.chat_staff_side(p_chat, p_author)
      and public.chat_staff_side(p_chat, p_recipient)
-     and public.kg_in_quiet_hours((select kindergarten_id from chats where id = p_chat), p_at)
+     and public.chat_quiet_at((select kindergarten_id from chats where id = p_chat), p_at)
 $$;
 revoke execute on function public.chat_quiet_suppressed(uuid, uuid, uuid, timestamptz) from public, anon, authenticated;
 grant execute on function public.chat_quiet_suppressed(uuid, uuid, uuid, timestamptz) to service_role;
 
 -- Who gets an in-app notification about a new message (service role only):
 -- other current members, minus people who looked at the chat in the last minute (they are reading it),
--- minus people who already have an unread notification for this chat (one per chat, no spam),
--- minus staff during quiet hours when the author writes from the parent side.
-create or replace function public.chat_notify_targets(p_chat uuid, p_author uuid) returns setof uuid
+-- minus people who already have an unread notification for this chat (one per chat, no spam).
+-- `deliver_after`: staff receiving a message from the parent side during quiet hours still get the bell
+-- row at once, but its push waits until the quiet hours end (garden time zone).
+create or replace function public.chat_notify_targets(p_chat uuid, p_author uuid)
+  returns table (user_id uuid, deliver_after timestamptz)
   language sql stable security definer set search_path = public as $$
-  select u from public.chat_member_ids(p_chat) u
+  select u, case when public.chat_quiet_suppressed(p_chat, p_author, u, now())
+                 then public.chat_quiet_ends((select kindergarten_id from chats where id = p_chat), now()) end
+  from public.chat_member_ids(p_chat) u
   where u is distinct from p_author
     and not exists (select 1 from chat_reads r where r.chat_id = p_chat and r.user_id = u and r.last_read_at > now() - interval '1 minute')
     and not exists (select 1 from notifications n where n.user_id = u and n.type = 'message.new' and n.url = '/chats/' || p_chat::text and n.read_at is null)
-    and not public.chat_quiet_suppressed(p_chat, p_author, u, now())
 $$;
 revoke execute on function public.chat_notify_targets(uuid, uuid) from public, anon, authenticated;
 grant execute on function public.chat_notify_targets(uuid, uuid) to service_role;
@@ -303,6 +387,11 @@ begin
     if new.reply_to is not null and (select chat_id from messages where id = new.reply_to) is distinct from new.chat_id then
       raise exception 'hs:invalid';
     end if;
+    -- a reply cannot quote a message the author is not allowed to read
+    if new.reply_to is not null and auth.uid() is not null
+       and (select created_at from messages where id = new.reply_to) < public.chat_history_from(new.chat_id, auth.uid()) then
+      raise exception 'hs:invalid';
+    end if;
     if auth.uid() is not null then
       new.created_at := now();
       new.edited_at := null;
@@ -316,6 +405,10 @@ begin
     end if;
     if new.body is distinct from old.body and new.deleted_at is null then
       if length(trim(new.body)) = 0 then raise exception 'hs:invalid'; end if;
+      -- authors may fix a message only within 15 minutes of sending it
+      if auth.uid() is not null and old.created_at < now() - interval '15 minutes' then
+        raise exception 'hs:editExpired';
+      end if;
       new.edited_at := now();
     end if;
   end if;
@@ -349,7 +442,9 @@ create policy chats_update on public.chats for update to authenticated
   using (kind = 'group' and public.is_admin(kindergarten_id))
   with check (kind = 'group' and public.is_admin(kindergarten_id));
 
-create policy messages_select on public.messages for select to authenticated using (public.can_access_chat(chat_id));
+-- Parents see a group chat's messages from the day their child joined the group.
+create policy messages_select on public.messages for select to authenticated
+  using (public.can_access_chat(chat_id) and created_at >= public.chat_visible_from(chat_id));
 create policy messages_insert on public.messages for insert to authenticated
   with check (author_id = auth.uid() and public.can_write_chat(chat_id));
 revoke insert, update, delete on public.messages from authenticated;
@@ -360,7 +455,9 @@ create policy messages_update on public.messages for update to authenticated
   using (author_id = auth.uid() and deleted_at is null and public.can_write_chat(chat_id))
   with check (author_id = auth.uid() and deleted_at is null and public.can_write_chat(chat_id));
 
-create policy message_files_select on public.message_files for select to authenticated using (public.can_access_chat(chat_id));
+-- Live attachments of messages the user may read (the message subquery applies messages RLS).
+create policy message_files_select on public.message_files for select to authenticated
+  using (deleted_at is null and public.can_access_chat(chat_id) and exists (select 1 from messages x where x.id = message_id));
 -- rows are written by the send action with the service role, after its own permission check
 revoke insert, update, delete on public.message_files from authenticated;
 
@@ -413,7 +510,7 @@ revoke execute on function public.mark_chat_read(uuid) from public, anon;
 grant execute on function public.mark_chat_read(uuid) to authenticated;
 
 -- Soft delete: the author (any chat) or owner/head (group chats — moderation, audited).
--- Clears the text and removes the attachment rows; returns the storage paths for the caller to remove.
+-- Clears the text and soft-deletes the attachment rows; returns the storage paths for the caller to remove.
 create or replace function public.delete_chat_message(p_id uuid) returns setof text
   language plpgsql security definer set search_path = public as $$
 declare m messages; c chats; moderated boolean;
@@ -436,14 +533,15 @@ begin
     perform public.log_action(c.kindergarten_id, 'chat.message_delete', 'message', p_id::text,
       jsonb_build_object('chat_id', c.id, 'group_id', c.group_id, 'author_id', m.author_id, 'text', left(m.body, 200)));
   end if;
-  return query delete from message_files where message_id = p_id returning path;
+  return query update message_files set deleted_at = now() where message_id = p_id and deleted_at is null returning path;
 end $$;
 revoke execute on function public.delete_chat_message(uuid) from public, anon;
 grant execute on function public.delete_chat_message(uuid) to authenticated;
 
 -- Chats of the current user in a garden with the last message and the unread count.
--- Unread = live messages from others after the user's read marker (or, before the first read,
--- after the user joined the garden).
+-- Unread = live messages from others after the user's read marker and after the user joined the chat
+-- (chat_member_since: a parent from the day the child joined the group, a teacher from their teacher
+-- membership). The last message honours the parents' history limit.
 create or replace function public.chat_list(p_kg uuid)
   returns table (
     id uuid, kind text, group_id uuid, group_name text, group_color text, group_sort int,
@@ -454,8 +552,9 @@ create or replace function public.chat_list(p_kg uuid)
   language sql stable security definer set search_path = public as $$
   with base as (
     select c.*, auth.uid() as uid,
-      coalesce((select r.last_read_at from chat_reads r where r.chat_id = c.id and r.user_id = auth.uid()),
-               (select min(m.created_at) from memberships m where m.user_id = auth.uid() and m.kindergarten_id = c.kindergarten_id)) as read_from
+      greatest((select r.last_read_at from chat_reads r where r.chat_id = c.id and r.user_id = auth.uid()),
+               public.chat_member_since(c.id, auth.uid())) as read_from,
+      public.chat_history_from(c.id, auth.uid()) as visible_from
     from chats c
     where c.kindergarten_id = p_kg and public.is_member(p_kg)
       and (c.kind <> 'direct' or auth.uid() in (c.user_a, c.user_b))
@@ -467,14 +566,15 @@ create or replace function public.chat_list(p_kg uuid)
       order by array_position(array['owner','head','teacher','accountant','club_teacher','cook','parent'], m.role::text) limit 1),
     b.parents_can_write, public.chat_can_write_uid(b.id, b.uid),
     l.id, l.body, l.author_id, ap.full_name, l.created_at, l.deleted_at is not null,
-    (select f.kind from message_files f where f.message_id = l.id order by f.created_at limit 1),
+    (select f.kind from message_files f where f.message_id = l.id and f.deleted_at is null order by f.created_at limit 1),
     (select count(*)::int from messages x
-      where x.chat_id = b.id and x.deleted_at is null and x.author_id is distinct from b.uid and x.created_at > b.read_from),
+      where x.chat_id = b.id and x.deleted_at is null and x.author_id is distinct from b.uid
+        and x.created_at > b.read_from and x.created_at >= b.visible_from),
     b.created_at
   from base b
   left join groups g on g.id = b.group_id
   left join profiles o on b.kind = 'direct' and o.id = case when b.user_a = b.uid then b.user_b else b.user_a end
-  left join lateral (select * from messages x where x.chat_id = b.id order by x.created_at desc limit 1) l on true
+  left join lateral (select * from messages x where x.chat_id = b.id and x.created_at >= b.visible_from order by x.created_at desc limit 1) l on true
   left join profiles ap on ap.id = l.author_id
 $$;
 revoke execute on function public.chat_list(uuid) from public, anon;
@@ -498,7 +598,8 @@ create or replace function public.chat_participants(p_chat uuid)
   ids as (
     select u as uid from c, public.chat_member_ids(c.id) u
     union
-    select distinct x.author_id from c join messages x on x.chat_id = c.id where x.author_id is not null
+    select distinct x.author_id from c join messages x on x.chat_id = c.id
+    where x.author_id is not null and x.created_at >= public.chat_visible_from(c.id)
   )
   select p.id, p.full_name,
     case

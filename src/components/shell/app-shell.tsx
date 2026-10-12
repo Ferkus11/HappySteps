@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { AccountMenu, type ContextOption } from "./account-menu";
 import { LanguageSwitcher } from "./language-switcher";
 import { OfflineBanner } from "./offline-banner";
+import { useLiveUnreadChats } from "@/components/chats/live-unread";
 
 export interface ShellProps {
   nav: { all: NavItem[]; mobile: NavItem[]; more: NavItem[] };
@@ -58,6 +59,7 @@ export function AppShell(props: ShellProps) {
   const t = useTranslations("nav");
   const tc = useTranslations("common");
   const pathname = usePathname();
+  const unreadChats = useLiveUnreadChats(props.unreadChats, props.nav.all.some((i) => i.key === "chats"));
   const [moreOpen, setMoreOpen] = React.useState(false);
   const kgName = props.kindergarten?.name ?? tc("appName");
 
@@ -117,7 +119,7 @@ export function AppShell(props: ShellProps) {
               {props.nav.all.some((i) => i.key === "chats") ? (
                 <Link href="/chats" className="relative hidden size-11 place-items-center rounded-full text-muted hover:bg-surface-muted md:grid" aria-label={t("chats")}>
                   <MessageCircle className="size-5" />
-                  <CountDot n={props.unreadChats} />
+                  <CountDot n={unreadChats} />
                 </Link>
               ) : null}
               <Link href="/notifications" className="relative grid size-11 place-items-center rounded-full text-muted hover:bg-surface-muted" aria-label={tc("notifications")}>
@@ -151,7 +153,7 @@ export function AppShell(props: ShellProps) {
                 >
                   <span className="relative">
                     <Icon className="size-[22px]" aria-hidden />
-                    {item.key === "chats" ? <CountDot n={props.unreadChats} /> : null}
+                    {item.key === "chats" ? <CountDot n={unreadChats} /> : null}
                   </span>
                   <span className="max-w-full truncate px-1">{t(item.key)}</span>
                 </Link>

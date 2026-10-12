@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -28,6 +28,7 @@ import {
   deletedKind,
   localDay,
   mergeMessages,
+  withinEditWindow,
   type ChatFile,
   type ChatKind,
   type ChatMessage,
@@ -113,6 +114,12 @@ export function Conversation(p: ConversationProps) {
   const [editing, setEditing] = React.useState<ChatMessage | null>(null);
   const [toDelete, setToDelete] = React.useState<ChatMessage | null>(null);
   const [now] = React.useState(() => new Date());
+  // Edits are allowed for 15 minutes after sending: re-check the window every 30 s.
+  const [clock, setClock] = React.useState(() => Date.now());
+  React.useEffect(() => {
+    const id = setInterval(() => setClock(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
   const scroller = React.useRef<HTMLDivElement>(null);
   const stick = React.useRef(true);
   const peopleRef = React.useRef(people);
@@ -274,21 +281,6 @@ export function Conversation(p: ConversationProps) {
               }),
             );
             if (!found) void fetchMissing([f.message_id]);
-          },
-        )
-        .on(
-          "postgres_changes",
-          { event: "DELETE", schema: "public", table: "message_files" },
-          (e: Change) => {
-            const id = (e.old as { id?: string }).id;
-            if (id)
-              setMessages((s) =>
-                s.map((x) =>
-                  x.files.some((y) => y.id === id)
-                    ? { ...x, files: x.files.filter((y) => y.id !== id) }
-                    : x,
-                ),
-              );
           },
         )
         .on(
@@ -532,7 +524,12 @@ export function Conversation(p: ConversationProps) {
             : null
         }
         canReply={canWrite}
-        canEdit={m.author_id === p.me && canWrite && !local[m.id]}
+        canEdit={
+          m.author_id === p.me &&
+          canWrite &&
+          !local[m.id] &&
+          withinEditWindow(m.created_at, clock)
+        }
         canDelete={
           !local[m.id] &&
           (m.author_id === p.me || (p.moderator && p.chat.kind === "group"))
@@ -754,12 +751,6 @@ function ModerationMenu({
   );
 }
 
-function fileSize(n: number) {
-  return n >= 1024 * 1024
-    ? `${(n / 1024 / 1024).toFixed(1)} МБ`
-    : `${Math.max(1, Math.round(n / 1024))} КБ`;
-}
-
 function Bubble({
   m,
   mine,
@@ -799,6 +790,20 @@ function Bubble({
 }) {
   const t = useTranslations("chats");
   const tr = useTranslations("roles");
+  const fmt = useFormatter();
+  const fileSize = (bytes: number) =>
+    bytes >= 1024 * 1024
+      ? fmt.number(bytes / 1024 / 1024, {
+          style: "unit",
+          unit: "megabyte",
+          unitDisplay: "short",
+          maximumFractionDigits: 1,
+        })
+      : fmt.number(Math.max(1, Math.round(bytes / 1024)), {
+          style: "unit",
+          unit: "kilobyte",
+          unitDisplay: "short",
+        });
   const del = deletedKind(m);
   const menu = del === "none" && !local && (canReply || canEdit || canDelete);
   const staffRole = role && role !== "parent" ? tr(role) : null;
@@ -956,13 +961,16 @@ function Bubble({
           {menu ? (
             <Dropdown>
               <DropdownTrigger asChild>
+                {/* 44px hit area around a small visual circle */}
                 <button
                   type="button"
-                  className="absolute right-1 bottom-1 grid size-7 cursor-pointer place-items-center rounded-full text-faint opacity-60 hover:bg-surface-muted hover:text-text group-hover:opacity-100 pointer-coarse:opacity-100"
+                  className="group/menu absolute -right-1 -bottom-1 grid size-11 cursor-pointer place-items-center rounded-full text-faint opacity-60 group-hover:opacity-100 hover:text-text pointer-coarse:opacity-100"
                   aria-label={t("messageActions")}
                   data-testid="message-menu"
                 >
-                  <ChevronDown className="size-4" />
+                  <span className="grid size-7 place-items-center rounded-full group-hover/menu:bg-surface-muted">
+                    <ChevronDown className="size-4" />
+                  </span>
                 </button>
               </DropdownTrigger>
               <DropdownContent align={mine ? "end" : "start"}>
@@ -993,7 +1001,7 @@ function Bubble({
           <button
             type="button"
             onClick={onRetry}
-            className="mt-1 inline-flex min-h-9 cursor-pointer items-center gap-1 px-2 text-xs font-semibold text-danger"
+            className="mt-1 inline-flex min-h-11 cursor-pointer items-center gap-1 px-2 text-xs font-semibold text-danger"
             data-testid="message-retry"
           >
             <RotateCcw className="size-3.5" aria-hidden /> {t("notSent")}

@@ -8,8 +8,9 @@ import { audit } from "@/lib/audit";
 import { notify } from "@/lib/notify";
 import { createServiceClient } from "@/lib/supabase/service";
 import { zUuid } from "@/lib/validation";
+import { sniffMime } from "@/lib/documents-logic";
 import { CHAT_FILE_MAX, CHAT_FILE_TYPES, CHAT_TEXT_MAX, type ChatMessage, type ChatPerson, type ChatSummary } from "@/lib/chats-logic";
-import { MESSAGE_COLUMNS, loadChatList, loadMessages, loadParticipants, loadQuotes, toMessage } from "@/lib/chats";
+import { MESSAGE_COLUMNS, loadChatList, loadMessages, loadParticipants, loadQuotes, toMessage, unreadTotal } from "@/lib/chats";
 
 const BUCKET = "chat-files";
 
@@ -40,10 +41,13 @@ export async function sendMessageAction(form: FormData) {
     const hasFile = file instanceof File && file.size > 0;
     if (!body && !hasFile) throw new ActionError("invalid");
     let ext: string | undefined;
+    let mime: string | null = null;
     if (hasFile) {
       if (file.size > CHAT_FILE_MAX) throw new ActionError("fileTooLarge");
-      ext = CHAT_FILE_TYPES[file.type];
-      if (!ext) throw new ActionError("fileType");
+      // Trust the bytes, not the browser's `file.type` (HEIC is converted to JPEG in the browser).
+      mime = sniffMime(new Uint8Array(await file.slice(0, 16).arrayBuffer()));
+      ext = mime ? CHAT_FILE_TYPES[mime] : undefined;
+      if (!mime || !ext) throw new ActionError("fileType");
     }
     const { data: chat } = await supabase.from("chats").select("id, kind, kindergarten_id, groups(name)").eq("id", v.chatId).eq("kindergarten_id", ctx.kg.id).maybeSingle();
     if (!chat) throw new ActionError("forbidden");
@@ -54,7 +58,7 @@ export async function sendMessageAction(form: FormData) {
     let path: string | null = null;
     if (hasFile) {
       path = `${ctx.kg.id}/${v.chatId}/${randomUUID()}.${ext}`;
-      const up = await service.storage.from(BUCKET).upload(path, file, { contentType: file.type });
+      const up = await service.storage.from(BUCKET).upload(path, file, { contentType: mime ?? undefined });
       if (up.error) throw new ActionError("generic");
     }
     const ins = await supabase
@@ -80,7 +84,7 @@ export async function sendMessageAction(form: FormData) {
         kind: ext === "pdf" ? "pdf" : "photo",
         path,
         name: (file.name || `file.${ext}`).slice(0, 200),
-        mime: file.type,
+        mime,
         size: file.size,
       });
       if (f.error) {
@@ -92,18 +96,27 @@ export async function sendMessageAction(form: FormData) {
     const { data: row } = await supabase.from("messages").select(MESSAGE_COLUMNS).eq("id", v.id).single();
     const message = toMessage(row as never);
 
+    // Staff written to from the parent side during quiet hours get the bell row now, the push in the morning.
     const { data: targets } = await service.rpc("chat_notify_targets", { p_chat: v.chatId, p_author: ctx.userId });
     const groupName = (chat as unknown as { groups: { name: string } | null }).groups?.name;
-    await notify({
-      kindergartenId: ctx.kg.id,
-      userIds: ((targets ?? []) as string[]).filter((u) => u !== ctx.userId),
-      type: "message.new",
-      params: {
-        from: groupName ? `${ctx.profile.full_name} · ${groupName}` : ctx.profile.full_name,
-        text: preview(body || (hasFile ? (file as File).name : "")),
-      },
-      url: `/chats/${v.chatId}`,
-    });
+    const byDelivery = new Map<string | null, string[]>();
+    for (const t of (targets ?? []) as { user_id: string; deliver_after: string | null }[]) {
+      if (t.user_id === ctx.userId) continue;
+      byDelivery.set(t.deliver_after, [...(byDelivery.get(t.deliver_after) ?? []), t.user_id]);
+    }
+    for (const [deliverAfter, userIds] of byDelivery) {
+      await notify({
+        kindergartenId: ctx.kg.id,
+        userIds,
+        type: "message.new",
+        params: {
+          from: groupName ? `${ctx.profile.full_name} · ${groupName}` : ctx.profile.full_name,
+          text: preview(body || (hasFile ? (file as File).name : "")),
+        },
+        url: `/chats/${v.chatId}`,
+        deliverAfter,
+      });
+    }
     return message;
   });
 }
@@ -170,6 +183,11 @@ export async function chatContactsAction() {
 
 export async function chatListAction() {
   return kgAction(null, async (ctx, supabase): Promise<ChatSummary[]> => loadChatList(supabase, ctx));
+}
+
+/** Header badge refresh (live, see components/chats/live-unread.ts). */
+export async function unreadTotalAction() {
+  return kgAction(null, async (ctx, supabase): Promise<number> => unreadTotal(supabase, ctx));
 }
 
 export async function olderMessagesAction(chatId: string, before: string) {
