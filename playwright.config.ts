@@ -20,8 +20,8 @@ export default defineConfig({
     launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : undefined,
   },
   projects: [
-    { name: "e2e", testMatch: "e2e/**/*.spec.ts", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } },
-    { name: "screens", testMatch: "screens/**/*.spec.ts", use: { ...devices["Desktop Chrome"] } },
+    { name: "e2e", testMatch: "e2e/**/*.spec.ts", use: { ...devices["Desktop Chrome"], locale: "ru-RU", viewport: { width: 1440, height: 900 } } },
+    { name: "screens", testMatch: "screens/**/*.spec.ts", use: { ...devices["Desktop Chrome"], locale: "ru-RU" } },
   ],
   webServer: {
     command: `scripts/serve-standalone.sh ${PORT}`,

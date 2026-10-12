@@ -63,6 +63,12 @@ const SAME_IN_BOTH = new Set([
   "common.account",
   "common.export",
   "common.profile",
+  "admin.plan",
+  "children.photo",
+  "settings.logo",
+  "settings.iban",
+  "settings.bank",
+  "profile.title",
   "roles.accountant",
 ]);
 

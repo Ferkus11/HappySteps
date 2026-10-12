@@ -53,3 +53,22 @@ export async function rejects(c: PoolClient, sql: string, params: unknown[] = []
     return true;
   }
 }
+
+/** Transaction (rolled back) where setup runs as superuser, then `become` switches to a user. */
+export async function inTx<T>(fn: (c: PoolClient, become: (userId: string | null) => Promise<void>) => Promise<T>): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    const become = async (userId: string | null) => {
+      await client.query("reset role");
+      await client.query("select set_config('request.jwt.claims', $1, true)", [
+        JSON.stringify(userId ? { sub: userId, role: "authenticated" } : { role: "anon" }),
+      ]);
+      await client.query(userId ? "set local role authenticated" : "set local role anon");
+    };
+    return await fn(client, become);
+  } finally {
+    await client.query("rollback").catch(() => {});
+    client.release();
+  }
+}

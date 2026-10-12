@@ -1,4 +1,6 @@
 import { getTranslations } from "next-intl/server";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/card";
 import { LoginForm } from "./login-form";
 
@@ -8,6 +10,9 @@ export async function generateMetadata() {
 }
 
 export default async function LoginPage() {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  if (data.user) redirect("/");
   const t = await getTranslations("auth");
   return (
     <Card className="p-6 md:p-8">
