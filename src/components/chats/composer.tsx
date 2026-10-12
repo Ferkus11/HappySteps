@@ -21,25 +21,12 @@ import {
   CHAT_TEXT_MAX,
   type ChatMessage,
 } from "@/lib/chats-logic";
+import { prepareDocumentFile } from "@/lib/heic";
 
 export interface Draft {
   body: string;
   file: File | null;
   replyTo: ChatMessage | null;
-}
-
-const isHeic = (f: File) =>
-  /image\/hei[cf]/.test(f.type) || /\.(heic|heif)$/i.test(f.name);
-
-/** HEIC photos from iPhones are converted to JPEG in the browser (no server-side codec needed). */
-async function normalize(f: File): Promise<File> {
-  if (!isHeic(f)) return f;
-  const { default: heic2any } = await import("heic2any");
-  const out = await heic2any({ blob: f, toType: "image/jpeg", quality: 0.85 });
-  const blob = Array.isArray(out) ? out[0] : out;
-  return new File([blob], f.name.replace(/\.(heic|heif)$/i, "") + ".jpg", {
-    type: "image/jpeg",
-  });
 }
 
 export function Composer({
@@ -81,7 +68,8 @@ export function Composer({
     if (input.current) input.current.value = "";
     if (!f) return;
     try {
-      const n = await normalize(f);
+      // HEIC photos from iPhones are converted to JPEG in the browser (shared with documents)
+      const n = await prepareDocumentFile(f);
       if (!CHAT_FILE_TYPES[n.type]) return toast.error(te("fileType"));
       if (n.size > CHAT_FILE_MAX) return toast.error(te("fileTooLarge"));
       setFile(n);
@@ -164,7 +152,7 @@ export function Composer({
           <button
             type="button"
             onClick={() => setFile(null)}
-            className="grid size-8 cursor-pointer place-items-center rounded-full text-muted hover:bg-surface"
+            className="-my-1 -mr-2 grid size-11 shrink-0 cursor-pointer place-items-center rounded-full text-muted hover:bg-surface"
             aria-label={t("removeFile")}
           >
             <X className="size-4" />
@@ -259,7 +247,7 @@ function ContextBar({
       <button
         type="button"
         onClick={onClose}
-        className="grid size-9 cursor-pointer place-items-center rounded-full text-muted hover:bg-surface"
+        className="-my-1.5 grid size-11 shrink-0 cursor-pointer place-items-center rounded-full text-muted hover:bg-surface"
         aria-label={tc("cancel")}
       >
         <X className="size-4" />

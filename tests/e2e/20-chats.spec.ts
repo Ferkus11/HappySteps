@@ -248,6 +248,85 @@ test("direct chat parent ↔ teacher with «прочитано»", async ({ brow
   await teacher.context().close();
 });
 
+test("late joiner: a parent sees the group chat from the day the child joined it; staff see all", async ({ browser }) => {
+  const old = say("Сообщение до прихода Айлин");
+  const teacherId = (await one("select id from profiles where phone = $1", [PHONES.teacher])).id;
+  await db.query("insert into messages (kindergarten_id, chat_id, author_id, body, created_at) values ($1, $2, $3, $4, now() - interval '5 days')", [kgA, sun, teacherId, old]);
+  const child = (await one("select id from children where kindergarten_id = $1 and full_name like 'Касымова Айлин%'", [kgA])).id;
+  const hist = await one("select id, from_date::text as from_date from child_group_history where child_id = $1 and to_date is null", [child]);
+  await db.query("update child_group_history set from_date = current_date - 1 where id = $1", [hist.id]);
+  try {
+    const p2 = await as(browser, PARENT2.phone);
+    await openSun(p2);
+    await expect(bubble(p2, "Все на месте, завтракаем")).toBeVisible();
+    await expect(bubble(p2, old)).toHaveCount(0);
+    const parent = await as(browser, PHONES.parent);
+    await openSun(parent);
+    await expect(bubble(parent, old)).toBeVisible();
+    await p2.context().close();
+    await parent.context().close();
+  } finally {
+    await db.query("update child_group_history set from_date = $2::date where id = $1", [hist.id, hist.from_date]);
+  }
+});
+
+test("quiet hours: the parent is warned, staff get the bell now and the push in the morning", async ({ browser }) => {
+  const prev = await one("select quiet_hours_start::text as s, quiet_hours_end::text as e from kindergarten_settings where kindergarten_id = $1", [kgA]);
+  await db.query("update kindergarten_settings set quiet_hours_start = '00:00', quiet_hours_end = '23:59' where kindergarten_id = $1", [kgA]);
+  await db.query("delete from notifications where url = $1", [`/chats/${sun}`]);
+  await db.query("update chat_reads set last_read_at = now() - interval '1 hour' where chat_id = $1", [sun]);
+  try {
+    const parent = await as(browser, PHONES.parent);
+    await openSun(parent);
+    await expect(parent.getByTestId("quiet-hint")).toContainText("Сотрудники получат сообщение утром");
+    await send(parent, say("Вопрос поздним вечером"));
+    const rows = async () =>
+      (await db.query("select p.phone, n.deliver_after from notifications n join profiles p on p.id = n.user_id where n.url = $1", [`/chats/${sun}`])).rows as {
+        phone: string;
+        deliver_after: Date | null;
+      }[];
+    await expect.poll(async () => (await rows()).length).toBeGreaterThanOrEqual(3);
+    const byPhone = Object.fromEntries((await rows()).map((r) => [r.phone, r.deliver_after]));
+    for (const staff of [PHONES.teacher, PHONES.head, PHONES.owner]) {
+      expect(byPhone[staff], staff).toBeInstanceOf(Date);
+      expect(byPhone[staff]!.getTime(), staff).toBeGreaterThan(Date.now());
+    }
+    expect(byPhone[PARENT2.phone]).toBeNull();
+    await parent.context().close();
+  } finally {
+    await db.query("update kindergarten_settings set quiet_hours_start = $2::time, quiet_hours_end = $3::time where kindergarten_id = $1", [kgA, prev.s, prev.e]);
+    await db.query("delete from notifications where url = $1", [`/chats/${sun}`]);
+  }
+});
+
+test("a message can be edited only within 15 minutes of sending; edited ones are marked «изменено»", async ({ browser }) => {
+  const parentId = (await one("select id from profiles where phone = $1", [PHONES.parent])).id;
+  const old = say("Отправлено давно");
+  await db.query("insert into messages (kindergarten_id, chat_id, author_id, body, created_at) values ($1, $2, $3, $4, now() - interval '20 minutes')", [kgA, sun, parentId, old]);
+  const parent = await as(browser, PHONES.parent);
+  await openSun(parent);
+  await bubble(parent, old).hover();
+  await bubble(parent, old).getByTestId("message-menu").click();
+  await expect(parent.getByTestId("message-reply")).toBeVisible();
+  await expect(parent.getByTestId("message-edit")).toHaveCount(0);
+  await parent.keyboard.press("Escape");
+  const fresh = say("Опечатка в сообщении");
+  await send(parent, fresh);
+  await bubble(parent, fresh).hover();
+  await bubble(parent, fresh).getByTestId("message-menu").click();
+  await parent.getByTestId("message-edit").click();
+  const fixed = say("Исправленное сообщение");
+  await parent.getByTestId("composer-input").fill(fixed);
+  await parent.getByTestId("composer-send").click();
+  await expect(bubble(parent, fixed)).toContainText("изменено");
+  // the server refuses to change the old one
+  const c = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });
+  await c.auth.signInWithPassword({ email: `${PHONES.parent.replace(/\D/g, "")}@${process.env.AUTH_EMAIL_DOMAIN ?? "users.happysteps.local"}`, password: "Test1234!" });
+  const r = await c.from("messages").update({ body: say("Поздняя правка") }).eq("body", old).select("id");
+  expect(r.error?.message ?? "").toContain("hs:editExpired");
+  await parent.context().close();
+});
+
 test("garden B sees nothing of garden A", async ({ page }) => {
   await login(page, PHONES.parentB);
   await page.goto("/chats");

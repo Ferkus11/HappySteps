@@ -107,6 +107,14 @@ export function mergeMessages(...lists: ChatMessage[][]): ChatMessage[] {
   return [...map.values()].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at) || a.id.localeCompare(b.id));
 }
 
+/** Authors may edit a message for this long after sending it (enforced in SQL, tg_message_guard). */
+export const CHAT_EDIT_WINDOW_MS = 15 * 60_000;
+
+/** Is the message still editable at `nowMs`? (a little margin so a save started in time still passes) */
+export function withinEditWindow(createdAt: string, nowMs: number): boolean {
+  return nowMs - Date.parse(createdAt) < CHAT_EDIT_WINDOW_MS - 30_000;
+}
+
 /** Shown instead of a removed message: by the author or by the administration (moderation). */
 export function deletedKind(m: Pick<ChatMessage, "deleted_at" | "deleted_by" | "author_id">): "none" | "self" | "admin" {
   if (!m.deleted_at) return "none";
