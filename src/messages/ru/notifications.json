@@ -7,7 +7,7 @@
     "announcement.new": { "title": "Новое объявление", "body": "{title}" },
     "announcement.reminder": { "title": "Напоминание об объявлении", "body": "Прочитайте, пожалуйста: {title}" },
     "event.reminder": { "title": "Завтра: {title}", "body": "{date} {time} · {place}" },
-    "absence.reported": { "title": "{child} не придёт", "body": "{reason}, {period}" },
+    "absence.reported": { "title": "{child} не придёт", "body": "{reason, select, sick {Болеет} vacation {Отпуск} family {Семейные обстоятельства} other {Другая причина}}: {period}" },
     "attendance.not_marked": { "title": "Посещаемость не отмечена", "body": "Группа «{group}» ещё не отмечена сегодня" },
     "receipt.new": { "title": "Новый чек на проверку", "body": "{child}: {amount}" },
     "receipt.accepted": { "title": "Оплата подтверждена", "body": "{month}: {amount}" },

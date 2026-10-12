@@ -5,6 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ensureKindergarten, ensureMembership, ensureUser, must } from "./lib";
 import { seedMenu } from "./e2e-menu";
+import { seedAttendance } from "./e2e-attendance";
 
 export const E2E_PASSWORD = "Test1234!";
 
@@ -98,5 +99,6 @@ export async function seedE2E(db: SupabaseClient) {
 
   await seedMenu(db, { A });
 
+  await seedAttendance(db, { A });
   return { users: u, kindergartens: { A, B }, groups: { gA1, gA2, gB1 } };
 }

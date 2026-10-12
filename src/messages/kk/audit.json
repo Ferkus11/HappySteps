@@ -40,6 +40,7 @@
     "worktime.absence": "Қызметкердің болмауы белгіленді",
     "worktime.auto_close": "Күн автоматты түрде жабылды",
     "attendance.edit_past": "Өткен күндердің келу есебін түзету",
+    "attendance.absence_cancel": "Ата-ана хабарлаған келмеу болдырылмады",
     "holidays.update": "Демалыс және мереке күндері өзгертілді",
     "announcement.delete": "Хабарландыру жойылды",
     "invoice.adjust": "Шот сомасы өзгертілді",
