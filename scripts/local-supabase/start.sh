@@ -95,6 +95,7 @@ apply_migrations() {
       $PSQL -d "$DB_NAME" -c "insert into supabase_migrations.schema_migrations(version, name) values ('$version', '$base')"
     fi
   done
+  $PSQL -d "$DB_NAME" -f "$ROOT/scripts/local-supabase/realtime-local.sql" >/dev/null
   $PSQL -d "$DB_NAME" -c "notify pgrst, 'reload schema'" >/dev/null
 }
 

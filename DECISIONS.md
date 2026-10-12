@@ -69,3 +69,11 @@ Playwright запускает standalone-сборку (`scripts/serve-standalone
 
 ## D-015. Бизнес-ошибки из SQL
 Функции и триггеры модулей бросают `raise exception 'hs:<ключ>'`; сервер показывает перевод ключа из `errors.json`.
+
+## D-016. Локальная эмуляция Realtime
+Docker-образ Supabase Realtime недоступен, поэтому шлюз локального стека эмулирует протокол Phoenix для
+`postgres_changes` (`scripts/local-supabase/realtime.mjs`). Для таблиц из публикации `supabase_realtime`
+создаются локальные триггеры с `NOTIFY` (только в локальном стеке; в облаке/self-hosted работает настоящий Realtime по WAL).
+Каждый подписчик перечитывает строку от своего имени — RLS решает, кому доставить, как и в Supabase.
+Как и в Supabase, DELETE-события содержат только первичный ключ и не фильтруются RLS — поэтому модули
+используют мягкое удаление (`deleted_at`). Broadcast и Presence не эмулируются — приложение их не использует.
