@@ -1,0 +1,52 @@
+# DECISIONS
+
+Решения, которых нет в ТЗ или которые от него отступают. Формат: что решили → почему.
+
+## D-001. Рабочая копия и хранение репозитория
+К проекту не подключён GitHub. Код живёт в git-репозитории; после каждого этапа он синхронизируется
+в общую папку проекта `/mnt/project-files/happy-steps` (вместе с `.git`, без `node_modules`/`.next`).
+→ Работа сохраняется между сессиями; push/деплой — когда появится репозиторий и аккаунты.
+
+## D-002. Локальный Supabase без Docker
+В среде разработки недоступны Docker-образы (лимит реестров). Поэтому `scripts/local-supabase` поднимает
+системный Postgres 16 + официальные бинарники Supabase Auth (GoTrue v2.180) и PostgREST v12 + небольшой шлюз
+на `:54321` с эмуляцией Storage и Realtime. Код приложения не знает об этом — он ходит в «обычный» Supabase.
+С Docker используется штатный `supabase start` (`supabase/config.toml`), миграции те же.
+→ Эмуляция Storage/Realtime покрывает только то, что использует приложение; на проде — настоящий Supabase.
+
+## D-003. Next.js 16 без cacheComponents
+`create-next-app` включает `cacheComponents`. Приложение почти целиком персональное (cookies, RLS),
+поэтому оставлен классический динамический рендеринг. `output: "standalone"` — для Docker-образа.
+
+## D-004. Вход по телефону через технический e-mail
+Phone-провайдер Supabase Auth в облаке требует подключить SMS-провайдера. ТЗ это допускает (§4):
+пользователь создаётся через admin API с e-mail `<цифры телефона>@<AUTH_EMAIL_DOMAIN>` и `email_confirm: true`,
+вход — `signInWithPassword({ email, password })`. Пользователь видит только телефон; телефон хранится в `profiles.phone` (уникален).
+
+## D-005. Ограничение частоты входа
+Собственная таблица `login_attempts`: не больше 5 неудачных попыток на номер (и 25 на IP) за 15 минут.
+Проверка в server action до обращения к Auth. Встроенные лимиты GoTrue остаются вторым рубежом.
+
+## D-006. Компоненты в стиле shadcn/ui написаны вручную
+Реестр shadcn недоступен из среды. Компоненты (`src/components/ui`) написаны в той же манере поверх `radix-ui`,
+`class-variance-authority`, `tailwind-merge` — их так же можно менять как свой код.
+
+## D-007. Шрифт Manrope self-hosted
+`@fontsource-variable/manrope` (подмножества cyrillic + cyrillic-ext, все казахские буквы).
+Без Google Fonts — сборка и работа не зависят от внешних CDN (важно для self-hosted в РК).
+
+## D-008. i18n без префикса языка в URL
+Язык в cookie `hs_locale` и в `profiles.locale`; переключение — server action + `router.refresh()`,
+без перезагрузки страницы. Переводы разбиты по модулям: `src/messages/<locale>/<namespace>.json`.
+Тест проверяет одинаковый набор ключей, валидный ICU и отсутствие нетронутых русских строк в kk.
+
+## D-009. Версии инструментов
+TypeScript 5.9 (Next 16 официально поддерживает 5.x; TS 7 — новая нативная реализация, не рискуем),
+Playwright 1.56.1 (совпадает с предустановленным Chromium), @types/node 22 (под Node 22).
+
+## D-010. RLS-тесты на Vitest + pg
+Вместо pgTAP: тесты выполняют SQL в транзакции с `set local role authenticated` и `request.jwt.claims` —
+ровно как PostgREST. Транзакция всегда откатывается. Отдельный тест проверяет, что RLS включён на всех таблицах `public`.
+
+## D-011. E2E на production-сборке
+Playwright запускает standalone-сборку (`scripts/serve-standalone.sh`) — тот же артефакт, что в Docker-образе.

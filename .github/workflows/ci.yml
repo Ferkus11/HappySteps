@@ -1,0 +1,32 @@
+name: CI
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install Postgres 16
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-16
+          sudo pg_ctlcluster 16 main start
+          sudo -u postgres psql -c "alter user postgres password 'postgres'"
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Start local Supabase (Postgres + GoTrue + PostgREST + gateway)
+        run: npm run db:reset > stack.log 2>&1 && cat stack.log
+      - run: npm run db:seed -- --e2e
+      - run: npm run verify
+        env:
+          CI: "true"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results

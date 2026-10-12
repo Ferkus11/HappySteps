@@ -1,0 +1,46 @@
+import {
+  BarChart3,
+  Baby,
+  Bell,
+  Building2,
+  CalendarDays,
+  ClipboardCheck,
+  Clock,
+  FileText,
+  History,
+  Home,
+  ListOrdered,
+  Megaphone,
+  MessageCircle,
+  Palette,
+  Settings,
+  UsersRound,
+  UtensilsCrossed,
+  Wallet,
+  Contact,
+  type LucideIcon,
+} from "lucide-react";
+import type { NavKey } from "@/lib/nav";
+
+export const navIcons: Record<NavKey, LucideIcon> = {
+  dashboard: Home,
+  children: Baby,
+  groups: UsersRound,
+  staff: Contact,
+  worktime: Clock,
+  attendance: ClipboardCheck,
+  menu: UtensilsCrossed,
+  announcements: Megaphone,
+  events: CalendarDays,
+  chats: MessageCircle,
+  documents: FileText,
+  payments: Wallet,
+  clubs: Palette,
+  waitlist: ListOrdered,
+  analytics: BarChart3,
+  audit: History,
+  settings: Settings,
+  admin: Building2,
+};
+
+export { Bell };

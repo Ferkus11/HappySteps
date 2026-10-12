@@ -1,0 +1,22 @@
+{
+  "dashboard": "Главная",
+  "children": "Дети",
+  "groups": "Группы",
+  "staff": "Сотрудники",
+  "worktime": "Рабочее время",
+  "attendance": "Посещаемость",
+  "menu": "Меню",
+  "announcements": "Объявления",
+  "events": "События",
+  "chats": "Чаты",
+  "documents": "Документы",
+  "payments": "Оплата",
+  "clubs": "Кружки",
+  "waitlist": "Лист ожидания",
+  "analytics": "Аналитика",
+  "audit": "Журнал действий",
+  "settings": "Настройки сада",
+  "admin": "Сады платформы",
+  "more": "Ещё",
+  "mainNavigation": "Основное меню"
+}
