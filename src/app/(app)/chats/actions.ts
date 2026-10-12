@@ -199,6 +199,15 @@ export async function olderMessagesAction(chatId: string, before: string) {
   });
 }
 
+/** The newest page — the conversation catches up with it once its realtime channel has joined. */
+export async function latestMessagesAction(chatId: string) {
+  return kgAction(null, async (_ctx, supabase): Promise<{ messages: ChatMessage[]; quotes: ChatMessage[] }> => {
+    zUuid.parse(chatId);
+    const page = await loadMessages(supabase, chatId);
+    return { messages: page.messages, quotes: await loadQuotes(supabase, page.messages) };
+  });
+}
+
 /** Messages by id (a realtime event arrived; re-read with files under RLS). */
 export async function messagesByIdAction(ids: string[]) {
   return kgAction(null, async (_ctx, supabase): Promise<ChatMessage[]> => {

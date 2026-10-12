@@ -14,7 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/ui/empty-state";
-import { subscribeAuthed } from "./realtime";
+import { subscribeAuthed, uniqueTopic } from "./realtime";
 import { localDay, sortChats, type ChatSummary } from "@/lib/chats-logic";
 import { formatTime } from "@/lib/format";
 import { chatListAction } from "@/app/(app)/chats/actions";
@@ -75,7 +75,7 @@ export function ChatsFrame({
     };
     const unsubscribe = subscribeAuthed((supabase) =>
       supabase
-        .channel(`chat-list-${userId}`)
+        .channel(uniqueTopic(`chat-list-${userId}`))
         .on(
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "messages" },

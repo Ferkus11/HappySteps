@@ -374,7 +374,7 @@ describe("chats · unread counters", () => {
       await become(F.users.parent);
       await c.query("select public.mark_chat_read($1)", [chat.sun]);
       await c.query("reset role");
-      await c.query("update chat_reads set last_read_at = now() - interval '1 hour' where chat_id = $1 and user_id = $2", [chat.sun, F.users.parent]);
+      await c.query("update chat_reads set last_read_at = now() - interval '1 millisecond' where chat_id = $1 and user_id = $2", [chat.sun, F.users.parent]);
       await c.query("insert into notifications (kindergarten_id, user_id, type, url) values ($1, $2, 'message.new', $3)", [F.A, F.users.parent, `/chats/${chat.sun}`]);
       await post(c, become, "teacher", chat.sun, "Раз");
       await post(c, become, "teacher", chat.sun, "Два");

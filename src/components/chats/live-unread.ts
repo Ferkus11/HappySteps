@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { unreadTotalAction } from "@/app/(app)/chats/actions";
-import { subscribeAuthed } from "./realtime";
+import { subscribeAuthed, uniqueTopic } from "./realtime";
 
 /**
  * Keeps the header «Чаты» badge live: the server value is adopted on every render that brings a new
@@ -24,7 +24,7 @@ export function useLiveUnreadChats(initial: number | undefined, enabled: boolean
     };
     const unsubscribe = subscribeAuthed((supabase) =>
       supabase
-        .channel("chats-unread-badge")
+        .channel(uniqueTopic("chats-unread-badge"))
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, reload)
         .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, reload)
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_reads" }, reload)

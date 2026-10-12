@@ -55,6 +55,7 @@ async function as(browser: Browser, phone: string): Promise<Page> {
 async function openSun(page: Page) {
   await page.goto(`/chats/${sun}`);
   await expect(page.getByTestId("chat-heading")).toHaveText("Солнышко");
+  await expect(page.getByTestId("conversation")).toHaveAttribute("data-live", "true");
 }
 
 async function send(page: Page, text: string) {

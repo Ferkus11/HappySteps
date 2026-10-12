@@ -48,6 +48,7 @@ import {
   deleteMessageAction,
   editMessageAction,
   markChatReadAction,
+  latestMessagesAction,
   messagesByIdAction,
   olderMessagesAction,
   participantsAction,
@@ -56,7 +57,7 @@ import {
 } from "@/app/(app)/chats/actions";
 import { ChatAvatar, useChatsFrame } from "./chats-frame";
 import { Composer, type Draft } from "./composer";
-import { subscribeAuthed } from "./realtime";
+import { subscribeAuthed, uniqueTopic } from "./realtime";
 
 export interface ConversationProps {
   chat: {
@@ -184,6 +185,7 @@ export function Conversation(p: ConversationProps) {
   }, [chatId]);
 
   // ── realtime ──
+  const [live, setLive] = React.useState(false);
   React.useEffect(() => {
     const fetchMissing = async (ids: string[]) => {
       const r = await messagesByIdAction(ids).catch(() => null);
@@ -203,7 +205,7 @@ export function Conversation(p: ConversationProps) {
     };
     return subscribeAuthed((supabase) =>
       supabase
-        .channel(`chat-${chatId}`)
+        .channel(uniqueTopic(`chat-${chatId}`))
         .on(
           "postgres_changes",
           {
@@ -311,6 +313,16 @@ export function Conversation(p: ConversationProps) {
               setParentsCanWrite(c.parents_can_write);
           },
         ),
+      // Joined (or re-joined after a drop): pick up whatever was written while the channel was not live.
+      async () => {
+        const r = await latestMessagesAction(chatId).catch(() => null);
+        if (r?.ok) {
+          setMessages((s) => mergeMessages(s, r.data.messages));
+          setQuotes((q) => ({ ...q, ...Object.fromEntries(r.data.quotes.map((x) => [x.id, x])) }));
+          for (const m of r.data.messages) void ensurePerson(m.author_id);
+        }
+        setLive(true);
+      },
     );
   }, [chatId, p.me, markRead]);
 
@@ -558,6 +570,7 @@ export function Conversation(p: ConversationProps) {
     <div
       className="fixed inset-0 z-50 flex flex-col bg-bg md:static md:z-auto md:h-full md:overflow-hidden md:rounded-card md:border md:border-border/70 md:bg-surface md:shadow-card"
       data-testid="conversation"
+      data-live={live ? "true" : undefined}
     >
       <header className="flex min-h-16 items-center gap-2 border-b border-border/70 bg-surface px-2 py-2 md:px-4">
         <Link
