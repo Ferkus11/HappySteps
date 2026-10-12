@@ -8,6 +8,7 @@ import { seedMenu } from "./e2e-menu";
 import { seedAttendance } from "./e2e-attendance";
 import { seedAnnouncements } from "./e2e-announcements";
 import { seedWorktime } from "./e2e-worktime";
+import { seedChats } from "./e2e-chats";
 
 export const E2E_PASSWORD = "Test1234!";
 
@@ -104,5 +105,6 @@ export async function seedE2E(db: SupabaseClient) {
   await seedAttendance(db, { A });
   await seedAnnouncements(db, { users: u, kindergartens: { A }, groups: { gA1, gA2 } });
   await seedWorktime(db, { users: u, kindergartens: { A, B } });
+  await seedChats(db, { users: u, kindergartens: { A, B }, groups: { gA1, gB1 } });
   return { users: u, kindergartens: { A, B }, groups: { gA1, gA2, gB1 } };
 }

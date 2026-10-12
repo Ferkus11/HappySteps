@@ -46,7 +46,7 @@
     "invoice.adjust": "Изменена сумма счёта",
     "receipt.confirm": "Чек подтверждён",
     "receipt.reject": "Чек отклонён",
-    "chat.message_delete": "Удалено сообщение",
+    "chat.message_delete": "Удалено сообщение в чате группы",
     "chat.lock": "Чат группы закрыт для родителей",
     "chat.unlock": "Чат группы открыт",
     "club.exclude": "Ребёнок исключён из кружка",

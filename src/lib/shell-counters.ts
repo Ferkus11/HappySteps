@@ -1,10 +1,12 @@
 import "server-only";
 import type { KgContext } from "@/lib/auth/context";
+import { createClient } from "@/lib/supabase/server";
+import { unreadTotal } from "@/lib/chats";
 
 /**
  * Header badges (unread chats, notifications). Modules register their counters here.
- * Stage 1: no chat/notification tables yet.
  */
-export async function getShellCounters(_ctx: KgContext): Promise<{ chats: number; notifications: number }> {
-  return { chats: 0, notifications: 0 };
+export async function getShellCounters(ctx: KgContext): Promise<{ chats: number; notifications: number }> {
+  const supabase = await createClient();
+  return { chats: await unreadTotal(supabase, ctx), notifications: 0 };
 }
