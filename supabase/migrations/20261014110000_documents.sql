@@ -132,6 +132,20 @@ grant execute on function public.staff_docs_can_upload(uuid, uuid) to authentica
 -- threshold 7 ("today" in the garden's time zone), the employee is still active staff, the garden is open,
 -- and that threshold was not sent yet for this expiry date. A document uploaded with ≤7 days left gets only
 -- the 7-day reminder; expired documents get none (the dashboard shows them).
+-- A staff document is superseded once the same person has a newer document of the same type
+-- (not "other") that expires later or never: the renewed copy retires the old one from reminders
+-- and from the "expiring" lists. Exposed to PostgREST as a computed column (`superseded`).
+create or replace function public.superseded(d public.staff_documents)
+  returns boolean language sql stable set search_path = public as $$
+  select d.type <> 'other' and exists (
+    select 1 from staff_documents n
+    where n.kindergarten_id = d.kindergarten_id and n.user_id = d.user_id and n.type = d.type
+      and n.id <> d.id and n.created_at > d.created_at
+      and (n.expires_on is null or d.expires_on is null or n.expires_on > d.expires_on))
+$$;
+revoke execute on function public.superseded(public.staff_documents) from public, anon;
+grant execute on function public.superseded(public.staff_documents) to authenticated, service_role;
+
 create or replace function public.document_expiry_due(p_now timestamptz default now())
   returns table (kindergarten_id uuid, document_id uuid, user_id uuid, person text, title text, doc_type text,
                  expires_on date, threshold int, days_left int)
@@ -142,6 +156,7 @@ create or replace function public.document_expiry_due(p_now timestamptz default 
     from staff_documents d
     left join kindergarten_settings s on s.kindergarten_id = d.kindergarten_id
     where d.expires_on is not null
+      and not public.superseded(d)
       and public.kg_is_open(d.kindergarten_id)
       and exists (select 1 from memberships m where m.user_id = d.user_id and m.kindergarten_id = d.kindergarten_id
                   and m.status = 'active' and m.role <> 'parent')

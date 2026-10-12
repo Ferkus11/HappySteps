@@ -80,7 +80,8 @@ type StaffRow = {
 
 /**
  * Staff documents visible to the current user (RLS: owner/head/accountant all, others own).
- * `expiringFrom` (today) keeps only documents expired or expiring within 30 days, soonest first.
+ * `expiringFrom` (today) keeps only documents expired or expiring within 30 days, soonest first,
+ * skipping copies a newer document of the same type has replaced (`superseded`).
  */
 export async function listStaffDocuments(
   supabase: SupabaseClient,
@@ -93,7 +94,7 @@ export async function listStaffDocuments(
     .eq("kindergarten_id", kgId);
   if (opts.userId) q = q.eq("user_id", opts.userId);
   if (opts.expiringFrom) {
-    q = q.not("expires_on", "is", null).lte("expires_on", addDays(opts.expiringFrom, EXPIRY_WINDOW_DAYS)).order("expires_on");
+    q = q.not("expires_on", "is", null).eq("superseded", false).lte("expires_on", addDays(opts.expiringFrom, EXPIRY_WINDOW_DAYS)).order("expires_on");
   } else {
     q = q.order("created_at", { ascending: false });
   }

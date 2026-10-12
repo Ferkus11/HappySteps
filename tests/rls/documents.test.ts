@@ -290,6 +290,28 @@ describe("documents · expiry reminders selection", () => {
     });
   });
 
+  it("a renewed document of the same type retires the old copy from reminders and the expiring list", async () => {
+    await inTx(async (c, become) => {
+      const today = (await c.query("select kg_today($1)::text as d", [F.A])).rows[0].d as string;
+      const old = await staffDoc(c, F.A, F.users.cook, F.users.head, today);
+      await c.query("update staff_documents set created_at = now() - interval '1 year' where id = $1", [old]);
+      const ids = async () => (await c.query("select document_id from document_expiry_due() where user_id = $1", [F.users.cook])).rows.map((r) => r.document_id);
+      expect(await ids()).toContain(old);
+      // an "other" document does not replace a med book
+      await c.query(
+        "insert into staff_documents (kindergarten_id, user_id, type, title, expires_on, path, mime, size) values ($1, $2, 'other', 'Справка', null, $3, 'image/jpeg', 100)",
+        [F.A, F.users.cook, `${F.A}/${F.users.cook}/${randomUUID()}.jpg`],
+      );
+      expect(await ids()).toContain(old);
+      const renewed = await staffDoc(c, F.A, F.users.cook, F.users.head, "2099-01-01");
+      expect(await ids()).not.toContain(old);
+      // the computed column is what the dashboard filters on, under the viewer's RLS
+      await become(F.users.head);
+      const r = await c.query("select id, superseded(d) as s from staff_documents d where id = any($1)", [[old, renewed]]);
+      expect(Object.fromEntries(r.rows.map((x) => [x.id, x.s]))).toEqual({ [old]: true, [renewed]: false });
+    });
+  });
+
   it("reminder bookkeeping is service-role only", async () => {
     await inTx(async (c, become) => {
       const id = await staffDoc(c, F.A, F.users.teacher, F.users.head, "2030-01-01");
