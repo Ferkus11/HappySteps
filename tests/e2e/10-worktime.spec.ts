@@ -35,13 +35,23 @@ async function tile(page: Page, name: "late" | "work" | "absent" | "unmarked") {
   return Number(await page.getByTestId(`tile-${name}`).first().innerText());
 }
 
+test.afterEach(async () => {
+  const { kg } = await ids();
+  await svc.from("kindergarten_settings").update({ late_threshold_minutes: 10 }).eq("kindergarten_id", kg);
+});
+
 test("scenario 2: a teacher starts the day late → head's tile «Опоздал» +1; finish and a second interval", async ({ page }) => {
   const { kg, teacher } = await ids();
   const d = today();
   // Deterministic setup: today the teacher's shift started an hour ago (threshold is 10 min).
   await svc.from("work_sessions").delete().eq("user_id", teacher).eq("kindergarten_id", kg).or(`work_date.eq.${d},ended_at.is.null`);
+  if (nowMinutes() === 0) await page.waitForTimeout(61_000);
   const now = nowMinutes();
   const start = Math.max(0, now - 60);
+  // Just after midnight the shift can't start an hour earlier: lower the late threshold for the run.
+  const nearMidnight = now - start <= 10;
+  if (nearMidnight) await svc.from("kindergarten_settings").update({ late_threshold_minutes: 0 }).eq("kindergarten_id", kg);
+  test.info().annotations.push({ type: "nearMidnight", description: String(nearMidnight) });
   const end = Math.min(23 * 60 + 59, Math.max(now + 240, start + 1));
   const { error } = await svc
     .from("schedule_overrides")
