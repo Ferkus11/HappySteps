@@ -11,6 +11,7 @@ import { ageOn, formatDate, formatMoney, todayIn } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { signedUrl } from "@/lib/kg-assets";
 import { ChildAttendanceCard } from "@/components/attendance/child-attendance-card";
+import { ChildPaymentCard } from "@/components/payments/child-card";
 import { ChildAdminActions, EditChild, GuardianRow, AddGuardian, PhotoUpload } from "./client";
 
 export default async function ChildPage({ params }: { params: Promise<{ id: string }> }) {
@@ -123,6 +124,7 @@ export default async function ChildPage({ params }: { params: Promise<{ id: stri
         </div>
         <div className="space-y-4">
           <ChildAttendanceCard ctx={ctx} child={child} />
+          <ChildPaymentCard ctx={ctx} childId={child.id} />
           <Card>
             <CardHeader title={t("parents")} action={isAdmin && child.status === "active" ? <AddGuardian childId={child.id} /> : null} />
             {guardians?.length ? (
