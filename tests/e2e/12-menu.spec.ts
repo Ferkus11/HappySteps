@@ -127,6 +127,10 @@ test("head switches a meal off in settings → it disappears from the editor and
   await expect(page.getByTestId("meal-switch-dinner")).toHaveAttribute("aria-checked", "false");
   await page.getByTestId("meal-switch-snack").click();
   await expect(page.getByTestId("meal-switch-snack")).toHaveAttribute("aria-checked", "true");
+  // The switches update optimistically — wait until both saves reached the database.
+  await expect
+    .poll(async () => (await service().from("kindergarten_settings").select("meals").eq("kindergarten_id", kgA).single()).data?.meals)
+    .toEqual(DEFAULT_MEALS);
   await page.goto(`/menu/edit?date=${TODAY}`);
   await expect(page.getByTestId("meal-section-snack")).toBeVisible();
   await expect(page.getByTestId("meal-section-dinner")).toHaveCount(0);
