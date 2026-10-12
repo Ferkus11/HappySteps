@@ -104,6 +104,14 @@ the foreground without redirection.
 - Full check: `npm run typecheck && npm run lint && npm test && npm run test:rls && npm run build && E2E_PORT=... npm run e2e`
   then `E2E_PORT=... npm run screens -- tests/screens/stage<N>-<module>.spec.ts`.
 
+## 5a. Lessons from earlier stages
+- Playwright file filters need `--project=screens` (with `=`); `npm run screens -- <file>` works.
+- Kill any old standalone server on your E2E port before re-running e2e after a rebuild (Playwright reuses it).
+- Tests must not assume other modules created no data (e.g. notifications) — assert on your own rows.
+- Kazakh screenshots: set cookie `hs_locale=kk` for the base URL before navigating.
+- Realtime delivers DELETE events without RLS (Supabase behaviour) — use soft delete (`deleted_at`) for anything users subscribe to.
+- Audit/notification label keys contain dots; look them up via `t.raw(...)` maps, not `t("a.b.c")`.
+
 ## 6. Registration points (expect trivial merge conflicts here — keep edits to one line each)
 - `src/messages/index.ts` — add your namespace.
 - `src/components/dashboard/widgets.tsx` — `...<module>Widgets` exported from
