@@ -12,6 +12,7 @@ import { seedDocuments } from "./e2e-documents";
 import { seedPayments } from "./e2e-payments";
 import { seedChats } from "./e2e-chats";
 import { seedWaitlist } from "./e2e-waitlist";
+import { seedClubs } from "./e2e-clubs";
 
 export const E2E_PASSWORD = "Test1234!";
 
@@ -112,5 +113,6 @@ export async function seedE2E(db: SupabaseClient) {
   await seedPayments(db, { users: u, kindergartens: { A } });
   await seedChats(db, { users: u, kindergartens: { A, B }, groups: { gA1, gB1 } });
   await seedWaitlist(db, { users: u, kindergartens: { A, B } });
+  await seedClubs(db, { users: u, kindergartens: { A } });
   return { users: u, kindergartens: { A, B }, groups: { gA1, gA2, gB1 } };
 }

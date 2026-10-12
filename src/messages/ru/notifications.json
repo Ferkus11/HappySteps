@@ -12,9 +12,9 @@
     "receipt.new": { "title": "Новый чек на проверку", "body": "{child}: {amount}" },
     "receipt.accepted": { "title": "Оплата подтверждена", "body": "{month}: {amount}" },
     "receipt.rejected": { "title": "Чек отклонён", "body": "{month}: {reason}. Загрузите чек заново." },
-    "club.request": { "title": "Заявка в кружок", "body": "{child} → {club}" },
+    "club.request": { "title": "{status, select, queued {Заявка в кружок — в очередь} other {Заявка в кружок}}", "body": "{child} → {club}" },
     "club.spot_free": { "title": "В кружке освободилось место", "body": "{club}: в очереди {count}" },
-    "club.decision": { "title": "Кружок «{club}»", "body": "{child}: {status}" },
+    "club.decision": { "title": "Кружок «{club}»", "body": "{child}: {status, select, active {записан, ждём на занятиях} queued {мест нет, ребёнок в очереди} rejected {заявка отклонена} excluded {исключён из кружка} closed {кружок закрыт} other {статус изменился}}" },
     "waitlist.new": { "title": "Новая заявка в лист ожидания", "body": "{child}, {parent}" },
     "document.expiring": { "title": "Истекает документ", "body": "{person}: {document} — до {date}" },
     "worktime.auto_closed": { "title": "Рабочий день закрыт автоматически", "body": "{date}: время окончания — {time}" }
