@@ -52,6 +52,7 @@
     "club.exclude": "Ребёнок исключён из кружка",
     "waitlist.accept": "Заявка принята",
     "document.delete": "Удалён документ",
-    "event.delete": "Удалено событие"
+    "event.delete": "Удалено событие",
+    "worktime.edit": "Правка табеля (время работы)"
   }
 }

@@ -52,6 +52,7 @@
     "club.exclude": "Бала үйірмеден шығарылды",
     "waitlist.accept": "Өтінім қабылданды",
     "document.delete": "Құжат жойылды",
-    "event.delete": "Іс-шара жойылды"
+    "event.delete": "Іс-шара жойылды",
+    "worktime.edit": "Табельді түзету (жұмыс уақыты)"
   }
 }
