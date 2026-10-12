@@ -4,7 +4,7 @@ import { CalendarClock, ChevronRight, Info, Receipt as ReceiptIcon, Wallet } fro
 import type { KgContext } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
 import { loadChildrenHistory, type Receipt } from "@/lib/payments-data";
-import { advanceOf, displayStatus, paymentPurpose, toPay, type Invoice } from "@/lib/payments";
+import { advanceOf, displayStatus, paymentPurpose, statementStatus, toPay, type Invoice } from "@/lib/payments";
 import { formatDate, formatDateTime, formatMoney, todayIn } from "@/lib/format";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
@@ -15,7 +15,7 @@ import { InvoiceStatusBadge, ReceiptStatusBadge } from "./status-badge";
 import { Requisites, type RequisiteItem } from "./requisites";
 import { UploadReceiptButton } from "./upload-receipt";
 import { ReviewDialog } from "./review-dialog";
-import { monthLabel } from "./month";
+import { monthLabel, monthPhrase } from "./month";
 
 export interface ParentKid {
   id: string;
@@ -48,7 +48,7 @@ export async function loadParentPayments(ctx: KgContext) {
       const list = invoices.filter((i) => i.child_id === kid.id);
       return { kid, latest: list[0] ?? null, older: list.slice(1), receipts: receipts.filter((r) => r.child_id === kid.id) };
     })
-    .filter((x) => x.kid.status === "active" || (x.latest && x.latest.balance > 0));
+    .filter((x) => x.kid.status === "active" || (x.latest && toPay(x.latest) > 0));
   return items;
 }
 
@@ -79,7 +79,8 @@ export async function CurrentInvoice({
 }) {
   const t = await getTranslations("payments");
   const today = todayIn(ctx.settings.timezone);
-  const status = displayStatus(inv, today, true);
+  // Overdue as soon as any open month is past its due date (debt_since), not only this month.
+  const status = statementStatus(inv, today);
   const due = toPay(inv);
   const lastRejected = receipts.find((r) => r.invoice_id === inv.id && r.status !== "pending");
   const tone = status === "paid" ? "bg-success-soft" : status === "overdue" ? "bg-danger-soft" : "bg-surface-muted";
@@ -172,7 +173,7 @@ export async function ParentPayments({ ctx }: { ctx: KgContext }) {
     <div className="space-y-4">
       {items.map(({ kid, latest, older, receipts }) => {
         const sub = (r: Receipt) => t("uploadedAt", { date: formatDateTime(r.created_at, tz) });
-        const req = latest ? requisiteItems(ctx, t, paymentPurpose(ctx.settings.requisites?.purpose, kid.full_name, monthLabel(t, latest.period))) : [];
+        const req = latest ? requisiteItems(ctx, t, paymentPurpose(ctx.settings.requisites?.purpose, kid.full_name, t("purposeMonth", { month: monthPhrase(t, latest.period) }))) : [];
         return (
           <div key={kid.id} className="grid items-start gap-4 lg:grid-cols-[1fr_380px]" data-testid="parent-child-payments" data-child={kid.full_name}>
             <Card>
@@ -217,7 +218,7 @@ export async function ParentPayments({ ctx }: { ctx: KgContext }) {
                               {inv.paid_amount > 0 ? ` · ${t("paid").toLowerCase()} ${formatMoney(inv.paid_amount)}` : ""}
                             </div>
                           </div>
-                          <InvoiceStatusBadge status={displayStatus(inv, today, false)} />
+                          <InvoiceStatusBadge status={displayStatus(inv, today)} />
                           <ChevronRight className="size-4 shrink-0 text-faint" aria-hidden />
                         </Link>
                       </li>

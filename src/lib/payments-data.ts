@@ -11,7 +11,6 @@ export interface ChildRef {
 
 export interface InvoiceWithChild extends Invoice {
   child: ChildRef;
-  isLatest: boolean;
 }
 
 export interface Receipt {
@@ -46,18 +45,20 @@ export function toReceipt(r: Record<string, unknown>): Receipt {
 
 /** All invoices of a month (RLS: staff with payments access see all, a parent only own children). */
 export async function loadMonth(supabase: SupabaseClient, kgId: string, period: string): Promise<InvoiceWithChild[]> {
-  const [{ data }, { data: later }] = await Promise.all([
-    supabase
-      .from("invoices")
-      .select(`${INVOICE_COLUMNS}, children(id, full_name, status, group_id)`)
-      .eq("kindergarten_id", kgId)
-      .eq("period", period),
-    supabase.from("invoices").select("child_id").eq("kindergarten_id", kgId).gt("period", period),
-  ]);
-  const hasLater = new Set((later ?? []).map((r) => r.child_id as string));
+  const { data } = await supabase
+    .from("invoices")
+    .select(`${INVOICE_COLUMNS}, children(id, full_name, status, group_id)`)
+    .eq("kindergarten_id", kgId)
+    .eq("period", period);
   return ((data ?? []) as Record<string, unknown>[])
-    .map((r) => ({ ...toInvoice(r), child: r.children as ChildRef, isLatest: !hasLater.has(String(r.child_id)) }))
+    .map((r) => ({ ...toInvoice(r), child: r.children as ChildRef }))
     .sort((a, b) => a.child.full_name.localeCompare(b.child.full_name, "ru"));
+}
+
+/** Period (YYYY-MM-01) of the kindergarten's first invoice, or null when nothing was billed yet. */
+export async function firstPeriod(supabase: SupabaseClient, kgId: string): Promise<string | null> {
+  const { data } = await supabase.from("invoices").select("period").eq("kindergarten_id", kgId).order("period").limit(1).maybeSingle();
+  return data ? String(data.period) : null;
 }
 
 export interface PendingReceipt extends Receipt {
@@ -134,7 +135,7 @@ export async function latestInvoice(supabase: SupabaseClient, childId: string): 
   return data ? toInvoice(data as Record<string, unknown>) : null;
 }
 
-/** Total current debt of the kindergarten (sum of positive balances of each child's latest invoice). */
+/** Total current debt of the kindergarten (sum of all open invoice balances). */
 export async function totalDebt(supabase: SupabaseClient, kgId: string): Promise<number> {
   return (await loadDebtors(supabase, kgId)).reduce((s, d) => s + d.debt, 0);
 }

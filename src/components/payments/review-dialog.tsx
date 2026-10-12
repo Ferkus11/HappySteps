@@ -2,23 +2,26 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { CheckCircle2, ExternalLink, FileText, Loader2, XCircle } from "lucide-react";
+import { CheckCircle2, ExternalLink, FileText, Loader2, Undo2, XCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { useAction } from "@/hooks/use-action";
-import { receiptUrlAction, reviewReceiptAction } from "@/app/(app)/payments/actions";
+import { receiptUrlAction, revertReceiptAction, reviewReceiptAction } from "@/app/(app)/payments/actions";
 import { formatMoney } from "@/lib/format";
 
 export interface ReviewReceipt {
   id: string;
   childName: string;
-  subtitle: string; // "Октябрь 2026 · загружен 12.10.2026 14:05"
+  subtitle: string; // "Октябрь 2026 · Загружен 12.10.2026 14:05"
   pending: boolean;
   toPay: number;
 }
 
-/** Opens a receipt (image/PDF via a short signed URL); owner/accountant confirm the amount or reject with a reason. */
+/**
+ * Opens a receipt (image/PDF via a short signed URL); owner/accountant confirm the amount or reject with a reason,
+ * and can undo a decision (back to «На проверке», with a reason — audited as receipt.revert).
+ */
 export function ReviewDialog({
   receipt,
   canReview,
@@ -37,13 +40,14 @@ export function ReviewDialog({
   const [open, setOpen] = React.useState(false);
   const [file, setFile] = React.useState<{ url: string; mime: string } | null>(null);
   const [fileError, setFileError] = React.useState(false);
-  const [mode, setMode] = React.useState<"confirm" | "reject">("confirm");
+  const [mode, setMode] = React.useState<"confirm" | "reject" | "revert">("confirm");
   const [amount, setAmount] = React.useState(String(Math.round(receipt.toPay) || ""));
   const [reason, setReason] = React.useState("");
   const review = useAction(reviewReceiptAction, {
     success: mode === "confirm" ? t("confirmedToast") : t("rejectedToast"),
     onSuccess: () => setOpen(false),
   });
+  const revert = useAction(revertReceiptAction, { success: t("revertedToast"), onSuccess: () => setOpen(false) });
 
   const loadSeq = React.useRef(0);
   function loadFile() {
@@ -164,6 +168,36 @@ export function ReviewDialog({
           <p className="mt-4 text-sm text-muted" data-testid="view-only">
             {t("viewOnly")}
           </p>
+        ) : canReview ? (
+          mode === "revert" ? (
+            <form
+              className="mt-5 space-y-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                revert.run(receipt.id, { reason });
+              }}
+            >
+              <p className="text-sm text-muted">{t("revertHint")}</p>
+              <Field label={t("revertReason")} htmlFor="r-revert" error={revert.fieldError("reason")}>
+                <Textarea
+                  id="r-revert"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder={t("revertPlaceholder")}
+                  maxLength={500}
+                  data-testid="revert-reason"
+                  autoFocus
+                />
+              </Field>
+              <Button type="submit" size="lg" className="w-full" disabled={revert.pending} data-testid="revert-submit">
+                <Undo2 /> {t("revertSubmit")}
+              </Button>
+            </form>
+          ) : (
+            <Button type="button" variant="outline" className="mt-5 w-full" onClick={() => setMode("revert")} data-testid="receipt-revert">
+              <Undo2 /> {t("revert")}
+            </Button>
+          )
         ) : null}
       </DialogContent>
     </Dialog>

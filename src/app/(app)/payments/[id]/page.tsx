@@ -5,7 +5,7 @@ import { ArrowLeft, CalendarClock, Receipt as ReceiptIcon } from "lucide-react";
 import { requireKg } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
 import { RECEIPT_COLUMNS, toReceipt } from "@/lib/payments-data";
-import { INVOICE_COLUMNS, advanceOf, displayStatus, toInvoice, toPay } from "@/lib/payments";
+import { INVOICE_COLUMNS, advanceOf, statementStatus, toInvoice, toPay } from "@/lib/payments";
 import { formatDate, formatDateTime, formatMoney, todayIn } from "@/lib/format";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -16,7 +16,7 @@ import { InvoiceStatusBadge, ReceiptStatusBadge } from "@/components/payments/st
 import { ReviewDialog } from "@/components/payments/review-dialog";
 import { AdjustDialog } from "@/components/payments/adjust-dialog";
 import { UploadReceiptButton } from "@/components/payments/upload-receipt";
-import { monthLabel } from "@/components/payments/month";
+import { monthLabel, monthPhrase } from "@/components/payments/month";
 import { cn } from "@/lib/utils";
 
 export async function generateMetadata() {
@@ -46,7 +46,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const receipts = ((recs ?? []) as Record<string, unknown>[]).map(toReceipt);
   const isLatest = !later;
   const today = todayIn(ctx.settings.timezone);
-  const status = displayStatus(inv, today, isLatest);
+  // The page shows the statement up to this month: older open months (carried) + this month.
+  const status = statementStatus(inv, today);
   const month = monthLabel(t, inv.period);
   const canManage = ctx.role === "owner" || ctx.role === "accountant";
   const isParent = ctx.role === "parent";
@@ -61,7 +62,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         </Link>
       </div>
       <PageHeader
-        title={<span data-testid="invoice-title">{t("invoiceTitle", { month })}</span>}
+        title={<span data-testid="invoice-title">{t("invoiceTitle", { month: monthPhrase(t, inv.period) })}</span>}
         description={
           <span className="inline-flex flex-wrap items-center gap-2">
             {isParent ? child.full_name : <Link href={`/children/${child.id}`} className="font-semibold text-text hover:text-brand">{child.full_name}</Link>}
@@ -84,6 +85,11 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           <div className="mt-2 flex items-center gap-1.5 text-sm text-muted">
             <CalendarClock className="size-4 shrink-0" aria-hidden /> {t("dueDate")}: {formatDate(inv.due_date)}
           </div>
+          {!isParent && inv.starts_on && !inv.adjusted_at ? (
+            <p className="mt-2 text-sm font-semibold text-warning" data-testid="invoice-starts-on">
+              {t("startsOn", { date: formatDate(inv.starts_on) })}
+            </p>
+          ) : null}
           {advanceOf(inv) > 0 ? (
             <p className="mt-2 text-sm font-semibold text-success" data-testid="invoice-advance">
               {t("advanceNext", { amount: formatMoney(advanceOf(inv)) })}

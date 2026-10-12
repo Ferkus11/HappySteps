@@ -9,13 +9,17 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { signedUrl } from "@/lib/kg-assets";
 import { formatMoney } from "@/lib/format";
 import { RECEIPT_MAX_BYTES, RECEIPT_TYPES, periodOf, toPay } from "@/lib/payments";
+import { sniffMime } from "@/lib/documents-logic";
 import { zMoney, zUuid } from "@/lib/validation";
 
 const BUCKET = "receipts";
 const MANAGERS = ["owner", "accountant"] as const;
 
-/** "10.2026" — language-neutral month for notification params (texts are rendered in the reader's language). */
-const monthParam = (period: string) => `${period.slice(5, 7)}.${period.slice(0, 4)}`;
+/**
+ * Notification param `month` is a language-neutral `YYYY-MM`: whoever renders the notification (in-app centre /
+ * push, stage 6) turns it into the month name in the reader's language.
+ */
+const monthParam = (period: string) => period.slice(0, 7);
 
 /** «Начислить за месяц»: idempotent, creates missing invoices of the month (same SQL as the daily cron). */
 export async function accrueMonthAction(month: string) {
@@ -42,19 +46,21 @@ export async function adjustInvoiceAction(id: string, input: z.input<typeof adju
   });
 }
 
-/** Parent uploads a receipt (photo/screenshot/PDF; HEIC is converted to JPEG in the browser). */
+/** Parent uploads a receipt (photo/screenshot/PDF; HEIC is converted to JPEG in the browser). The type is taken
+ * from the file's first bytes, never from the browser-provided `file.type`. */
 export async function uploadReceiptAction(invoiceId: string, form: FormData) {
   return kgAction(["parent"], async (ctx, supabase) => {
     zUuid.parse(invoiceId);
     const file = form.get("file");
     if (!(file instanceof File) || file.size === 0) throw new ActionError("invalid");
     if (file.size > RECEIPT_MAX_BYTES) throw new ActionError("fileTooLarge");
-    const ext = RECEIPT_TYPES[file.type];
-    if (!ext) throw new ActionError("fileType");
+    const mime = sniffMime(new Uint8Array(await file.slice(0, 16).arrayBuffer()));
+    const ext = mime ? RECEIPT_TYPES[mime] : undefined;
+    if (!mime || !ext) throw new ActionError("fileType");
     // RLS shows a parent only invoices of own children; is_guardian double-checks the active parent link.
     const { data: inv } = await supabase
       .from("invoices")
-      .select("id, child_id, period, balance, children(full_name)")
+      .select("id, child_id, period, carried, balance, children(full_name)")
       .eq("id", invoiceId)
       .eq("kindergarten_id", ctx.kg.id)
       .maybeSingle();
@@ -63,7 +69,7 @@ export async function uploadReceiptAction(invoiceId: string, form: FormData) {
     if (guardian !== true) throw new ActionError("forbidden");
     const path = `${ctx.kg.id}/${inv.child_id}/${randomUUID()}.${ext}`;
     const service = createServiceClient();
-    const up = await service.storage.from(BUCKET).upload(path, file, { contentType: file.type });
+    const up = await service.storage.from(BUCKET).upload(path, file, { contentType: mime });
     if (up.error) throw new ActionError("generic");
     // Permission checked above; receipt rows are written by the server only.
     const ins = await service.from("payment_receipts").insert({
@@ -72,7 +78,7 @@ export async function uploadReceiptAction(invoiceId: string, form: FormData) {
       child_id: inv.child_id,
       uploaded_by: ctx.userId,
       file_path: path,
-      mime: file.type,
+      mime,
       size: file.size,
     });
     if (ins.error) {
@@ -86,7 +92,7 @@ export async function uploadReceiptAction(invoiceId: string, form: FormData) {
       kindergartenId: ctx.kg.id,
       userIds: staff.filter((u) => u !== ctx.userId),
       type: "receipt.new",
-      params: { child, amount: formatMoney(toPay({ balance: Number(inv.balance) })), month: monthParam(String(inv.period)) },
+      params: { child, amount: formatMoney(toPay({ carried: Number(inv.carried), balance: Number(inv.balance) })), month: monthParam(String(inv.period)) },
       url: "/payments?tab=review",
     });
   });
@@ -125,6 +131,19 @@ export async function reviewReceiptAction(id: string, input: z.input<typeof revi
       params: v.accept ? { month, amount: formatMoney(r.confirmed_amount) } : { month, reason: r.reject_reason },
       url: "/payments",
     });
+  });
+}
+
+const revertSchema = z.object({ reason: z.string().trim().min(3, "revertReasonRequired").max(500, "tooLong") });
+
+/** Owner/accountant undo a wrong decision: the receipt goes back to «На проверке» (audited inside SQL as receipt.revert). */
+export async function revertReceiptAction(id: string, input: z.input<typeof revertSchema>) {
+  return kgAction([...MANAGERS], async (ctx, supabase) => {
+    zUuid.parse(id);
+    const v = parse(revertSchema, input);
+    const { data: rec } = await supabase.from("payment_receipts").select("id").eq("id", id).eq("kindergarten_id", ctx.kg.id).maybeSingle();
+    if (!rec) throw new ActionError("notFound");
+    check(await supabase.rpc("revert_receipt_review", { p_id: id, p_reason: v.reason }));
   });
 }
 

@@ -7,7 +7,7 @@ import { loadMonth } from "@/lib/payments-data";
 import { displayStatus, parseMonth, periodOf, totals } from "@/lib/payments";
 import { formatDate, todayIn } from "@/lib/format";
 import { attachment } from "@/lib/pdf";
-import { monthLabel } from "@/components/payments/month";
+import { monthPhrase } from "@/components/payments/month";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +25,7 @@ export async function GET(req: Request) {
   const [rows, groups] = await Promise.all([loadMonth(supabase, ctx.kg.id, periodOf(month)), listGroups(supabase, ctx.kg.id)]);
   const gName = new Map(groups.map((g) => [g.id, g.name]));
   const t = await getTranslations("payments");
-  const label = monthLabel(t, month);
+  const label = monthPhrase(t, month);
 
   const wb = new ExcelJS.Workbook();
   wb.creator = "Happy Steps";
@@ -39,9 +39,9 @@ export async function GET(req: Request) {
     t("xlsx.original"),
     t("accrued"),
     t("xlsx.adjustment"),
-    t("xlsx.carried"),
     t("paid"),
     t("balance"),
+    t("xlsx.advance"),
     t("filterStatus"),
     t("dueDate"),
     t("xlsx.paidAt"),
@@ -50,16 +50,16 @@ export async function GET(req: Request) {
   head.alignment = { wrapText: true, vertical: "middle" };
   const money = '#,##0 "₸"';
   for (const i of rows) {
-    const st = displayStatus(i, today, i.isLatest);
+    const st = displayStatus(i, today);
     const xr = ws.addRow([
       i.child.full_name + (i.child.status === "archived" ? ` (${t("archived").toLowerCase()})` : ""),
       i.child.group_id ? (gName.get(i.child.group_id) ?? "") : "",
       i.amount_original,
       i.amount,
       i.adjustment_comment ?? "",
-      i.carried,
       i.paid_amount,
       i.balance,
+      i.advance,
       t(`status.${st}`),
       formatDate(i.due_date),
       i.paid_at ? formatDate(i.paid_at, ctx.settings.timezone) : "",
@@ -67,10 +67,11 @@ export async function GET(req: Request) {
     if (st === "overdue") xr.getCell(9).font = { color: { argb: "FFC0262D" }, bold: true };
   }
   const sum = totals(rows);
-  const tr = ws.addRow([t("xlsx.total"), "", "", sum.accrued, "", "", sum.paid, sum.debt]);
+  // Each debt lives in exactly one invoice (FIFO), so these totals never double-count earlier months.
+  const tr = ws.addRow([t("xlsx.total"), "", "", sum.accrued, "", sum.paid, sum.debt]);
   tr.font = { bold: true };
   for (const c of [3, 4, 6, 7, 8]) ws.getColumn(c).numFmt = money;
-  [34, 16, 14, 14, 30, 18, 14, 14, 14, 12, 14].forEach((w, idx) => (ws.getColumn(idx + 1).width = w));
+  [34, 16, 14, 14, 30, 14, 14, 14, 14, 12, 14].forEach((w, idx) => (ws.getColumn(idx + 1).width = w));
   ws.views = [{ state: "frozen", xSplit: 1, ySplit: 4 }];
 
   const buf = await wb.xlsx.writeBuffer();

@@ -3,7 +3,7 @@ import { getTranslations } from "next-intl/server";
 import type { KgContext } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
 import { latestInvoice } from "@/lib/payments-data";
-import { advanceOf, displayStatus, toPay } from "@/lib/payments";
+import { advanceOf, statementStatus, toPay } from "@/lib/payments";
 import { formatDate, formatMoney, todayIn } from "@/lib/format";
 import { Card, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -17,7 +17,7 @@ export async function ChildPaymentCard({ ctx, childId }: { ctx: KgContext; child
   const supabase = await createClient();
   const inv = await latestInvoice(supabase, childId);
   if (!inv) return null;
-  const status = displayStatus(inv, todayIn(ctx.settings.timezone), true);
+  const status = statementStatus(inv, todayIn(ctx.settings.timezone));
   const href = ctx.role === "parent" ? "/payments" : `/payments/${inv.id}`;
   return (
     <Card data-testid="child-payment">

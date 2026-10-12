@@ -7,19 +7,9 @@ import { toast } from "sonner";
 import { Loader2, Upload } from "lucide-react";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { uploadReceiptAction } from "@/app/(app)/payments/actions";
-import { RECEIPT_MAX_BYTES, RECEIPT_TYPES } from "@/lib/payments";
+import { RECEIPT_MAX_BYTES } from "@/lib/payments";
+import { prepareDocumentFile } from "@/lib/heic";
 import { cn } from "@/lib/utils";
-
-const isHeic = (f: File) => /image\/hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name);
-
-/** iPhone photos are HEIC: convert to JPEG in the browser before uploading (the server accepts JPEG/PNG/WebP/PDF). */
-async function normalize(file: File): Promise<File> {
-  if (!isHeic(file)) return file;
-  const heic2any = (await import("heic2any")).default;
-  const out = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
-  const blob = Array.isArray(out) ? out[0] : out;
-  return new File([blob], file.name.replace(/\.hei[cf]$/i, "") + ".jpg", { type: "image/jpeg" });
-}
 
 /** «Загрузить чек»: opens the file picker and uploads right away — one tap for the parent. */
 export function UploadReceiptButton({
@@ -55,8 +45,8 @@ export function UploadReceiptButton({
     }
     setBusy(true);
     try {
-      const file = await normalize(raw);
-      if (!RECEIPT_TYPES[file.type]) throw new Error("fileType");
+      // iPhone photos are HEIC: converted to JPEG here; the server checks the real type from the file's bytes.
+      const file = await prepareDocumentFile(raw);
       if (file.size > RECEIPT_MAX_BYTES) throw new Error("fileTooLarge");
       const fd = new FormData();
       fd.append("file", file);

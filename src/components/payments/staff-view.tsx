@@ -4,8 +4,8 @@ import { ChevronLeft, ChevronRight, Download, Inbox, PartyPopper, Search } from 
 import type { KgContext } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
 import { listGroups } from "@/lib/queries/people";
-import { loadDebtors, loadMonth, loadPending } from "@/lib/payments-data";
-import { DISPLAY_STATUSES, daysBetween, displayStatus, parseMonth, periodOf, shiftMonth, toPay, totals, type DisplayStatus } from "@/lib/payments";
+import { firstPeriod, loadDebtors, loadMonth, loadPending } from "@/lib/payments-data";
+import { DISPLAY_STATUSES, canAccrueMonth, daysBetween, displayStatus, parseMonth, periodOf, shiftMonth, toPay, totals, type DisplayStatus } from "@/lib/payments";
 import { formatDate, formatDateTime, formatMoney, todayIn } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { InvoiceStatusBadge } from "./status-badge";
 import { ReviewDialog } from "./review-dialog";
 import { AccrueButton, FilterSelect, MonthInput } from "./staff-controls";
-import { monthLabel } from "./month";
+import { monthLabel, monthPhrase } from "./month";
 
 export const STAFF_TABS = ["review", "month", "debtors"] as const;
 export type StaffTab = (typeof STAFF_TABS)[number];
@@ -38,7 +38,7 @@ export async function StaffPayments({ ctx, sp }: { ctx: KgContext; sp: StaffPara
   const tabHref = (k: StaffTab) => (k === "review" ? "/payments" : `/payments?tab=${k}${sp.month && k === "month" ? `&month=${sp.month}` : ""}`);
   return (
     <>
-      <nav className="scrollbar-none mb-4 inline-flex max-w-full gap-1 overflow-x-auto rounded-2xl bg-surface-muted p-1" aria-label={t("title")}>
+      <nav className="scrollbar-none mb-4 flex w-full gap-1 overflow-x-auto rounded-2xl bg-surface-muted p-1 sm:inline-flex sm:w-auto sm:max-w-full" aria-label={t("title")}>
         {STAFF_TABS.map((k) => (
           <Link
             key={k}
@@ -46,11 +46,12 @@ export async function StaffPayments({ ctx, sp }: { ctx: KgContext; sp: StaffPara
             aria-current={tab === k ? "page" : undefined}
             data-testid={`tab-${k}`}
             className={cn(
-              "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl px-4 text-sm font-semibold text-muted",
+              "inline-flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl px-2 text-sm font-semibold whitespace-nowrap text-muted sm:h-10 sm:flex-none sm:shrink-0 sm:px-4",
               tab === k && "bg-surface text-text shadow-sm",
             )}
           >
-            {t(`tabs.${k}`)}
+            <span className="sm:hidden">{t(`tabsShort.${k}`)}</span>
+            <span className="hidden sm:inline">{t(`tabs.${k}`)}</span>
             {k === "review" && pending.length ? (
               <span className="grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1.5 text-[11px] font-bold text-brand-fg" data-testid="pending-count">
                 {pending.length}
@@ -86,9 +87,9 @@ async function ReviewQueue({ ctx, pending, canManage }: { ctx: KgContext; pendin
         {pending.map((r) => {
           const month = monthLabel(t, r.invoice.period);
           return (
-            <li key={r.id} className="flex flex-wrap items-center gap-3 px-4 py-3 md:px-5" data-testid="receipt-item" data-child={r.child.full_name}>
+            <li key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 md:px-5" data-testid="receipt-item" data-child={r.child.full_name}>
               <Avatar name={r.child.full_name} />
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 basis-[calc(100%-52px)] sm:basis-0">
                 <Link href={`/payments/${r.invoice_id}`} className="block truncate font-bold hover:text-brand">
                   {r.child.full_name}
                 </Link>
@@ -96,8 +97,8 @@ async function ReviewQueue({ ctx, pending, canManage }: { ctx: KgContext; pendin
                   {month} · {t("uploadedAt", { date: formatDateTime(r.created_at, tz) })}
                 </div>
               </div>
-              <div className="flex shrink-0 items-center gap-3">
-                <div className="text-right">
+              <div className="flex w-full items-center justify-between gap-3 pl-[52px] sm:w-auto sm:shrink-0 sm:pl-0">
+                <div className="sm:text-right">
                   <div className="text-xs text-faint">{t("toPay")}</div>
                   <div className="font-bold tabular-nums">{formatMoney(toPay(r.invoice))}</div>
                 </div>
@@ -127,10 +128,16 @@ async function MonthList({ ctx, sp, canManage }: { ctx: KgContext; sp: StaffPara
   const today = todayIn(ctx.settings.timezone);
   const month = parseMonth(sp.month, today);
   const supabase = await createClient();
-  const [rows, groups] = await Promise.all([loadMonth(supabase, ctx.kg.id, periodOf(month)), listGroups(supabase, ctx.kg.id)]);
+  const [rows, groups, first] = await Promise.all([
+    loadMonth(supabase, ctx.kg.id, periodOf(month)),
+    listGroups(supabase, ctx.kg.id),
+    canManage ? firstPeriod(supabase, ctx.kg.id) : Promise.resolve(null),
+  ]);
+  const canAccrue = canManage && canAccrueMonth(month, today, first);
+  const accrueProps = { month, monthText: monthPhrase(t, month) };
   const status = (DISPLAY_STATUSES as string[]).includes(sp.status ?? "") ? (sp.status as DisplayStatus) : "";
   const group = groups.some((g) => g.id === sp.group) || sp.group === "none" ? (sp.group as string) : "";
-  const withStatus = rows.map((r) => ({ ...r, shown: displayStatus(r, today, r.isLatest) }));
+  const withStatus = rows.map((r) => ({ ...r, shown: displayStatus(r, today) }));
   const filtered = withStatus.filter(
     (r) => (!status || r.shown === status) && (!group || (group === "none" ? !r.child.group_id : r.child.group_id === group)),
   );
@@ -149,18 +156,18 @@ async function MonthList({ ctx, sp, canManage }: { ctx: KgContext; sp: StaffPara
               <ChevronLeft />
             </Link>
           </Button>
-          <MonthInput params={params} value={month} />
+          <MonthInput params={params} value={month} label={monthLabel(t, month)} />
           <Button asChild variant="outline" size="icon" aria-label={t("nextMonth")}>
             <Link href={q(shiftMonth(month, 1))} data-testid="next-month">
               <ChevronRight />
             </Link>
           </Button>
-          <span className="hidden text-sm font-semibold text-muted sm:inline" data-testid="month-label">
+          <span className="hidden text-sm font-semibold text-muted sm:inline" data-testid="month-label" aria-hidden>
             {monthLabel(t, month)}
           </span>
-          <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row">
-            {canManage && month <= today.slice(0, 7) ? <AccrueButton month={month} /> : null}
-            <Button asChild variant="secondary" className="w-full sm:w-auto">
+          <div className="flex w-full gap-2 sm:ml-auto sm:w-auto">
+            {canAccrue && rows.length > 0 ? <AccrueButton {...accrueProps} variant="outline" className="flex-1 sm:flex-none" /> : null}
+            <Button asChild variant="secondary" className="flex-1 sm:flex-none">
               <a href={`/payments/export?month=${month}`} data-testid="export-xlsx" download>
                 <Download /> {t("export")}
               </a>
@@ -192,7 +199,12 @@ async function MonthList({ ctx, sp, canManage }: { ctx: KgContext; sp: StaffPara
       <Card className="p-0">
         {filtered.length === 0 ? (
           rows.length === 0 ? (
-            <EmptyState icon={Inbox} title={t("emptyMonth")} hint={canManage ? t("emptyMonthHint") : undefined} />
+            <EmptyState
+              icon={Inbox}
+              title={t("emptyMonth")}
+              hint={canAccrue ? t("emptyMonthHint") : undefined}
+              action={canAccrue ? <AccrueButton {...accrueProps} /> : undefined}
+            />
           ) : (
             <EmptyState icon={Search} title={t("emptyFiltered")} />
           )
@@ -212,6 +224,11 @@ async function MonthList({ ctx, sp, canManage }: { ctx: KgContext; sp: StaffPara
                     <div className="flex items-center gap-2">
                       <span className="truncate font-bold">{r.child.full_name}</span>
                       {r.child.status === "archived" ? <Badge className="shrink-0">{t("archived")}</Badge> : null}
+                      {r.starts_on && !r.adjusted_at ? (
+                        <Badge tone="warning" className="shrink-0" title={t("startsOn", { date: formatDate(r.starts_on) })} data-testid="starts-on">
+                          {t("startsShort", { date: formatDate(r.starts_on).slice(0, 5) })}
+                        </Badge>
+                      ) : null}
                     </div>
                     <div className="truncate text-sm text-muted">
                       {r.child.group_id ? gName.get(r.child.group_id) : t("noGroup")} · {formatMoney(r.amount)}
@@ -221,7 +238,7 @@ async function MonthList({ ctx, sp, canManage }: { ctx: KgContext; sp: StaffPara
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     <InvoiceStatusBadge status={r.shown} />
                     <span className={cn("text-sm font-bold tabular-nums", r.balance > 0 && r.shown === "overdue" && "text-danger")}>
-                      {r.balance < 0 ? `${t("advance")} ${formatMoney(-r.balance)}` : formatMoney(r.balance)}
+                      {r.advance > 0 ? `${t("advance")} ${formatMoney(r.advance)}` : formatMoney(r.balance)}
                     </span>
                   </div>
                 </Link>

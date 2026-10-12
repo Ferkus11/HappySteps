@@ -4,19 +4,43 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { CalendarPlus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, type ButtonProps } from "@/components/ui/button";
+import { Confirm } from "@/components/common/confirm";
+import { cn } from "@/lib/utils";
 import { Input, Select } from "@/components/ui/input";
 import { useAction } from "@/hooks/use-action";
 import { accrueMonthAction } from "@/app/(app)/payments/actions";
 
-/** «Начислить за месяц» — same idempotent SQL as the daily cron. */
-export function AccrueButton({ month }: { month: string }) {
+/**
+ * «Начислить за месяц» — same idempotent SQL as the daily cron, allowed for the current month (and the previous one
+ * at most). Always asks first: it creates invoices that parents see right away.
+ */
+export function AccrueButton({
+  month,
+  monthText,
+  variant = "primary",
+  className,
+}: {
+  month: string;
+  monthText: string;
+  variant?: ButtonProps["variant"];
+  className?: string;
+}) {
   const t = useTranslations("payments");
   const a = useAction(accrueMonthAction, { onSuccess: (d) => toast.success(t("accrueDone", { count: d.count })) });
   return (
-    <Button onClick={() => a.run(month)} disabled={a.pending} className="w-full sm:w-auto" data-testid="accrue-month">
-      <CalendarPlus /> {t("accrue")}
-    </Button>
+    <Confirm
+      trigger={
+        <Button variant={variant} disabled={a.pending} className={cn("min-w-0", className)} data-testid="accrue-month">
+          <CalendarPlus /> <span className="truncate sm:hidden">{t("accrueOk")}</span>
+          <span className="hidden truncate sm:inline">{t("accrue")}</span>
+        </Button>
+      }
+      title={t("accrueTitle", { month: monthText })}
+      description={t("accrueText")}
+      confirmLabel={t("accrueOk")}
+      onConfirm={() => a.run(month)}
+    />
   );
 }
 
@@ -31,18 +55,31 @@ function usePushParam() {
   };
 }
 
-export function MonthInput({ params, value }: { params: Record<string, string>; value: string }) {
+/**
+ * Month picker. On phones the native input is laid invisibly over the localized label ("Октябрь 2026"), so a tap
+ * still opens the system picker but nobody sees a raw "2026-10"; from sm up the input itself is shown.
+ */
+export function MonthInput({ params, value, label }: { params: Record<string, string>; value: string; label: string }) {
   const t = useTranslations("payments");
   const push = usePushParam();
   return (
-    <Input
-      type="month"
-      value={value}
-      aria-label={t("month")}
-      className="w-auto min-w-0 flex-1 sm:w-48 sm:flex-none"
-      data-testid="pick-month"
-      onChange={(e) => e.target.value && push(params, "month", e.target.value)}
-    />
+    <div className="relative min-w-0 flex-1 sm:flex-none">
+      <div
+        className="flex h-11 items-center justify-center rounded-xl border border-border bg-surface px-3 text-[15px] font-bold sm:hidden"
+        aria-hidden
+        data-testid="month-label-phone"
+      >
+        <span className="truncate">{label}</span>
+      </div>
+      <Input
+        type="month"
+        value={value}
+        aria-label={t("month")}
+        className="absolute inset-0 h-full w-full opacity-0 sm:static sm:w-48 sm:opacity-100"
+        data-testid="pick-month"
+        onChange={(e) => e.target.value && push(params, "month", e.target.value)}
+      />
+    </div>
   );
 }
 
