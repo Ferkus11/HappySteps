@@ -34,7 +34,7 @@ PGRST_VERSION="v12.2.3"
 download() {
   # Worktrees reuse the binaries of the main checkout when available.
   if [ ! -x "$BIN/auth" ] && [ -n "${STACK_BIN_FROM:-}" ] && [ -x "$STACK_BIN_FROM/auth" ]; then
-    cp "$STACK_BIN_FROM"/* "$BIN/"
+    cp -r "$STACK_BIN_FROM"/. "$BIN/"
   fi
   if [ ! -x "$BIN/auth" ]; then
     echo "→ downloading supabase/auth $AUTH_VERSION"

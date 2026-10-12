@@ -18,7 +18,7 @@ Read `SPEC.md` (sections 3, 5, 6, 8, 11, 13 at least) and `DECISIONS.md` first.
 ```bash
 scripts/worktree-setup.sh <SLOT> /home/claude/happy-steps   # SLOT is given in your brief (1..9)
 ```
-This symlinks `node_modules`, starts an independent local Supabase stack (own database, own ports),
+This hard-links `node_modules` (do not `npm install` — if you need a new package, say so in your final answer), starts an independent local Supabase stack (own database, own ports),
 writes `.env.local`, and seeds the e2e fixtures. Re-run it after adding/changing your migration
 (it resets the DB). Run e2e on your own port: `E2E_PORT=$((3100 + 10*SLOT)) npm run e2e`.
 Start long-running commands with output redirected to a file (e.g. `> /tmp/x.log 2>&1`), never in
