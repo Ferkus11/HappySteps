@@ -5,7 +5,7 @@ import type { Locale } from "@/i18n/config";
  * Add a namespace here once; both locales must define identical keys
  * (enforced by tests/unit/i18n.test.ts).
  */
-export const namespaces = ["common", "nav", "auth", "roles", "errors", "invites", "consent", "admin", "staff", "groups", "children", "audit", "settings", "dashboard", "profile", "notifications", "holidays", "menu", "attendance", "announcements", "events", "worktime", "documents", "payments", "chats"] as const;
+export const namespaces = ["common", "nav", "auth", "roles", "errors", "invites", "consent", "admin", "staff", "groups", "children", "audit", "settings", "dashboard", "profile", "notifications", "holidays", "menu", "attendance", "announcements", "events", "worktime", "documents", "payments", "chats", "clubs"] as const;
 
 export type Namespace = (typeof namespaces)[number];
 

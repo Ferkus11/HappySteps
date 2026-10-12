@@ -12,9 +12,9 @@
     "receipt.new": { "title": "Тексеруге жаңа түбіртек", "body": "{child}: {amount}" },
     "receipt.accepted": { "title": "Төлем расталды", "body": "{month}: {amount}" },
     "receipt.rejected": { "title": "Түбіртек қабылданбады", "body": "{month}: {reason}. Түбіртекті қайта жүктеңіз." },
-    "club.request": { "title": "Үйірмеге өтінім", "body": "{child} → {club}" },
+    "club.request": { "title": "{status, select, queued {Үйірмеге өтінім — кезекке} other {Үйірмеге өтінім}}", "body": "{child} → {club}" },
     "club.spot_free": { "title": "Үйірмеде орын босады", "body": "{club}: кезекте {count}" },
-    "club.decision": { "title": "«{club}» үйірмесі", "body": "{child}: {status}" },
+    "club.decision": { "title": "«{club}» үйірмесі", "body": "{child}: {status, select, active {жазылды, сабақта күтеміз} queued {бос орын жоқ, бала кезекте} rejected {өтінім қабылданбады} excluded {үйірмеден шығарылды} closed {үйірме жабылды} other {мәртебе өзгерді}}" },
     "waitlist.new": { "title": "Күту тізіміне жаңа өтінім", "body": "{child}, {parent}" },
     "document.expiring": { "title": "Құжаттың мерзімі бітіп жатыр", "body": "{person}: {document} — {date} дейін" },
     "worktime.auto_closed": { "title": "Жұмыс күні автоматты түрде жабылды", "body": "{date}: аяқталу уақыты — {time}" }
