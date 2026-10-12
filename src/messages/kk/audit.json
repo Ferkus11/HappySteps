@@ -46,7 +46,7 @@
     "invoice.adjust": "Шот сомасы өзгертілді",
     "receipt.confirm": "Түбіртек расталды",
     "receipt.reject": "Түбіртек қабылданбады",
-    "chat.message_delete": "Хабарлама жойылды",
+    "chat.message_delete": "Топ чатындағы хабарлама жойылды",
     "chat.lock": "Топ чаты ата-аналар үшін жабылды",
     "chat.unlock": "Топ чаты ашылды",
     "club.exclude": "Бала үйірмеден шығарылды",
