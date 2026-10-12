@@ -42,8 +42,10 @@ describe("notifications", () => {
         F.users.teacher,
       ]);
       await become(F.users.parent);
-      expect((await c.query("select user_id from notifications")).rows.map((r) => r.user_id)).toEqual([F.users.parent]);
-      expect((await c.query("update notifications set read_at = now() where user_id = $1", [F.users.parent])).rowCount).toBe(1);
+      // Other modules create notifications too — the point is that only own rows are visible.
+      const own = (await c.query("select distinct user_id from notifications")).rows.map((r) => r.user_id);
+      expect(own).toEqual([F.users.parent]);
+      expect((await c.query("update notifications set read_at = now() where user_id = $1", [F.users.parent])).rowCount).toBeGreaterThanOrEqual(1);
       expect((await c.query("update notifications set read_at = now() where user_id = $1", [F.users.teacher])).rowCount).toBe(0);
       expect(await rejects(c, "update notifications set type = 'x'")).toBe(true);
       expect(await rejects(c, "insert into notifications (user_id, type) values ($1, 'x')", [F.users.parent])).toBe(true);

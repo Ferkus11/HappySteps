@@ -34,7 +34,9 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   const [{ data: rows }, staff] = await Promise.all([q, listStaff(supabase, ctx.kg.id)]);
   const names = new Map(staff.map((p) => [p.userId, p.fullName]));
   const prefixes = ["account", "child", "guardian", "group", "worktime", "attendance", "payment", "invoice", "chat", "kindergarten"];
-  const actionLabel = (a: string) => (t.has(`actions.${a}`) ? t(`actions.${a}` as "actions.account.create") : a);
+  // Keys contain dots ("worktime.edit"), which next-intl would read as a path — look them up in the raw map.
+  const labels = t.raw("actions") as Record<string, string>;
+  const actionLabel = (a: string) => labels[a] ?? a;
   const tz = ctx.settings.timezone;
 
   return (
