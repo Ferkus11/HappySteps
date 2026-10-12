@@ -108,7 +108,7 @@ describe("calendar_birthdays", () => {
     await c.query("update profiles set birth_date = '1990-04-01' where id = any($1)", [[F.users.teacher, F.users.cook, F.users.parent]]);
   }
 
-  it("role filtering: admins all, teacher own groups + staff, parent own children, cook staff only", async () => {
+  it("role filtering: admins all, teacher own groups + staff, parent own children, cook/club teacher none", async () => {
     await inTx(async (c, become) => {
       await setup(c);
       const staff = ["staff:Асель", "staff:Гульнар"];
@@ -122,10 +122,11 @@ describe("calendar_birthdays", () => {
       expect(await names(c)).toEqual(["child:Алихан"]);
       await become(F.users.teacherParent);
       expect(await names(c)).toEqual(["child:Миша", "child:Сабина", ...staff].sort());
+      // SPEC §5.6: birthdays are for the admin and teacher calendars (D-022)
       await become(F.users.cook);
-      expect(await names(c)).toEqual(staff);
+      expect(await names(c)).toEqual([]);
       await become(F.users.clubTeacher);
-      expect(await names(c)).toEqual(staff);
+      expect(await names(c)).toEqual([]);
       await become(F.users.ownerB);
       expect(await names(c)).toEqual([]);
     });

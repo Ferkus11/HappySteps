@@ -16,7 +16,7 @@ export const buttonVariants = cva(
         link: "text-brand underline-offset-4 hover:underline px-0 h-auto",
       },
       size: {
-        sm: "h-9 px-3 text-[13px]",
+        sm: "h-9 px-3 text-[13px] pointer-coarse:h-11", // ≥44px touch targets on phones (SPEC §8)
         md: "h-11 px-4",
         lg: "h-14 px-6 text-base rounded-2xl",
         icon: "size-11",

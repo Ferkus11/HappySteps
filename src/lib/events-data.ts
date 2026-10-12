@@ -23,7 +23,7 @@ export interface Birthday {
   person_id: string;
   full_name: string;
   day: string;
-  age: number;
+  age: number | null;
   group_name: string | null;
 }
 

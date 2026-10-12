@@ -11,7 +11,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { KIND_STYLE, timeRange } from "@/lib/events";
 
-const ALL_ROLES: DashboardWidget["roles"] = ["owner", "head", "accountant", "teacher", "club_teacher", "cook", "parent"];
 
 async function UpcomingEvents({ ctx }: { ctx: KgContext }) {
   const t = await getTranslations("events");
@@ -70,7 +69,7 @@ async function BirthdaysWeek({ ctx }: { ctx: KgContext }) {
             <span className="min-w-0 flex-1">
               <span className="block truncate font-semibold">{b.full_name}</span>
               <span className="block truncate text-[13px] text-muted">
-                {b.kind === "child" ? t("turnsChild", { age: b.age }) : t("staffBirthday")}
+                {b.kind === "child" ? t("turnsChild", { age: b.age ?? 0 }) : t("staffBirthday")}
                 {b.group_name ? ` · ${b.group_name}` : ""}
               </span>
             </span>
@@ -83,6 +82,6 @@ async function BirthdaysWeek({ ctx }: { ctx: KgContext }) {
 }
 
 export const eventsWidgets: DashboardWidget[] = [
-  { id: "upcoming-events", roles: ALL_ROLES, slot: "main", order: 40, Component: UpcomingEvents },
+  { id: "upcoming-events", roles: ["owner", "head", "accountant", "teacher", "parent"], slot: "main", order: 40, Component: UpcomingEvents },
   { id: "birthdays-week", roles: ["owner", "head", "teacher"], slot: "main", order: 45, Component: BirthdaysWeek },
 ];

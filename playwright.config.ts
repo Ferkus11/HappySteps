@@ -17,7 +17,8 @@ export default defineConfig({
     locale: "ru-RU",
     timezoneId: "Asia/Almaty",
     trace: "retain-on-failure",
-    launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : undefined,
+    // --lang makes native date/time inputs render like a Russian device (24h, dd.mm.yyyy).
+    launchOptions: { args: ["--lang=ru-RU"], ...(process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {}) },
   },
   projects: [
     { name: "e2e", testMatch: "e2e/**/*.spec.ts", use: { ...devices["Desktop Chrome"], locale: "ru-RU", viewport: { width: 1440, height: 900 } } },

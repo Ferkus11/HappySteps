@@ -49,7 +49,7 @@ async function KitchenMenu({ ctx }: { ctx: KgContext }) {
         title={t("kitchenWidget")}
         href="/menu"
         action={
-          <Button asChild size="sm" data-testid="menu-kitchen-edit">
+          <Button asChild size="sm" variant="secondary" data-testid="menu-kitchen-edit">
             <Link href={`/menu/edit?date=${today}`}>
               <Pencil /> {t("edit")}
             </Link>
@@ -70,7 +70,7 @@ async function KitchenMenu({ ctx }: { ctx: KgContext }) {
                     </Link>
                   ) : null}
                 </div>
-                {filled ? <MealList menu={menus[d]} meals={meals} compact /> : <p className="rounded-xl bg-surface-muted px-3 py-3 text-sm text-muted">{t("empty")}</p>}
+                {filled ? <MealList menu={menus[d]} meals={meals} compact /> : <p className="rounded-xl bg-surface-muted px-3 py-3 text-sm text-muted">{t("emptyEditor")}</p>}
               </section>
             );
           }),
@@ -82,6 +82,6 @@ async function KitchenMenu({ ctx }: { ctx: KgContext }) {
 
 export const menuWidgets: DashboardWidget[] = [
   { id: "menu-today", roles: ["owner", "head", "accountant", "teacher", "club_teacher", "parent"], slot: "main", order: 30, Component: MenuToday },
-  { id: "menu-kitchen", roles: ["cook"], slot: "top", order: 10, Component: KitchenMenu },
-  { id: "menu-allergies", roles: ["cook"], slot: "main", order: 20, Component: AllergiesCard },
+  { id: "menu-kitchen", roles: ["cook"], slot: "top", order: 20, Component: KitchenMenu },
+  { id: "menu-allergies", roles: ["cook"], slot: "main", order: 25, Component: AllergiesCard },
 ];

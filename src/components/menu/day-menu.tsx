@@ -86,7 +86,7 @@ export async function DayMenuCard({
         <EmptyState
           className="py-6"
           icon={UtensilsCrossed}
-          title={t("empty")}
+          title={canEdit ? t("emptyEditor") : t("empty")}
           hint={canEdit ? undefined : t("emptyHint")}
           action={
             canEdit ? (

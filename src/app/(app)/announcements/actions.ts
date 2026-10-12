@@ -107,7 +107,8 @@ export async function uploadAnnouncementFileAction(id: string, form: FormData) {
     const up = await service.storage.from(BUCKET).upload(path, file, { contentType: file.type });
     if (up.error) throw new ActionError("generic");
     const name = (file.name || `file.${ext}`).slice(0, 200);
-    const ins = await supabase
+    // Permission checked above (announcement_manageable); rows are written by the server only.
+    const ins = await service
       .from("announcement_files")
       .insert({ announcement_id: id, kindergarten_id: ctx.kg.id, kind: isPdf ? "pdf" : "photo", path, name, mime: file.type, size: file.size });
     if (ins.error) {

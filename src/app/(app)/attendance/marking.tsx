@@ -145,7 +145,7 @@ function ToggleButton({ active, tone, onClick, label, testId }: { active: boolea
         "flex h-14 w-[68px] cursor-pointer flex-col items-center justify-center gap-0.5 rounded-2xl border text-[12px] font-bold transition-colors select-none active:scale-[0.97]",
         !active && "border-border bg-surface-muted text-muted",
         active && tone === "present" && "border-success bg-success text-white",
-        active && tone === "absent" && "border-tile-absent-fg bg-tile-absent-fg text-white",
+        active && tone === "absent" && "border-tile-absent-fg/50 bg-tile-absent text-tile-absent-fg",
       )}
     >
       <Icon className="size-5" strokeWidth={2.6} aria-hidden />

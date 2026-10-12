@@ -44,14 +44,8 @@ const scheduleSchema = z.object({
 export async function saveScheduleAction(input: z.input<typeof scheduleSchema>) {
   return kgAction([...ADMIN], async (ctx, supabase) => {
     const v = parse(scheduleSchema, input);
-    check(await supabase.from("staff_schedules").delete().eq("kindergarten_id", ctx.kg.id).eq("user_id", v.userId));
-    if (v.days.length) {
-      check(
-        await supabase.from("staff_schedules").insert(
-          v.days.map((d) => ({ kindergarten_id: ctx.kg.id, user_id: v.userId, weekday: d.weekday, start_time: d.start, end_time: d.end })),
-        ),
-      );
-    }
+    // One transaction: a failed insert never leaves the person without a schedule.
+    check(await supabase.rpc("worktime_save_schedule", { kg: ctx.kg.id, p_user: v.userId, p_days: v.days }));
     await audit(supabase, ctx.kg.id, "worktime.schedule", "person", v.userId, {
       days: v.days.map((d) => `${d.weekday}:${hhmm(d.start)}-${hhmm(d.end)}`),
     });

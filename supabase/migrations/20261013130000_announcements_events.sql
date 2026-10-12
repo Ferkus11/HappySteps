@@ -45,6 +45,8 @@ create table public.announcement_files (
   kind text not null check (kind in ('photo', 'pdf')),
   path text not null unique,
   name text not null check (length(name) between 1 and 200),
+  -- files live under <kindergarten>/<announcement>/ — a row can never point at someone else's object
+  check (path like kindergarten_id::text || '/' || announcement_id::text || '/%'),
   mime text not null,
   size int not null check (size > 0 and size <= 15 * 1024 * 1024),
   created_at timestamptz not null default now()
@@ -267,6 +269,8 @@ create policy announcements_select on public.announcements for select to authent
 );
 create policy announcements_insert on public.announcements for insert to authenticated
   with check (author_id = auth.uid() and public.can_publish(kindergarten_id, audience));
+revoke insert on public.announcements from authenticated;
+grant insert (kindergarten_id, author_id, audience, title, body, important) on public.announcements to authenticated;
 create policy announcements_update on public.announcements for update to authenticated
   using (public.is_admin(kindergarten_id) or (author_id = auth.uid() and public.is_member(kindergarten_id)))
   with check ((public.is_admin(kindergarten_id) or author_id = auth.uid()) and public.can_publish(kindergarten_id, audience));
@@ -295,8 +299,8 @@ revoke update, delete on public.announcement_reads from authenticated;
 
 create policy announcement_files_select on public.announcement_files for select to authenticated
   using (public.announcement_visible(announcement_id));
-create policy announcement_files_insert on public.announcement_files for insert to authenticated
-  with check (public.announcement_manageable(announcement_id));
+-- rows are inserted by the upload action with the service role, after its own permission check
+revoke insert on public.announcement_files from authenticated;
 create policy announcement_files_delete on public.announcement_files for delete to authenticated
   using (public.announcement_manageable(announcement_id));
 revoke update on public.announcement_files from authenticated;
@@ -306,11 +310,16 @@ create policy events_select on public.events for select to authenticated using (
   public.is_member(kindergarten_id)
   and (author_id = auth.uid() or public.in_audience(kindergarten_id, audience, public.event_group_ids(id)))
 );
+-- "Выходной день сада" also creates a holiday row (D-022), so only owner/head may use that kind.
 create policy events_insert on public.events for insert to authenticated
-  with check (author_id = auth.uid() and public.can_publish(kindergarten_id, audience));
+  with check (author_id = auth.uid() and public.can_publish(kindergarten_id, audience)
+              and (kind <> 'day_off' or public.is_admin(kindergarten_id)));
+revoke insert on public.events from authenticated;
+grant insert (kindergarten_id, author_id, audience, kind, title, date, start_time, end_time, place, description) on public.events to authenticated;
 create policy events_update on public.events for update to authenticated
   using (public.is_admin(kindergarten_id) or (author_id = auth.uid() and public.is_member(kindergarten_id)))
-  with check ((public.is_admin(kindergarten_id) or author_id = auth.uid()) and public.can_publish(kindergarten_id, audience));
+  with check ((public.is_admin(kindergarten_id) or author_id = auth.uid()) and public.can_publish(kindergarten_id, audience)
+              and (kind <> 'day_off' or public.is_admin(kindergarten_id)));
 create policy events_delete on public.events for delete to authenticated
   using (public.is_admin(kindergarten_id) or (author_id = auth.uid() and public.is_member(kindergarten_id)));
 revoke update on public.events from authenticated;
@@ -403,7 +412,8 @@ grant execute on function public.claim_event_reminders(uuid, date) to service_ro
 
 -- Birthdays in [p_from, p_to] (≤ 400 days) the current user may see (SPEC §5.6):
 --   owner/head/accountant: all active children + staff; teacher: children of own groups + staff;
---   parent: own children only; club_teacher/cook: staff only. Roles of one person are combined.
+--   parent: own children only; club_teacher/cook: none. Roles of one person are combined.
+--   Staff rows never expose the year of birth (birth_date and age are null).
 create or replace function public.calendar_birthdays(p_kg uuid, p_from date, p_to date)
   returns table (kind text, person_id uuid, full_name text, birth_date date, day date, age int, group_name text)
   language sql stable security definer set search_path = public as $$
@@ -421,11 +431,14 @@ create or replace function public.calendar_birthdays(p_kg uuid, p_from date, p_t
     select 'staff', p.id, p.full_name, p.birth_date, null
     from profiles p
     where p.birth_date is not null
-      and public.is_staff(p_kg)
+      and public.has_role(p_kg, array['owner','head','accountant','teacher']::public.app_role[])
       and exists (select 1 from memberships m where m.user_id = p.id and m.kindergarten_id = p_kg
                   and m.status = 'active' and m.role <> 'parent')
   )
-  select x.kind, x.person_id, x.full_name, x.birth_date, d.day, (extract(year from d.day) - extract(year from x.birth_date))::int, x.group_name
+  select x.kind, x.person_id, x.full_name,
+         case when x.kind = 'child' then x.birth_date end, d.day,
+         case when x.kind = 'child' then (extract(year from d.day) - extract(year from x.birth_date))::int end,
+         x.group_name
   from people x
   cross join yrs
   cross join lateral (select (x.birth_date + make_interval(years => yrs.y - extract(year from x.birth_date)::int))::date as day) d

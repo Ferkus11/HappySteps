@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { kgAction, parse, check } from "@/lib/actions/safe";
 import { ActionError } from "@/lib/actions/result";
 import { audit } from "@/lib/audit";
@@ -52,8 +53,22 @@ export async function createEventAction(input: EventInput) {
       await supabase.from("events").delete().eq("id", created.id);
       throw e;
     }
+    await syncDayOff(supabase, ctx.kg.id, v);
     return { id: created.id as string, date: v.date };
   });
+}
+
+/**
+ * "Выходной день сада" must also stop attendance/work-time expectations, which read the holidays table
+ * (single source of truth for days off, D-022). Owner/head only — enforced by the events policies too.
+ */
+async function syncDayOff(supabase: SupabaseClient, kgId: string, v: { kind: string; date: string; title: string }) {
+  if (v.kind !== "day_off") return;
+  check(
+    await supabase
+      .from("holidays")
+      .upsert({ kindergarten_id: kgId, date: v.date, name: v.title.slice(0, 120), kind: "day_off" }, { onConflict: "kindergarten_id,date" }),
+  );
 }
 
 export async function updateEventAction(id: string, input: EventInput) {
@@ -64,6 +79,7 @@ export async function updateEventAction(id: string, input: EventInput) {
     const updated = check(await supabase.from("events").update(row(v)).eq("id", id).eq("kindergarten_id", ctx.kg.id).select("id"));
     if (!updated.length) throw new ActionError("forbidden");
     await syncGroups(supabase, "event_groups", "event_id", id, ctx.kg.id, groupIds);
+    await syncDayOff(supabase, ctx.kg.id, v);
     return { id, date: v.date };
   });
 }

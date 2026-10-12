@@ -35,7 +35,7 @@ test.afterAll(async () => {
 
 test("cook fills today's menu with the keyboard → parent sees it on the dashboard and in /menu", async ({ page }) => {
   await login(page, PHONES.cook);
-  await expect(page.getByTestId("menu-kitchen-today")).toContainText("Повар ещё не заполнил меню");
+  await expect(page.getByTestId("menu-kitchen-today")).toContainText("Меню ещё не заполнено");
   await page.getByTestId("menu-kitchen-edit").click();
   await page.waitForURL(`**/menu/edit?date=${TODAY}`);
 
@@ -53,7 +53,7 @@ test("cook fills today's menu with the keyboard → parent sees it on the dashbo
 
   await page.goto("/");
   await expect(page.getByTestId("menu-kitchen-today")).toContainText("Каша гречневая E2E, Чай с лимоном");
-  await expect(page.getByTestId("menu-kitchen-tomorrow")).toContainText("Повар ещё не заполнил меню");
+  await expect(page.getByTestId("menu-kitchen-tomorrow")).toContainText("Меню ещё не заполнено");
 
   await login(page, PHONES.parent);
   const widget = page.getByTestId("menu-today");
@@ -98,7 +98,7 @@ test("cook copies a day (with overwrite confirmation) and clears it", async ({ p
   await page.getByTestId("confirm-ok").click();
   await expectToast(page, "Меню удалено");
   await page.goto("/menu");
-  await expect(page.getByTestId(`menu-day-${TOMORROW}`)).toContainText("Повар ещё не заполнил меню");
+  await expect(page.getByTestId(`menu-day-${TOMORROW}`)).toContainText("Меню ещё не заполнено");
   await expect(page.getByTestId("menu-fill")).toBeVisible();
 });
 

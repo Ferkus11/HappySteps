@@ -78,7 +78,9 @@ create unique index work_sessions_one_open on public.work_sessions (kindergarten
 -- Is the user a staff member (any non-parent role, active or archived) of the kindergarten?
 create or replace function public.worktime_is_staff_member(kg uuid, u uuid) returns boolean
   language sql stable security definer set search_path = public as $$
-  select exists (select 1 from memberships m where m.kindergarten_id = kg and m.user_id = u and m.role <> 'parent')
+  -- answers only for the caller's own gardens (or server-side calls without a user)
+  select (auth.uid() is null or public.is_member(kg))
+     and exists (select 1 from memberships m where m.kindergarten_id = kg and m.user_id = u and m.role <> 'parent')
 $$;
 revoke execute on function public.worktime_is_staff_member(uuid, uuid) from public, anon;
 grant execute on function public.worktime_is_staff_member(uuid, uuid) to authenticated, service_role;
@@ -93,7 +95,8 @@ grant execute on function public.worktime_sees_all(uuid) to authenticated, servi
 
 create or replace function public.worktime_tz(kg uuid) returns text
   language sql stable security definer set search_path = public as $$
-  select coalesce((select timezone from kindergarten_settings where kindergarten_id = kg), 'Asia/Almaty')
+  select coalesce((select timezone from kindergarten_settings
+                   where kindergarten_id = kg and (auth.uid() is null or public.is_member(kg))), 'Asia/Almaty')
 $$;
 revoke execute on function public.worktime_tz(uuid) from public, anon;
 grant execute on function public.worktime_tz(uuid) to authenticated, service_role;
@@ -372,7 +375,7 @@ create or replace function public.worktime_range(kg uuid, p_from date, p_to date
          case
            when l.first_start is not null then
              case when l.late_min > l.thr then 'late' when l.open then 'work' else 'done' end
-           when l.a_kind is not null then 'absent'
+           when l.a_kind is not null and l.s_start is not null then 'absent'
            when l.s_start is null then 'off'
            when l.d < l.today or (l.d = l.today and l.now_local >= l.d + l.s_start + make_interval(mins => l.thr)) then 'unmarked'
            else 'upcoming'
@@ -441,3 +444,16 @@ grant execute on function public.worktime_start(uuid) to authenticated;
 grant execute on function public.worktime_finish(uuid) to authenticated;
 grant execute on function public.worktime_edit_session(uuid, date, time, time, text) to authenticated;
 grant execute on function public.worktime_add_session(uuid, uuid, date, time, time, text) to authenticated;
+
+-- Replaces a weekly template atomically (caller's rights — RLS on staff_schedules applies).
+-- p_days: [{ "weekday": 1, "start": "08:00", "end": "17:00" }, ...]; missing weekdays are days off.
+create or replace function public.worktime_save_schedule(kg uuid, p_user uuid, p_days jsonb) returns void
+  language plpgsql security invoker set search_path = public as $$
+begin
+  delete from staff_schedules where kindergarten_id = kg and user_id = p_user;
+  insert into staff_schedules (kindergarten_id, user_id, weekday, start_time, end_time)
+  select kg, p_user, (d ->> 'weekday')::smallint, (d ->> 'start')::time, (d ->> 'end')::time
+  from jsonb_array_elements(coalesce(p_days, '[]'::jsonb)) d;
+end $$;
+revoke execute on function public.worktime_save_schedule(uuid, uuid, jsonb) from public, anon;
+grant execute on function public.worktime_save_schedule(uuid, uuid, jsonb) to authenticated;

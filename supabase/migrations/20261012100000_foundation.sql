@@ -529,6 +529,8 @@ create or replace function public.child_group_on(p_child uuid, p_date date) retu
     (select group_id from children where id = p_child)
   )
 $$;
+revoke execute on function public.child_group_on(uuid, date) from public, anon;
+grant execute on function public.child_group_on(uuid, date) to authenticated, service_role;
 
 -- Allergy list for the kitchen without exposing other child data (SPEC §3.4: cook 👁 аллергии).
 create or replace function public.kitchen_allergies(kg uuid)

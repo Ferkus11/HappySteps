@@ -36,7 +36,7 @@ export interface CalBirthday {
   person_id: string;
   full_name: string;
   day: string;
-  age: number;
+  age: number | null;
   group_name: string | null;
 }
 export interface CalDayOff {
@@ -273,7 +273,7 @@ function DayList({ info, onOpen }: { info: { events: CalEvent[]; birthdays: CalB
           <span className="min-w-0 flex-1">
             <span className="block truncate font-semibold">{b.full_name}</span>
             <span className="block text-[13px] text-muted">
-              {b.kind === "child" ? t("turnsChild", { age: b.age }) : t("staffBirthday")}
+              {b.kind === "child" ? t("turnsChild", { age: b.age ?? 0 }) : t("staffBirthday")}
               {b.group_name ? ` · ${b.group_name}` : ""}
             </span>
           </span>

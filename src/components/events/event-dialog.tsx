@@ -110,7 +110,8 @@ export function EventDialog({
           </Field>
           <Field label={t("kind")} htmlFor="e-kind">
             <Select id="e-kind" name="kind" defaultValue={event?.kind ?? "matinee"} data-testid="event-kind">
-              {EVENT_KINDS.map((k) => (
+              {/* A garden day off also blocks attendance/work-time expectations — owner/head only (they may target "all"). */}
+              {EVENT_KINDS.filter((k) => k !== "day_off" || audiences.includes("all") || event?.kind === "day_off").map((k) => (
                 <option key={k} value={k}>
                   {t(`kinds.${k}`)}
                 </option>

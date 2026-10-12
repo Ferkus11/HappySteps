@@ -4,7 +4,7 @@ import { z } from "zod";
 import { kgAction, parse, check } from "@/lib/actions/safe";
 import { ActionError } from "@/lib/actions/result";
 import { audit } from "@/lib/audit";
-import { notify } from "@/lib/notify";
+import { memberIds, notify } from "@/lib/notify";
 import { addDays, formatDate, todayIn } from "@/lib/format";
 import { zDate, zUuid } from "@/lib/validation";
 import { ABSENCE_REASONS } from "@/lib/attendance-logic";
@@ -87,9 +87,10 @@ export async function reportAbsenceAction(input: z.input<typeof reportSchema>) {
     const { data: child } = await supabase.from("children").select("full_name, group_id").eq("id", v.childId).maybeSingle();
     if (child?.group_id) {
       const { data: teachers } = await supabase.from("group_teachers").select("user_id").eq("group_id", child.group_id);
+      const active = new Set(await memberIds(ctx.kg.id, ["teacher"])); // archived teachers get nothing
       await notify({
         kindergartenId: ctx.kg.id,
-        userIds: (teachers ?? []).map((t) => t.user_id as string),
+        userIds: (teachers ?? []).map((t) => t.user_id as string).filter((id) => active.has(id)),
         type: "absence.reported",
         params: { child: child.full_name, reason: v.reason, period: v.from === v.to ? formatDate(v.from) : `${formatDate(v.from)} — ${formatDate(v.to)}` },
         url: `/attendance?group=${child.group_id}`,

@@ -130,7 +130,8 @@ create or replace function public.expected_portions(kg uuid, d date)
                  marked int, present int, absent int, expected int, unmarked int)
   language plpgsql stable security definer set search_path = public as $$
 begin
-  if not public.is_staff(kg) then
+  -- club teachers have no access to attendance (SPEC §3.4)
+  if not public.has_role(kg, array['owner','head','accountant','teacher','cook']::public.app_role[]) then
     raise exception 'hs:forbidden' using errcode = '42501';
   end if;
   return query
@@ -169,8 +170,8 @@ begin
   end if;
   if new.status = 'absent' then
     rep := public.active_absence_report(new.child_id, new.date);
+    new.absence_report_id := rep.id; -- never trust a client-supplied link
     if rep.id is not null then
-      new.absence_report_id := rep.id;
       new.reason := coalesce(new.reason, rep.reason);
     end if;
   else
@@ -275,7 +276,8 @@ create or replace function public.attendance_reminders_due(p_now timestamptz def
     from kindergarten_settings s
     where public.kg_is_open(s.kindergarten_id)
   ), open_kgs as (
-    select * from kgs where public.kg_is_working_day(kg, d) and t >= rt
+    -- a missed cron run must not produce a "mark attendance" reminder late in the day
+    select * from kgs where public.kg_is_working_day(kg, d) and t >= rt and t < rt + interval '4 hours'
   ), unmarked as (
     select k.kg, k.d, k.t, k.et, g.id as gid, g.name as gname
     from open_kgs k
@@ -323,7 +325,8 @@ create policy child_attendance_update on public.child_attendance for update to a
 create policy child_attendance_delete on public.child_attendance for delete to authenticated
   using (public.is_admin(kindergarten_id) or (public.teaches_group(group_id) and date = public.kg_today(kindergarten_id)));
 -- Upserts (PostgREST `on conflict do update`) touch the key columns too; the trigger rejects changing them.
-revoke update on public.child_attendance from authenticated;
+revoke insert, update on public.child_attendance from authenticated;
+grant insert (kindergarten_id, child_id, date, status, reason) on public.child_attendance to authenticated;
 grant update (kindergarten_id, child_id, date, status, reason) on public.child_attendance to authenticated;
 
 -- Absence reports: staff that see attendance read them; parents read and create for own children

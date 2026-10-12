@@ -185,13 +185,14 @@ describe("announcements · reads, stats, reminders", () => {
 });
 
 describe("announcements · files and storage", () => {
-  it("file rows follow the announcement's visibility; only managers add them", async () => {
+  it("file rows follow the announcement's visibility; clients can't add them", async () => {
     await inTx(async (c, become) => {
       const id = await publish(c, become, "head", "staff");
+      await c.query("reset role"); // file rows are written by the server (service role) only
       await c.query("insert into announcement_files (announcement_id, kindergarten_id, kind, path, name, mime, size) values ($1, $2, 'pdf', $3, 'a.pdf', 'application/pdf', 100)", [
         id,
         F.A,
-        `${F.A}/announcements/${id}/x.pdf`,
+        `${F.A}/${id}/x.pdf`,
       ]);
       await become(F.users.cook);
       expect((await c.query("select 1 from announcement_files where announcement_id = $1", [id])).rowCount).toBe(1);
