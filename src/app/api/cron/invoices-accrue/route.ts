@@ -6,8 +6,9 @@ export const dynamic = "force-dynamic";
 
 /**
  * Daily: makes sure every active kindergarten has this month's invoices (SPEC §5.9 — accrual on the 1st,
- * in the kindergarten's time zone). Idempotent: invoices_accrue() creates only missing (child, month) rows,
- * so a later run also picks up children added during the month.
+ * in the kindergarten's time zone). Idempotent: invoices_accrue() creates only missing (child, month) rows for
+ * children who have already started (enrolled_on ≤ today), so the run on the 1st bills everyone enrolled by then
+ * and a child starting mid-month is billed on their first day (full fee, flagged for the accountant to check).
  */
 export async function GET(req: Request) {
   const denied = cronUnauthorized(req);

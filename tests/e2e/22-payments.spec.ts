@@ -48,6 +48,12 @@ async function serverReceipt(child: string, period: string, uploadedBy: string |
   return data.id as string;
 }
 
+/** Sum of the open balances of a month (what the month list must show as «Долг»). */
+async function monthDebt(period: string) {
+  const { data } = await db.from("invoices").select("balance").eq("kindergarten_id", A).eq("period", period);
+  return (data ?? []).reduce((s, r) => s + Number(r.balance), 0);
+}
+
 async function ownerDebt(page: Page) {
   await login(page, PHONES.owner);
   const el = page.getByTestId("dash-payments");
@@ -76,36 +82,49 @@ test.afterAll(async () => {
   await db.from("notifications").delete().eq("kindergarten_id", A).like("type", "receipt.%");
 });
 
-test("accountant accrues the current month; a second click creates nothing (idempotent)", async ({ page }) => {
+test("accountant accrues the current month after a confirmation; a second run creates nothing; older months are not offered", async ({ page }) => {
   await login(page, PHONES.accountant);
+  // two months back: before the first billed month and outside the window — no accrual button at all
+  await page.goto(`/payments?tab=month&month=${month(-2).slice(0, 7)}`);
+  await expect(page.getByText("За этот месяц счетов нет")).toBeVisible();
+  await expect(page.getByTestId("accrue-month")).toHaveCount(0);
   await page.goto(`/payments?tab=month&month=${CUR.slice(0, 7)}`);
   await expect(page.getByText("За этот месяц счетов нет")).toBeVisible();
   await page.getByTestId("accrue-month").click();
+  await expect(page.getByRole("dialog")).toContainText(/Начислить счета за [а-я]+ \d{4}\?/);
+  await page.getByRole("button", { name: "Отмена" }).click();
+  expect((await db.from("invoices").select("id", { count: "exact", head: true }).eq("kindergarten_id", A).eq("period", CUR)).count).toBe(0);
+  await page.getByTestId("accrue-month").click();
+  await page.getByTestId("confirm-ok").click();
   await expectToast(page, /Создано? \d+ сч/);
   await expect(page.getByTestId("month-row").filter({ hasText: "Ахметов Алихан" })).toBeVisible();
   const { count } = await db.from("invoices").select("id", { count: "exact", head: true }).eq("kindergarten_id", A).eq("period", CUR);
   expect(count).toBeGreaterThanOrEqual(4);
   await page.getByTestId("accrue-month").click();
+  await page.getByTestId("confirm-ok").click();
   await expectToast(page, "Новых счетов нет — все уже начислены");
   const again = await db.from("invoices").select("id", { count: "exact", head: true }).eq("kindergarten_id", A).eq("period", CUR);
   expect(again.count).toBe(count);
-  // totals: 4 fee-paying children; Алихан and Миша have nothing carried
-  await expect(page.getByTestId("month-row").filter({ hasText: "Касымова Айлин" })).toContainText("120 000 ₸"); // 60 000 carried + 60 000
+  // FIFO: the month list shows only this month's own balance — Айлин's unpaid previous month stays in its own month
+  await expect(page.getByTestId("month-row").filter({ hasText: "Касымова Айлин" })).toContainText("60 000 ₸");
+  await expect(page.getByTestId("total-debt")).toHaveAttribute("data-value", String(await monthDebt(CUR)));
 });
 
 test("scenario 5: receipt → rejected with a reason → parent notified, uploads again → confirmed → paid, debt gone", async ({ page, browser }) => {
   const debtBefore = await ownerDebt(page);
   expect(debtBefore).toBeGreaterThan(0);
 
-  // Parent: amount, requisites with copy buttons, upload a receipt.
+  // Parent: amount, requisites with copy buttons; a file that only pretends to be an image is refused (type from bytes).
   await login(page, PHONES.parent);
   await page.goto("/payments");
   const card = page.getByTestId("current-invoice").filter({ has: page.getByTestId("parent-to-pay") }).first();
   await expect(card.getByTestId("parent-to-pay")).toHaveText("65 000 ₸");
   await expect(page.getByTestId("requisite-kaspi")).toHaveText("+7 701 000 00 00");
-  await expect(page.getByTestId("requisite-purpose")).toContainText("Ахметов Алихан Даниярович");
+  await expect(page.getByTestId("requisite-purpose")).toContainText(/Ахметов Алихан Даниярович, за [а-я]+ \d{4}/);
   await expect(page.getByTestId("copy-iban")).toBeVisible();
   await expect(page.getByTestId("upload-receipt").first()).toHaveAttribute("data-ready", "true");
+  await page.getByTestId("receipt-file").setInputFiles({ name: "receipt.png", mimeType: "image/png", buffer: Buffer.from("<html>not an image</html>") });
+  await expectToast(page, "Этот формат не поддерживается");
   await page.getByTestId("receipt-file").setInputFiles(RECEIPT);
   await expectToast(page, "Чек отправлен на проверку");
   await expect(card.getByTestId("invoice-status")).toHaveAttribute("data-status", "review");
@@ -131,6 +150,7 @@ test("scenario 5: receipt → rejected with a reason → parent notified, upload
   // Parent is notified, sees the reason and uploads again.
   const notes = await db.from("notifications").select("params").eq("type", "receipt.rejected").eq("user_id", users.parent);
   expect(notes.data!.map((n) => n.params.reason)).toContain(REASON);
+  expect(notes.data!.map((n) => n.params.month)).toContain(CUR.slice(0, 7)); // YYYY-MM, named in the reader's language
   await login(page, PHONES.parent);
   await page.goto("/payments");
   await expect(page.getByTestId("rejected-reason")).toContainText(REASON);
@@ -174,7 +194,7 @@ test("accountant adjusts an amount: the comment is required and the change is au
   await login(page, PHONES.accountant);
   await page.goto(`/payments?tab=month&month=${CUR.slice(0, 7)}`);
   await page.getByTestId("month-row").filter({ hasText: "Смирнов Миша" }).click();
-  await expect(page.getByTestId("invoice-title")).toContainText("Счёт за");
+  await expect(page.getByTestId("invoice-title")).toContainText(/^Счёт за [а-я]+ \d{4}$/);
   await page.getByTestId("adjust-invoice").click();
   await page.getByTestId("adjust-amount").fill("50000");
   await page.getByTestId("adjust-submit").click();
@@ -191,7 +211,7 @@ test("accountant adjusts an amount: the comment is required and the change is au
   expect(a.data!.details).toMatchObject({ comment: "Скидка: второй ребёнок в саду", to: 50000 });
 });
 
-test("partial payment leaves «Частично» and carries the rest; an overpayment becomes next month's advance", async ({ page }) => {
+test("partial payment leaves «Частично» and the rest open in its month; an overpayment pays the next month", async ({ page }) => {
   await serverReceipt("Сабина", PREV);
   await serverReceipt("Айлин", PREV);
   await login(page, PHONES.accountant);
@@ -207,15 +227,58 @@ test("partial payment leaves «Частично» and carries the rest; an overp
     await expect(page.getByTestId("receipt-item").filter({ hasText: name })).toHaveCount(0);
   }
   await page.goto(`/payments?tab=month&month=${PREV.slice(0, 7)}`);
-  await expect(page.getByTestId("month-row").filter({ hasText: "Бекова Сабина" })).toHaveAttribute("data-status", "partial");
+  // previous month: 20 000 still open after its due date → «Просрочен» (stored status is «Частично»)
+  await expect(page.getByTestId("month-row").filter({ hasText: "Бекова Сабина" })).toHaveAttribute("data-status", "overdue");
+  expect((await invoice("Сабина", PREV)).status).toBe("partial");
   await expect(page.getByTestId("month-row").filter({ hasText: "Касымова Айлин" })).toHaveAttribute("data-status", "paid");
 
   await page.goto(`/payments/${(await invoice("Сабина", CUR)).id}`);
   await expect(page.getByTestId("invoice-carried-debt")).toHaveText("+20 000 ₸");
   await expect(page.getByTestId("invoice-to-pay")).toHaveText("80 000 ₸");
   await page.goto(`/payments/${(await invoice("Айлин", CUR)).id}`);
-  await expect(page.getByTestId("invoice-carried-advance")).toHaveText("−10 000 ₸");
+  await expect(page.getByTestId("invoice-carried-debt")).toHaveCount(0);
+  await expect(page.getByTestId("invoice-paid")).toHaveText("−10 000 ₸"); // 70 000 − 60 000 of the previous month
   await expect(page.getByTestId("invoice-to-pay")).toHaveText("50 000 ₸");
+});
+
+test("FIFO: one receipt on the current invoice pays the older debt first and both months become «Оплачен»; a wrong confirmation can be reverted", async ({ page }) => {
+  // Сабина: previous month 20 000 still open, current month 60 000 → the statement asks for 80 000.
+  const rid = await serverReceipt("Сабина", CUR);
+  await login(page, PHONES.accountant);
+  await page.goto("/payments");
+  await page.getByTestId("receipt-item").filter({ hasText: "Бекова Сабина" }).getByTestId("open-receipt").click();
+  await expect(page.getByTestId("confirmed-amount")).toHaveValue("80000");
+  await page.getByTestId("receipt-confirm").click();
+  await expectToast(page, "Оплата подтверждена");
+  expect((await invoice("Сабина", PREV)).status).toBe("paid");
+  expect((await invoice("Сабина", CUR)).status).toBe("paid");
+  await page.goto(`/payments?tab=month&month=${PREV.slice(0, 7)}`);
+  await expect(page.getByTestId("month-row").filter({ hasText: "Бекова Сабина" })).toHaveAttribute("data-status", "paid");
+  await page.goto("/payments?tab=debtors");
+  await expect(page.getByTestId("debtor-row").filter({ hasText: "Бекова Сабина" })).toHaveCount(0);
+
+  // The accountant made a mistake: revert the decision (reason required) — the receipt is back in the queue.
+  await page.goto(`/payments/${(await invoice("Сабина", CUR)).id}`);
+  await page.locator('[data-testid="receipt-row"][data-status="accepted"]').first().getByTestId("open-receipt").click();
+  await page.getByTestId("receipt-revert").click();
+  await page.getByTestId("revert-submit").click();
+  await expect(page.getByText("Укажите причину отмены решения.").first()).toBeVisible();
+  await page.getByTestId("revert-reason").fill("Подтвердила не ту сумму");
+  await page.getByTestId("revert-submit").click();
+  await expectToast(page, "Решение отменено, чек снова на проверке");
+  expect((await db.from("payment_receipts").select("status").eq("id", rid).single()).data!.status).toBe("pending");
+  expect((await invoice("Сабина", PREV)).status).toBe("review");
+  const a = await db.from("audit_log").select("details, actor_id").eq("action", "receipt.revert").eq("entity_id", rid).single();
+  expect(a.data!.actor_id).toBe(users.accountant);
+  expect(a.data!.details).toMatchObject({ from: "accepted", amount: 80000, reason: "Подтвердила не ту сумму" });
+  await page.goto("/payments");
+  await expect(page.getByTestId("receipt-item").filter({ hasText: "Бекова Сабина" })).toHaveCount(1);
+  // leave it rejected so later tests see a clean queue
+  await page.getByTestId("receipt-item").filter({ hasText: "Бекова Сабина" }).getByTestId("open-receipt").click();
+  await page.getByTestId("receipt-reject").click();
+  await page.getByTestId("reject-reason").fill("Повторная проверка: сумма не совпадает");
+  await page.getByTestId("reject-submit").click();
+  await expectToast(page, "Чек отклонён, родитель получит уведомление");
 });
 
 test("head can view receipts but not confirm them; a forged confirm is rejected", async ({ page, browser }) => {

@@ -54,6 +54,7 @@
     "document.delete": "Удалён документ",
     "event.delete": "Удалено событие",
     "worktime.edit": "Правка табеля (время работы)",
-    "invoice.accrue": "Начислены счета за месяц"
+    "invoice.accrue": "Начислены счета за месяц",
+    "receipt.revert": "Отменено решение по чеку"
   }
 }
