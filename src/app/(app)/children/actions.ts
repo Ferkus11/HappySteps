@@ -4,7 +4,7 @@ import { z } from "zod";
 import { kgAction, parse, check } from "@/lib/actions/safe";
 import { ActionError } from "@/lib/actions/result";
 import { audit } from "@/lib/audit";
-import { addPersonToKindergarten, type InviteLink } from "@/lib/people";
+import { groupOverCapacity, insertChild, linkParent, type ParentInviteResult } from "@/lib/children";
 import { createServiceClient } from "@/lib/supabase/service";
 import { zDate, zMoney, zName, zOptionalText, zPhone, zUuid } from "@/lib/validation";
 
@@ -25,64 +25,23 @@ const createSchema = childSchema.extend({
   confirmOverCapacity: z.boolean().default(false),
 });
 
-export interface ParentInviteResult {
-  name: string;
-  existed: boolean;
-  invite: InviteLink | null;
-}
+export type { ParentInviteResult };
 
 export async function createChildAction(input: z.input<typeof createSchema>) {
   return kgAction(["owner", "head"], async (ctx, supabase) => {
     const v = parse(createSchema, input);
-    if (v.groupId && !v.confirmOverCapacity) {
-      const [{ data: g }, { count }] = await Promise.all([
-        supabase.from("groups").select("name, capacity").eq("id", v.groupId).single(),
-        supabase.from("children").select("id", { count: "exact", head: true }).eq("group_id", v.groupId).eq("status", "active"),
-      ]);
-      if (g && (count ?? 0) >= g.capacity) {
-        return { needsConfirm: { group: g.name as string, count: count ?? 0, capacity: g.capacity as number } } as const;
-      }
+    if (!v.confirmOverCapacity) {
+      const over = await groupOverCapacity(supabase, v.groupId);
+      if (over) return { needsConfirm: over } as const;
     }
-    const child = check(
-      await supabase
-        .from("children")
-        .insert({
-          kindergarten_id: ctx.kg.id,
-          full_name: v.fullName,
-          birth_date: v.birthDate,
-          group_id: v.groupId,
-          enrolled_on: v.enrolledOn,
-          monthly_fee: v.monthlyFee,
-          allergies: v.allergies,
-          medical_notes: v.medicalNotes,
-        })
-        .select("id")
-        .single(),
-    );
-    await audit(supabase, ctx.kg.id, "child.create", "child", child.id, { name: v.fullName });
+    const childId = await insertChild(supabase, ctx.kg.id, v);
     const invites: ParentInviteResult[] = [];
     for (const p of v.parents) {
-      invites.push(await linkParent(supabase, ctx.userId, ctx.kg.id, child.id, p));
+      const { name, existed, invite } = await linkParent(supabase, ctx.userId, ctx.kg.id, childId, p);
+      invites.push({ name, existed, invite });
     }
-    return { id: child.id as string, invites };
+    return { id: childId, invites };
   });
-}
-
-async function linkParent(
-  supabase: Awaited<ReturnType<typeof import("@/lib/supabase/server").createClient>>,
-  actorId: string,
-  kgId: string,
-  childId: string,
-  p: z.infer<typeof parentSchema>,
-): Promise<ParentInviteResult> {
-  const res = await addPersonToKindergarten({ supabase, actorId, kgId, fullName: p.fullName, phone: p.phone, role: "parent" });
-  check(
-    await supabase
-      .from("child_guardians")
-      .upsert({ child_id: childId, user_id: res.userId, kindergarten_id: kgId, relation: p.relation }, { onConflict: "child_id,user_id" }),
-  );
-  await audit(supabase, kgId, "guardian.link", "child", childId, { parent: res.userId });
-  return { name: p.fullName, existed: res.existed, invite: res.invite };
 }
 
 export async function addGuardianAction(childId: string, input: z.input<typeof parentSchema>) {
@@ -91,7 +50,8 @@ export async function addGuardianAction(childId: string, input: z.input<typeof p
     const v = parse(parentSchema, input);
     const { data: child } = await supabase.from("children").select("id").eq("id", childId).eq("kindergarten_id", ctx.kg.id).maybeSingle();
     if (!child) throw new ActionError("notFound");
-    return linkParent(supabase, ctx.userId, ctx.kg.id, childId, v);
+    const { name, existed, invite } = await linkParent(supabase, ctx.userId, ctx.kg.id, childId, v);
+    return { name, existed, invite } satisfies ParentInviteResult;
   });
 }
 
