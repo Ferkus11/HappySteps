@@ -51,6 +51,7 @@
     "chat.unlock": "Чат группы открыт",
     "club.exclude": "Ребёнок исключён из кружка",
     "waitlist.accept": "Заявка принята",
-    "document.delete": "Удалён документ"
+    "document.delete": "Удалён документ",
+    "event.delete": "Удалено событие"
   }
 }

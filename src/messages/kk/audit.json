@@ -51,6 +51,7 @@
     "chat.unlock": "Топ чаты ашылды",
     "club.exclude": "Бала үйірмеден шығарылды",
     "waitlist.accept": "Өтінім қабылданды",
-    "document.delete": "Құжат жойылды"
+    "document.delete": "Құжат жойылды",
+    "event.delete": "Іс-шара жойылды"
   }
 }
