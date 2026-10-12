@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 import type { KgContext } from "@/lib/auth/context";
 import type { Role } from "@/lib/auth/roles";
 import { cn } from "@/lib/utils";
+import { attendanceWidgets } from "@/components/attendance/widgets";
 
 /**
  * Dashboard widgets contributed by modules (SPEC §5.13).
@@ -26,7 +27,7 @@ export interface DashboardWidget {
 
 export const dashboardWidgets: DashboardWidget[] = [
   // ...worktimeWidgets,
-  // ...attendanceWidgets,
+  ...attendanceWidgets,
   // ...menuWidgets,
   // ...announcementsWidgets,
 ];

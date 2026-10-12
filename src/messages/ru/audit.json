@@ -40,6 +40,7 @@
     "worktime.absence": "Отмечено отсутствие сотрудника",
     "worktime.auto_close": "День закрыт автоматически",
     "attendance.edit_past": "Правка посещаемости задним числом",
+    "attendance.absence_cancel": "Отменён пропуск, сообщённый родителем",
     "holidays.update": "Изменены выходные и праздники",
     "announcement.delete": "Удалено объявление",
     "invoice.adjust": "Изменена сумма счёта",

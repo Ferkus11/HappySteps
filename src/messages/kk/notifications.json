@@ -7,7 +7,7 @@
     "announcement.new": { "title": "Жаңа хабарландыру", "body": "{title}" },
     "announcement.reminder": { "title": "Хабарландыру туралы еске салу", "body": "Оқып шығыңыз: {title}" },
     "event.reminder": { "title": "Ертең: {title}", "body": "{date} {time} · {place}" },
-    "absence.reported": { "title": "{child} келмейді", "body": "{reason}, {period}" },
+    "absence.reported": { "title": "{child} келмейді", "body": "{reason, select, sick {Ауырып тұр} vacation {Демалыс} family {Отбасылық жағдай} other {Басқа себеп}}: {period}" },
     "attendance.not_marked": { "title": "Келу есебі белгіленбеген", "body": "«{group}» тобы бүгін әлі белгіленбеген" },
     "receipt.new": { "title": "Тексеруге жаңа түбіртек", "body": "{child}: {amount}" },
     "receipt.accepted": { "title": "Төлем расталды", "body": "{month}: {amount}" },
