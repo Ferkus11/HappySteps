@@ -8,6 +8,7 @@ import { announcementsWidgets } from "@/components/announcements/widgets";
 import { eventsWidgets } from "@/components/events/widgets";
 import { worktimeWidgets } from "@/components/worktime/widgets";
 import { documentsWidgets } from "@/components/documents/widgets";
+import { paymentsWidgets } from "@/components/payments/widgets";
 
 /**
  * Dashboard widgets contributed by modules (SPEC §5.13).
@@ -37,6 +38,7 @@ export const dashboardWidgets: DashboardWidget[] = [
   ...eventsWidgets,
   ...worktimeWidgets,
   ...documentsWidgets,
+  ...paymentsWidgets,
 ];
 
 export function DashboardWidgets({ ctx, slot }: { ctx: KgContext; slot: DashboardWidget["slot"] }) {

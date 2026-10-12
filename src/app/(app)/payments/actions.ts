@@ -1,0 +1,141 @@
+"use server";
+
+import { randomUUID } from "node:crypto";
+import { z } from "zod";
+import { kgAction, parse, check } from "@/lib/actions/safe";
+import { ActionError } from "@/lib/actions/result";
+import { memberIds, notify } from "@/lib/notify";
+import { createServiceClient } from "@/lib/supabase/service";
+import { signedUrl } from "@/lib/kg-assets";
+import { formatMoney } from "@/lib/format";
+import { RECEIPT_MAX_BYTES, RECEIPT_TYPES, periodOf, toPay } from "@/lib/payments";
+import { zMoney, zUuid } from "@/lib/validation";
+
+const BUCKET = "receipts";
+const MANAGERS = ["owner", "accountant"] as const;
+
+/** "10.2026" — language-neutral month for notification params (texts are rendered in the reader's language). */
+const monthParam = (period: string) => `${period.slice(5, 7)}.${period.slice(0, 4)}`;
+
+/** «Начислить за месяц»: idempotent, creates missing invoices of the month (same SQL as the daily cron). */
+export async function accrueMonthAction(month: string) {
+  return kgAction([...MANAGERS], async (ctx, supabase) => {
+    const m = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "invalid").parse(month);
+    const n = check(await supabase.rpc("accrue_invoices", { p_kg: ctx.kg.id, p_period: periodOf(m) }));
+    return { count: Number(n) };
+  });
+}
+
+const adjustSchema = z.object({
+  amount: zMoney,
+  comment: z.string().trim().min(3, "adjustCommentRequired").max(500, "tooLong"),
+});
+
+/** Change one invoice's amount with a mandatory comment (audited inside SQL as invoice.adjust). */
+export async function adjustInvoiceAction(id: string, input: z.input<typeof adjustSchema>) {
+  return kgAction([...MANAGERS], async (ctx, supabase) => {
+    zUuid.parse(id);
+    const v = parse(adjustSchema, input);
+    const { data: inv } = await supabase.from("invoices").select("id").eq("id", id).eq("kindergarten_id", ctx.kg.id).maybeSingle();
+    if (!inv) throw new ActionError("notFound");
+    check(await supabase.rpc("adjust_invoice", { p_id: id, p_amount: v.amount, p_comment: v.comment }));
+  });
+}
+
+/** Parent uploads a receipt (photo/screenshot/PDF; HEIC is converted to JPEG in the browser). */
+export async function uploadReceiptAction(invoiceId: string, form: FormData) {
+  return kgAction(["parent"], async (ctx, supabase) => {
+    zUuid.parse(invoiceId);
+    const file = form.get("file");
+    if (!(file instanceof File) || file.size === 0) throw new ActionError("invalid");
+    if (file.size > RECEIPT_MAX_BYTES) throw new ActionError("fileTooLarge");
+    const ext = RECEIPT_TYPES[file.type];
+    if (!ext) throw new ActionError("fileType");
+    // RLS shows a parent only invoices of own children; is_guardian double-checks the active parent link.
+    const { data: inv } = await supabase
+      .from("invoices")
+      .select("id, child_id, period, balance, children(full_name)")
+      .eq("id", invoiceId)
+      .eq("kindergarten_id", ctx.kg.id)
+      .maybeSingle();
+    if (!inv) throw new ActionError("notFound");
+    const { data: guardian } = await supabase.rpc("is_guardian", { c: inv.child_id });
+    if (guardian !== true) throw new ActionError("forbidden");
+    const path = `${ctx.kg.id}/${inv.child_id}/${randomUUID()}.${ext}`;
+    const service = createServiceClient();
+    const up = await service.storage.from(BUCKET).upload(path, file, { contentType: file.type });
+    if (up.error) throw new ActionError("generic");
+    // Permission checked above; receipt rows are written by the server only.
+    const ins = await service.from("payment_receipts").insert({
+      kindergarten_id: ctx.kg.id,
+      invoice_id: inv.id,
+      child_id: inv.child_id,
+      uploaded_by: ctx.userId,
+      file_path: path,
+      mime: file.type,
+      size: file.size,
+    });
+    if (ins.error) {
+      await service.storage.from(BUCKET).remove([path]);
+      check(ins);
+    }
+    let staff = await memberIds(ctx.kg.id, ["accountant"]);
+    if (!staff.length) staff = await memberIds(ctx.kg.id, ["owner"]);
+    const child = (inv.children as unknown as { full_name: string } | null)?.full_name ?? "";
+    await notify({
+      kindergartenId: ctx.kg.id,
+      userIds: staff.filter((u) => u !== ctx.userId),
+      type: "receipt.new",
+      params: { child, amount: formatMoney(toPay({ balance: Number(inv.balance) })), month: monthParam(String(inv.period)) },
+      url: "/payments?tab=review",
+    });
+  });
+}
+
+const reviewSchema = z.discriminatedUnion("accept", [
+  z.object({ accept: z.literal(true), amount: z.coerce.number({ message: "numberInvalid" }).positive("numberInvalid").max(100_000_000, "numberInvalid") }),
+  z.object({ accept: z.literal(false), reason: z.string().trim().min(3, "rejectReasonRequired").max(500, "tooLong") }),
+]);
+
+/** Accountant/owner confirms (with the confirmed amount) or rejects (with a reason) a pending receipt. */
+export async function reviewReceiptAction(id: string, input: z.input<typeof reviewSchema>) {
+  return kgAction([...MANAGERS], async (ctx, supabase) => {
+    zUuid.parse(id);
+    const v = parse(reviewSchema, input);
+    const { data: rec } = await supabase.from("payment_receipts").select("id, child_id").eq("id", id).eq("kindergarten_id", ctx.kg.id).maybeSingle();
+    if (!rec) throw new ActionError("notFound");
+    const r = check(
+      await supabase.rpc("review_receipt", {
+        p_id: id,
+        p_accept: v.accept,
+        p_amount: v.accept ? v.amount : null,
+        p_reason: v.accept ? null : v.reason,
+      }),
+    ) as { invoice_id: string; child_id: string; confirmed_amount: string | null; reject_reason: string | null };
+    const { data: inv } = await supabase.from("invoices").select("period").eq("id", r.invoice_id).single();
+    // Every active parent of the child (the uploader and co-guardians) learns the result.
+    const { data: links } = await createServiceClient().from("child_guardians").select("user_id").eq("child_id", r.child_id);
+    const parents = new Set(await memberIds(ctx.kg.id, ["parent"]));
+    const ids = (links ?? []).map((l) => l.user_id as string).filter((u) => parents.has(u));
+    const month = inv ? monthParam(String(inv.period)) : "";
+    await notify({
+      kindergartenId: ctx.kg.id,
+      userIds: ids,
+      type: v.accept ? "receipt.accepted" : "receipt.rejected",
+      params: v.accept ? { month, amount: formatMoney(r.confirmed_amount) } : { month, reason: r.reject_reason },
+      url: "/payments",
+    });
+  });
+}
+
+/** Short-lived link to a receipt file; RLS decides who may read the row (staff with access, the child's parents). */
+export async function receiptUrlAction(id: string) {
+  return kgAction(["owner", "head", "accountant", "parent"], async (ctx, supabase) => {
+    zUuid.parse(id);
+    const { data } = await supabase.from("payment_receipts").select("file_path, mime").eq("id", id).eq("kindergarten_id", ctx.kg.id).maybeSingle();
+    if (!data) throw new ActionError("notFound");
+    const url = await signedUrl(BUCKET, data.file_path as string, 120);
+    if (!url) throw new ActionError("generic");
+    return { url, mime: data.mime as string };
+  });
+}

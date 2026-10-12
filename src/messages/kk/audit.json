@@ -53,6 +53,7 @@
     "waitlist.accept": "Өтінім қабылданды",
     "document.delete": "Құжат жойылды",
     "event.delete": "Іс-шара жойылды",
-    "worktime.edit": "Табельді түзету (жұмыс уақыты)"
+    "worktime.edit": "Табельді түзету (жұмыс уақыты)",
+    "invoice.accrue": "Айға шоттар есептелді"
   }
 }
