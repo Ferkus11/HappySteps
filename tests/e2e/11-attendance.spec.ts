@@ -158,7 +158,9 @@ test("teacher can't open another group; cook can't open the lists of names", asy
   await login(page, PHONES.cook);
   await page.goto(`/attendance?group=${gA1}`);
   await expect(page).toHaveURL((u) => u.pathname === "/");
-  await expect(page.getByText("Ахметов Алихан")).toHaveCount(0);
+  // The cook's dashboard legitimately lists allergies (menu module); attendance lists must not appear.
+  await expect(page.getByTestId("attendance-list")).toHaveCount(0);
+  await expect(page.getByTestId("attendance-child")).toHaveCount(0);
   await page.goto("/attendance/report");
   await expect(page).toHaveURL((u) => u.pathname === "/");
   expect((await page.request.get(`/attendance/export?group=${gA1}&month=${today.slice(0, 7)}`)).status()).toBe(403);

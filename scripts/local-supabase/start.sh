@@ -49,13 +49,12 @@ download() {
 }
 
 stop_services() {
-  for name in gateway auth postgrest; do
-    if [ -f "$STACK/$name.pid" ]; then
-      kill "$(cat "$STACK/$name.pid")" 2>/dev/null || true
-      rm -f "$STACK/$name.pid"
-    fi
-  done
-  sleep 0.5
+  # Match by this checkout's paths: pid files alone miss processes re-parented by setsid.
+  pkill -f "$BIN/auth serve" 2>/dev/null || true
+  pkill -f "$BIN/postgrest $STACK/postgrest.conf" 2>/dev/null || true
+  pkill -f "node $ROOT/scripts/local-supabase/gateway.mjs" 2>/dev/null || true
+  rm -f "$STACK"/*.pid
+  for _ in $(seq 1 20); do pgrep -f "$BIN/auth serve|$BIN/postgrest|$ROOT/scripts/local-supabase/gateway.mjs" >/dev/null || break; sleep 0.25; done
 }
 
 ensure_postgres() {
