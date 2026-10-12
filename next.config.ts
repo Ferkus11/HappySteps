@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
   // Self-contained server build for the Docker image (docs/self-hosting.md).
   output: "standalone",
   poweredByHeader: false,
+  // PDF fonts (src/lib/pdf.ts) are read from disk at runtime — copy them into the standalone build.
+  outputFileTracingIncludes: { "/**/export": ["./src/assets/fonts/**/*"] },
   experimental: {
     serverActions: { bodySizeLimit: "16mb" },
   },
