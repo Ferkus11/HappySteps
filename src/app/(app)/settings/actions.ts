@@ -7,8 +7,6 @@ import { audit } from "@/lib/audit";
 import { createServiceClient } from "@/lib/supabase/service";
 import { zColor, zOptionalText, zTime } from "@/lib/validation";
 
-const MEALS = ["breakfast", "second_breakfast", "lunch", "snack", "dinner"] as const;
-
 const dailySchema = z.object({
   defaultLocale: z.enum(["ru", "kk"]),
   address: zOptionalText(200),
@@ -18,7 +16,6 @@ const dailySchema = z.object({
   attendanceEscalationTime: zTime,
   quietHoursStart: zTime,
   quietHoursEnd: zTime,
-  meals: z.array(z.enum(MEALS)).min(1, "required"),
 });
 
 export async function saveDailySettingsAction(input: z.input<typeof dailySchema>) {
@@ -36,7 +33,6 @@ export async function saveDailySettingsAction(input: z.input<typeof dailySchema>
           attendance_escalation_time: v.attendanceEscalationTime,
           quiet_hours_start: v.quietHoursStart,
           quiet_hours_end: v.quietHoursEnd,
-          meals: MEALS.filter((m) => v.meals.includes(m)),
         })
         .eq("kindergarten_id", ctx.kg.id),
     );

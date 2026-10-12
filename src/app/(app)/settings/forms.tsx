@@ -6,11 +6,9 @@ import { Upload } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/switch";
 import { useAction } from "@/hooks/use-action";
 import { saveDailySettingsAction, saveOwnerSettingsAction, uploadLogoAction } from "./actions";
 
-const MEALS = ["breakfast", "second_breakfast", "lunch", "snack", "dinner"] as const;
 const ACCENTS = ["#C02A62", "#D6336C", "#1F6FAE", "#2E9E7A", "#7C6CD6", "#C2571A"];
 
 export function DailySettings({
@@ -25,12 +23,10 @@ export function DailySettings({
     attendanceEscalationTime: string;
     quietHoursStart: string;
     quietHoursEnd: string;
-    meals: string[];
   };
 }) {
   const t = useTranslations("settings");
   const tc = useTranslations("common");
-  const [meals, setMeals] = React.useState<string[]>(value.meals);
   const { run, pending, fieldError } = useAction(saveDailySettingsAction, { success: t("saved") });
   return (
     <Card>
@@ -49,7 +45,6 @@ export function DailySettings({
             attendanceEscalationTime: String(f.get("esc")),
             quietHoursStart: String(f.get("qs")),
             quietHoursEnd: String(f.get("qe")),
-            meals: meals as (typeof MEALS)[number][],
           });
         }}
       >
@@ -84,18 +79,6 @@ export function DailySettings({
             <Input name="qe" type="time" defaultValue={value.quietHoursEnd} aria-label={`${t("quietHours")} 2`} />
           </div>
         </Field>
-        <fieldset>
-          <legend className="mb-2 text-[13px] font-semibold text-muted">{t("meals")}</legend>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {MEALS.map((m) => (
-              <label key={m} className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-xl border border-border px-3 text-sm">
-                <Checkbox checked={meals.includes(m)} onCheckedChange={(v) => setMeals((s) => (v ? [...s, m] : s.filter((x) => x !== m)))} />
-                {t(`mealNames.${m}`)}
-              </label>
-            ))}
-          </div>
-          {fieldError("meals") ? <p className="mt-1.5 text-[13px] text-danger">{fieldError("meals")}</p> : null}
-        </fieldset>
         <Button type="submit" disabled={pending}>
           {tc("save")}
         </Button>

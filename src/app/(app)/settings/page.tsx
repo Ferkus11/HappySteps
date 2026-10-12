@@ -48,7 +48,6 @@ export default async function SettingsPage() {
             attendanceEscalationTime: s.attendance_escalation_time.slice(0, 5),
             quietHoursStart: s.quiet_hours_start.slice(0, 5),
             quietHoursEnd: s.quiet_hours_end.slice(0, 5),
-            meals: s.meals,
           }}
         />
         {settingsSections.map((Section, i) => (
