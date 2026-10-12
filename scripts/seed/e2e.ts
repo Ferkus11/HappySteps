@@ -4,6 +4,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ensureKindergarten, ensureMembership, ensureUser, must } from "./lib";
+import { seedAnnouncements } from "./e2e-announcements";
 
 export const E2E_PASSWORD = "Test1234!";
 
@@ -95,5 +96,6 @@ export async function seedE2E(db: SupabaseClient) {
     requisites: { kaspi: "+7 701 000 00 00", iban: "KZ00 0000 0000 0000 0000", bank: "Kaspi Bank", recipient: "ТОО «Happy Steps»", purpose: "Оплата за детский сад" },
   }).eq("kindergarten_id", A);
 
+  await seedAnnouncements(db, { users: u, kindergartens: { A }, groups: { gA1, gA2 } });
   return { users: u, kindergartens: { A, B }, groups: { gA1, gA2, gB1 } };
 }

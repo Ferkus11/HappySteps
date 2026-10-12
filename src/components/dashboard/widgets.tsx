@@ -2,6 +2,8 @@ import type { ComponentType } from "react";
 import type { KgContext } from "@/lib/auth/context";
 import type { Role } from "@/lib/auth/roles";
 import { cn } from "@/lib/utils";
+import { announcementsWidgets } from "@/components/announcements/widgets";
+import { eventsWidgets } from "@/components/events/widgets";
 
 /**
  * Dashboard widgets contributed by modules (SPEC §5.13).
@@ -28,7 +30,8 @@ export const dashboardWidgets: DashboardWidget[] = [
   // ...worktimeWidgets,
   // ...attendanceWidgets,
   // ...menuWidgets,
-  // ...announcementsWidgets,
+  ...announcementsWidgets,
+  ...eventsWidgets,
 ];
 
 export function DashboardWidgets({ ctx, slot }: { ctx: KgContext; slot: DashboardWidget["slot"] }) {
