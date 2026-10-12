@@ -1,4 +1,8 @@
 import { Pool, type PoolClient } from "pg";
+import { config } from "dotenv";
+
+// Each checkout (incl. parallel worktrees) has its own database — take it from .env.local.
+config({ path: ".env.local", quiet: true });
 
 export const pool = new Pool({
   connectionString: process.env.SUPABASE_DB_URL ?? "postgres://postgres:postgres@127.0.0.1:5432/happysteps",
