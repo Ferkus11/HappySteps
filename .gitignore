@@ -47,3 +47,7 @@ next-env.d.ts
 /screenshots/
 .claude/worktrees/
 !.env.example
+
+# Supabase CLI state (supabase link / start)
+supabase/.temp
+supabase/.branches

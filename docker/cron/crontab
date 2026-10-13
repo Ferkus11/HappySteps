@@ -1,0 +1,8 @@
+# Happy Steps background jobs — the same schedules as vercel.json (time zone UTC).
+# min  hour dom mon dow  command
+*/15   *    *   *   *    sh /cron/call.sh /api/cron/attendance-reminders
+5      *    *   *   *    sh /cron/call.sh /api/cron/event-reminders
+*/15   *    *   *   *    sh /cron/call.sh /api/cron/worktime-autoclose
+0      3    *   *   *    sh /cron/call.sh /api/cron/document-expiry
+0      1    *   *   *    sh /cron/call.sh /api/cron/invoices-accrue
+*/5    *    *   *   *    sh /cron/call.sh /api/cron/push-deferred

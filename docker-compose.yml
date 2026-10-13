@@ -1,0 +1,71 @@
+# Happy Steps on your own server: app + Caddy (HTTPS) + cron. Step-by-step guide: docs/self-hosting.md
+#
+#   cp .env.example .env    # fill in production values (the same file feeds build args and runtime env)
+#   docker compose up -d --build
+#
+# Supabase itself runs from the official supabase/docker compose (project "supabase"); this stack joins its
+# network "supabase_default" so Caddy can reach its API gateway as kong:8000.
+# No self-hosted Supabase on this host? Create the network once: docker network create supabase_default
+name: happy-steps
+
+services:
+  app:
+    build:
+      context: .
+      args:
+        # NEXT_PUBLIC_* are baked into the browser bundle at build time — rebuild after changing them.
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?set NEXT_PUBLIC_SUPABASE_URL in .env}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:?set NEXT_PUBLIC_SUPABASE_ANON_KEY in .env}
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:?set NEXT_PUBLIC_VAPID_PUBLIC_KEY in .env}
+    image: happy-steps:${APP_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file: ${APP_ENV_FILE:-.env}
+    environment:
+      # One trusted proxy (Caddy) in front of the app; see .env.example.
+      TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-1}
+    expose:
+      - "3000"
+    networks: [default, supabase]
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in .env}
+      API_DOMAIN: ${API_DOMAIN:-api.localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.kz}
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [default, supabase]
+
+  cron:
+    image: alpine:3.22
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/cron/entrypoint.sh"]
+    environment:
+      TZ: UTC
+      CRON_SECRET: ${CRON_SECRET:?set CRON_SECRET in .env}
+      APP_INTERNAL_URL: http://app:3000
+    volumes:
+      - ./docker/cron:/cron:ro
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  supabase:
+    external: true
+    name: ${SUPABASE_NETWORK:-supabase_default}

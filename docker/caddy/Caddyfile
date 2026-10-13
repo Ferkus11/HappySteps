@@ -1,0 +1,25 @@
+# Happy Steps — reverse proxy with automatic HTTPS (Let's Encrypt). See docs/self-hosting.md.
+# Domains come from .env: APP_DOMAIN (the app) and API_DOMAIN (self-hosted Supabase API gateway).
+# Caddy overwrites X-Forwarded-For with the real client address, so the app runs with TRUSTED_PROXY_HOPS=1.
+{
+	email {$ACME_EMAIL:admin@example.kz}
+}
+
+{$APP_DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+	reverse_proxy {$APP_UPSTREAM:app:3000}
+}
+
+# Supabase API (Auth, REST, Realtime, Storage) and Studio (behind DASHBOARD_USERNAME/PASSWORD).
+# Supabase gateway is reachable as "kong:8000" on the supabase_default network (Envoy or Kong).
+# If Supabase runs on another server, delete this block.
+{$API_DOMAIN:api.localhost} {
+	encode zstd gzip
+	reverse_proxy {$SUPABASE_UPSTREAM:kong:8000}
+}

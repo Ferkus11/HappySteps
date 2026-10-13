@@ -1,0 +1,13 @@
+# Add-on for the official Supabase compose (docs/self-hosting.md, step 2): publish Postgres and the API gateway
+# on 127.0.0.1 only. Docker bypasses ufw, so without this ports 5432/6543/8000 would be open to the internet.
+# Caddy (docker-compose.yml of Happy Steps) reaches the gateway over the docker network as kong:8000.
+# Install: copy next to Supabase's docker-compose.yml and set in its .env:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.localports.yml
+services:
+  api-gw:
+    ports: !override
+      - "127.0.0.1:${API_GW_HTTP_PORT:-8000}:8000/tcp"
+  supavisor:
+    ports: !override
+      - "127.0.0.1:${POSTGRES_PORT}:5432"
+      - "127.0.0.1:${POOLER_PROXY_PORT_TRANSACTION}:6543"
