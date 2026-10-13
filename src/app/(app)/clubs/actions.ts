@@ -7,7 +7,10 @@ import { audit } from "@/lib/audit";
 import { memberIds, notify } from "@/lib/notify";
 import { createServiceClient } from "@/lib/supabase/service";
 import { adminRecipients, notifySpotFree } from "@/lib/clubs-notify";
-import { sniffMime } from "@/lib/documents-logic";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { KgContext } from "@/lib/auth/context";
+import { commitUpload, prepareUpload, removeObject, type PreparedUpload } from "@/lib/uploads";
+import { UPLOAD_SPECS, type DeclaredFile } from "@/lib/uploads-core";
 import { normalizeSchedule, scheduleValid, type EnrollmentStatus } from "@/lib/clubs";
 import { zOptionalText, zTime, zUuid } from "@/lib/validation";
 
@@ -99,31 +102,38 @@ export async function saveClubAction(id: string | null, input: z.input<typeof cl
   });
 }
 
-const PHOTO_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+const CLUB_BUCKET = UPLOAD_SPECS.clubPhoto.bucket;
 
-export async function uploadClubPhotoAction(id: string, form: FormData) {
+async function photoClub(ctx: KgContext, supabase: SupabaseClient, id: string) {
+  const club = check(await supabase.from("clubs").select("id, photo_path").eq("id", id).eq("kindergarten_id", ctx.kg.id).maybeSingle());
+  if (!club) throw new ActionError("notFound");
+  return club as { id: string; photo_path: string | null };
+}
+
+/** Step A of a club photo upload (D-035): checks, limits, signed upload URL for a server-chosen path. */
+export async function prepareClubPhotoAction(id: string, file: DeclaredFile) {
+  return kgAction(["owner", "head"], async (ctx, supabase): Promise<PreparedUpload> => {
+    zUuid.parse(id);
+    await photoClub(ctx, supabase, id);
+    const prefix = `${ctx.kg.id}/clubs/${id}-`;
+    return prepareUpload("clubPhoto", ctx, { target: id, prefix, file, path: (ext, uid) => `${prefix}${uid}.${ext}` });
+  });
+}
+
+/** Step C: verifies the uploaded photo (size, real type) and sets it on the club; the old one is removed. */
+export async function commitClubPhotoAction(id: string, ticket: string) {
   return kgAction(["owner", "head"], async (ctx, supabase) => {
     zUuid.parse(id);
-    const file = form.get("file");
-    if (!(file instanceof File) || file.size === 0) throw new ActionError("invalid");
-    if (file.size > 5 * 1024 * 1024) throw new ActionError("photoTooLarge");
-    // Trust the bytes, not the browser's `file.type`.
-    const mime = sniffMime(new Uint8Array(await file.slice(0, 16).arrayBuffer()));
-    const ext = mime ? PHOTO_TYPES[mime] : undefined;
-    if (!mime || !ext) throw new ActionError("fileType");
-    const club = check(await supabase.from("clubs").select("id, photo_path").eq("id", id).eq("kindergarten_id", ctx.kg.id).maybeSingle());
-    if (!club) throw new ActionError("notFound");
-    const path = `${ctx.kg.id}/clubs/${id}-${crypto.randomUUID()}.${ext}`;
-    const service = createServiceClient();
-    const up = await service.storage.from("club-photos").upload(path, file, { contentType: mime });
-    if (up.error) throw new ActionError("generic");
+    const club = await photoClub(ctx, supabase, id);
+    const file = await commitUpload("clubPhoto", ctx, ticket, { target: id, prefix: `${ctx.kg.id}/clubs/${id}-` });
+    if (club.photo_path === file.path) return;
     // RLS-checked: the update succeeds only for owner/head of this garden.
-    const upd = await supabase.from("clubs").update({ photo_path: path }).eq("id", id).select("id");
+    const upd = await supabase.from("clubs").update({ photo_path: file.path }).eq("id", id).select("id");
     if (upd.error || !upd.data?.length) {
-      await service.storage.from("club-photos").remove([path]);
+      await removeObject(CLUB_BUCKET, file.path);
       throw new ActionError("forbidden");
     }
-    if (club.photo_path) await service.storage.from("club-photos").remove([club.photo_path as string]);
+    if (club.photo_path) await removeObject(CLUB_BUCKET, club.photo_path);
   });
 }
 

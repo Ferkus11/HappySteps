@@ -10,7 +10,9 @@ const nextConfig: NextConfig = {
   // PDF fonts (src/lib/pdf.ts) are read from disk at runtime — copy them into the standalone build.
   outputFileTracingIncludes: { "/**/export": ["./src/assets/fonts/**/*"] },
   experimental: {
-    serverActions: { bodySizeLimit: "16mb" },
+    // Files never pass through server actions: the browser uploads them straight to Supabase Storage with signed
+    // upload URLs (D-035; Vercel caps a function request body at 4.5 MB). A small limit catches a regression.
+    serverActions: { bodySizeLimit: "1mb" },
   },
   turbopack: {
     rules: {

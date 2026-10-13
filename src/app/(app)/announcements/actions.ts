@@ -1,6 +1,5 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { kgAction, parse, check } from "@/lib/actions/safe";
@@ -10,10 +9,10 @@ import { notify } from "@/lib/notify";
 import { createServiceClient } from "@/lib/supabase/service";
 import { AUDIENCES, assertTargets, syncGroups } from "@/lib/audience";
 import { zUuid } from "@/lib/validation";
+import { commitUpload, prepareUpload, type PreparedUpload } from "@/lib/uploads";
+import type { DeclaredFile } from "@/lib/uploads-core";
 
 const BUCKET = "announcements";
-const MAX_FILE = 15 * 1024 * 1024;
-const PHOTO_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 
 const schema = z.object({
   title: z.string().trim().min(1, "required").max(200, "tooLong"),
@@ -91,29 +90,40 @@ export async function deleteAnnouncementAction(id: string) {
   });
 }
 
-/** Uploads one photo or PDF (called once per file so each request stays under the body limit). */
-export async function uploadAnnouncementFileAction(id: string, form: FormData) {
+async function assertManageable(supabase: SupabaseClient, id: string) {
+  const { data: ok } = await supabase.rpc("announcement_manageable", { a: id });
+  if (!ok) throw new ActionError("forbidden");
+}
+
+/** Step A of attaching one photo or PDF (D-035): permission, limits, signed upload URL for a server-chosen path. */
+export async function prepareAnnouncementFileAction(id: string, file: DeclaredFile) {
+  return kgAction(["owner", "head", "teacher"], async (ctx, supabase): Promise<PreparedUpload> => {
+    zUuid.parse(id);
+    await assertManageable(supabase, id);
+    const prefix = `${ctx.kg.id}/${id}/`;
+    return prepareUpload("announcement", ctx, { target: id, prefix, file, path: (ext, uid) => `${prefix}${uid}.${ext}` });
+  });
+}
+
+/** Step C: re-checks permission, verifies the stored file (size, real type) and writes its row. */
+export async function commitAnnouncementFileAction(id: string, ticket: string) {
   return kgAction(["owner", "head", "teacher"], async (ctx, supabase) => {
     zUuid.parse(id);
-    const file = form.get("file");
-    if (!(file instanceof File) || file.size === 0) throw new ActionError("invalid");
-    if (file.size > MAX_FILE) throw new ActionError("fileTooLarge");
-    const isPdf = file.type === "application/pdf";
-    const ext = isPdf ? "pdf" : PHOTO_TYPES[file.type];
-    if (!ext) throw new ActionError("fileType");
-    const { data: ok } = await supabase.rpc("announcement_manageable", { a: id });
-    if (!ok) throw new ActionError("forbidden");
-    const path = `${ctx.kg.id}/${id}/${randomUUID()}.${ext}`;
-    const service = createServiceClient();
-    const up = await service.storage.from(BUCKET).upload(path, file, { contentType: file.type });
-    if (up.error) throw new ActionError("generic");
-    const name = (file.name || `file.${ext}`).slice(0, 200);
+    await assertManageable(supabase, id);
+    const file = await commitUpload("announcement", ctx, ticket, { target: id, prefix: `${ctx.kg.id}/${id}/` });
     // Permission checked above (announcement_manageable); rows are written by the server only.
-    const ins = await service
-      .from("announcement_files")
-      .insert({ announcement_id: id, kindergarten_id: ctx.kg.id, kind: isPdf ? "pdf" : "photo", path, name, mime: file.type, size: file.size });
+    const service = createServiceClient();
+    const ins = await service.from("announcement_files").insert({
+      announcement_id: id,
+      kindergarten_id: ctx.kg.id,
+      kind: file.ext === "pdf" ? "pdf" : "photo",
+      path: file.path,
+      name: file.name,
+      mime: file.mime,
+      size: file.size,
+    });
     if (ins.error) {
-      await service.storage.from(BUCKET).remove([path]);
+      if (ins.error.code !== "23505") await service.storage.from(BUCKET).remove([file.path]);
       check(ins);
     }
   });

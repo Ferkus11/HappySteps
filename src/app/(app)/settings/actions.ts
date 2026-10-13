@@ -4,7 +4,8 @@ import { z } from "zod";
 import { kgAction, parse, check } from "@/lib/actions/safe";
 import { ActionError } from "@/lib/actions/result";
 import { audit } from "@/lib/audit";
-import { createServiceClient } from "@/lib/supabase/service";
+import { commitUpload, prepareUpload, removeObject, type PreparedUpload } from "@/lib/uploads";
+import { UPLOAD_SPECS, type DeclaredFile } from "@/lib/uploads-core";
 import { zColor, zOptionalText, zTime } from "@/lib/validation";
 
 const dailySchema = z.object({
@@ -76,21 +77,26 @@ export async function saveOwnerSettingsAction(input: z.input<typeof ownerSchema>
   });
 }
 
-export async function uploadLogoAction(form: FormData) {
+const LOGO_BUCKET = UPLOAD_SPECS.logo.bucket;
+
+/** Step A of a logo upload (owner only, D-035): limits and a signed upload URL for a server-chosen path. */
+export async function prepareLogoAction(file: DeclaredFile) {
+  return kgAction(["owner"], async (ctx): Promise<PreparedUpload> => {
+    const prefix = `${ctx.kg.id}/logo-`;
+    return prepareUpload("logo", ctx, { target: ctx.kg.id, prefix, file, path: (ext, id) => `${prefix}${id}.${ext}` });
+  });
+}
+
+/** Step C: verifies the uploaded logo (size, real type) and sets it; the old one is removed. */
+export async function commitLogoAction(ticket: string) {
   return kgAction(["owner"], async (ctx, supabase) => {
-    const file = form.get("file");
-    if (!(file instanceof File) || !file.size) throw new ActionError("invalid");
-    if (file.size > 2 * 1024 * 1024) throw new ActionError("fileTooLarge");
-    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) throw new ActionError("fileType");
-    const path = `${ctx.kg.id}/logo-${Date.now()}.${file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg"}`;
-    const service = createServiceClient();
-    const up = await service.storage.from("kindergarten-assets").upload(path, file, { contentType: file.type });
-    if (up.error) throw new ActionError("generic");
-    const res = await supabase.from("kindergartens").update({ logo_path: path }).eq("id", ctx.kg.id).select("id");
+    const file = await commitUpload("logo", ctx, ticket, { target: ctx.kg.id, prefix: `${ctx.kg.id}/logo-` });
+    if (ctx.kg.logo_path === file.path) return;
+    const res = await supabase.from("kindergartens").update({ logo_path: file.path }).eq("id", ctx.kg.id).select("id");
     if (res.error || !res.data?.length) {
-      await service.storage.from("kindergarten-assets").remove([path]);
+      await removeObject(LOGO_BUCKET, file.path);
       throw new ActionError("forbidden");
     }
-    if (ctx.kg.logo_path) await service.storage.from("kindergarten-assets").remove([ctx.kg.logo_path]);
+    if (ctx.kg.logo_path) await removeObject(LOGO_BUCKET, ctx.kg.logo_path);
   });
 }

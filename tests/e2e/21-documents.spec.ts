@@ -12,6 +12,7 @@ const RUN = Date.now().toString(36);
 const PDF_TITLE = `E2E справка ${RUN}`;
 const PHOTO_TITLE = `E2E фото ${RUN}`;
 const MED_BOOK = `E2E медкнижка ${RUN}`;
+const BIG_SCAN = `E2E скан 6 МБ ${RUN}`;
 // 1×1 PNG and a minimal PDF
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 const PDF = Buffer.from("%PDF-1.4\n1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n2 0 obj << /Type /Pages /Kids [] /Count 0 >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n", "latin1");
@@ -183,6 +184,38 @@ test("teacher uploads own med book with expiry → head sees it in «Истек�
   // employee card shows the documents too
   await page.goto(`/staff/${teacherId}`);
   await expect(page.getByTestId("staff-documents-card")).toContainText(MED_BOOK);
+});
+
+test("a 6 MB scan goes from the browser straight to storage (over Vercel's 4.5 MB body limit) and opens via a signed link", async ({ page }) => {
+  // D-035: no server action receives file bytes — the browser PUTs them to Storage with a signed upload URL.
+  const big = Buffer.concat([PDF, Buffer.alloc(6 * 1024 * 1024 - PDF.length, 0x20)]);
+  let largestAppPost = 0;
+  let storagePuts = 0;
+  page.on("request", (r) => {
+    if (r.url().includes("/storage/v1/object/upload/sign/") && r.method() === "PUT") storagePuts++;
+    else if (r.method() === "POST" && !r.url().includes("/storage/v1/")) largestAppPost = Math.max(largestAppPost, r.postDataBuffer()?.length ?? 0);
+  });
+  await login(page, PHONES.teacher);
+  await page.goto("/documents");
+  const mine = page.getByTestId("my-documents");
+  await upload(page, mine, { input: "doc-file", name: "scan.pdf", mime: "application/pdf", buffer: big, title: BIG_SCAN, type: "contract" });
+  expect(storagePuts).toBe(1);
+  expect(largestAppPost).toBeLessThan(64 * 1024);
+  const row = await db.query("select id, size, mime, path from staff_documents where title = $1", [BIG_SCAN]);
+  expect(row.rows[0]).toMatchObject({ size: big.length, mime: "application/pdf" });
+  expect(row.rows[0].path).toMatch(new RegExp(`/${teacherId}/[0-9a-f-]{36}\\.pdf$`));
+  // opens through the app's link → short-lived signed URL of the private object, bytes intact
+  const res = await page.request.get(`/documents/file/${row.rows[0].id}?k=s`);
+  expect(res.status()).toBe(200);
+  expect(res.headers()["content-type"]).toContain("application/pdf");
+  expect(res.url()).toContain("token=");
+  const body = await res.body();
+  expect(body.length).toBe(big.length);
+  expect(body.subarray(0, 5).toString()).toBe("%PDF-");
+  // tidy up through the UI (own upload)
+  await mine.getByTestId("doc-row").filter({ hasText: BIG_SCAN }).getByTestId("doc-delete").click();
+  await page.getByTestId("confirm-ok").click();
+  await expectToast(page, "Документ удалён");
 });
 
 test("accountant sees staff documents read-only and no child folders", async ({ page }) => {

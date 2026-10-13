@@ -1,6 +1,10 @@
 "use server";
 
 import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { KgContext } from "@/lib/auth/context";
+import { commitUpload, prepareUpload, removeObject, type PreparedUpload } from "@/lib/uploads";
+import { UPLOAD_SPECS, type DeclaredFile } from "@/lib/uploads-core";
 import { kgAction, parse, check } from "@/lib/actions/safe";
 import { ActionError } from "@/lib/actions/result";
 import { audit } from "@/lib/audit";
@@ -152,28 +156,39 @@ export async function restoreChildAction(id: string) {
   });
 }
 
-const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const PHOTO_BUCKET = UPLOAD_SPECS.childPhoto.bucket;
+const photoPrefix = (kgId: string, childId: string) => `${kgId}/${childId}/`;
 
-export async function uploadChildPhotoAction(id: string, form: FormData) {
+/** Owner/head and a child of this garden (RLS-checked read). */
+async function photoChild(ctx: KgContext, supabase: SupabaseClient, id: string) {
+  const { data: child } = await supabase.from("children").select("id, photo_path").eq("id", id).eq("kindergarten_id", ctx.kg.id).maybeSingle();
+  if (!child) throw new ActionError("notFound");
+  return child;
+}
+
+/** Step A of a child photo upload (D-035): checks, limits, signed upload URL for a server-chosen path. */
+export async function prepareChildPhotoAction(id: string, file: DeclaredFile) {
+  return kgAction(["owner", "head"], async (ctx, supabase): Promise<PreparedUpload> => {
+    zUuid.parse(id);
+    await photoChild(ctx, supabase, id);
+    const prefix = photoPrefix(ctx.kg.id, id);
+    return prepareUpload("childPhoto", ctx, { target: id, prefix, file, path: (ext, uid) => `${prefix}photo-${uid}.${ext}` });
+  });
+}
+
+/** Step C: verifies the uploaded photo and makes it the child's photo (the old one is removed). */
+export async function commitChildPhotoAction(id: string, ticket: string) {
   return kgAction(["owner", "head"], async (ctx, supabase) => {
     zUuid.parse(id);
-    const file = form.get("file");
-    if (!(file instanceof File) || file.size === 0) throw new ActionError("invalid");
-    if (file.size > 5 * 1024 * 1024) throw new ActionError("fileTooLarge");
-    if (!PHOTO_TYPES.includes(file.type)) throw new ActionError("fileType");
+    const child = await photoChild(ctx, supabase, id);
+    const file = await commitUpload("childPhoto", ctx, ticket, { target: id, prefix: photoPrefix(ctx.kg.id, id) });
+    if (child.photo_path === file.path) return; // the same upload committed twice
     // RLS-checked: the update succeeds only for admins of this kindergarten.
-    const { data: child } = await supabase.from("children").select("id, photo_path").eq("id", id).eq("kindergarten_id", ctx.kg.id).single();
-    if (!child) throw new ActionError("notFound");
-    const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-    const path = `${ctx.kg.id}/${id}/photo-${Date.now()}.${ext}`;
-    const service = createServiceClient();
-    const up = await service.storage.from("child-photos").upload(path, file, { contentType: file.type });
-    if (up.error) throw new ActionError("generic");
-    const upd = await supabase.from("children").update({ photo_path: path }).eq("id", id).select("id");
+    const upd = await supabase.from("children").update({ photo_path: file.path }).eq("id", id).select("id");
     if (upd.error || !upd.data?.length) {
-      await service.storage.from("child-photos").remove([path]);
+      await removeObject(PHOTO_BUCKET, file.path);
       throw new ActionError("forbidden");
     }
-    if (child.photo_path) await service.storage.from("child-photos").remove([child.photo_path]);
+    if (child.photo_path) await removeObject(PHOTO_BUCKET, child.photo_path);
   });
 }

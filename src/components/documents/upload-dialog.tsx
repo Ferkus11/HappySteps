@@ -10,7 +10,13 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Field, Input, Select } from "@/components/ui/input";
 import { CHILD_CATEGORIES, DOCUMENT_ACCEPT, DOCUMENT_TYPES, MAX_DOCUMENT_SIZE, STAFF_DOC_TYPES, isHeic } from "@/lib/documents-logic";
 import { prepareDocumentFile } from "@/lib/heic";
-import { uploadChildDocumentAction, uploadStaffDocumentAction } from "@/app/(app)/documents/actions";
+import {
+  commitChildDocumentAction,
+  commitStaffDocumentAction,
+  prepareChildDocumentAction,
+  prepareStaffDocumentAction,
+} from "@/app/(app)/documents/actions";
+import { directUpload } from "@/lib/upload-client";
 import { useOfflineGuard } from "@/lib/pwa/offline-guard";
 
 type Props =
@@ -56,8 +62,10 @@ export function UploadDocumentButton(props: Props & { size?: "sm" | "md"; classN
     }
     if (offline.blocked()) return;
     const fd = new FormData(e.currentTarget);
-    fd.delete("pick");
-    fd.delete("camera");
+    const field = (k: string) => {
+      const v = fd.get(k);
+      return typeof v === "string" ? v : undefined;
+    };
     try {
       let ready = file;
       if (isHeic(file)) {
@@ -65,9 +73,24 @@ export function UploadDocumentButton(props: Props & { size?: "sm" | "md"; classN
         ready = await prepareDocumentFile(file);
       }
       if (ready.size > MAX_DOCUMENT_SIZE) throw new Error("fileTooLarge");
-      fd.set("file", ready);
       setBusy("uploading");
-      const res = props.kind === "child" ? await uploadChildDocumentAction(fd) : await uploadStaffDocumentAction(fd);
+      // The file goes straight to storage (D-035); prepare/commit check permission and the stored file.
+      let res;
+      if (props.kind === "child") {
+        const childId = field("childId") ?? "";
+        res = await directUpload(
+          ready,
+          (f) => prepareChildDocumentAction(childId, f),
+          (ticket) => commitChildDocumentAction({ childId, category: field("category") as never, title: field("title"), ticket }),
+        );
+      } else {
+        const userId = field("userId") ?? "";
+        res = await directUpload(
+          ready,
+          (f) => prepareStaffDocumentAction(userId, f),
+          (ticket) => commitStaffDocumentAction({ userId, type: field("type") as never, title: field("title"), expiresOn: field("expiresOn"), ticket }),
+        );
+      }
       if (!res.ok) {
         toast.error(te.has(res.error) ? te(res.error) : te("generic"));
         return;

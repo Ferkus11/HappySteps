@@ -11,6 +11,7 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { Avatar } from "@/components/ui/avatar";
 import { Confirm } from "@/components/common/confirm";
 import { useAction } from "@/hooks/use-action";
+import { directUpload } from "@/lib/upload-client";
 import {
   addGuardianAction,
   archiveChildAction,
@@ -18,7 +19,8 @@ import {
   transferChildAction,
   unlinkGuardianAction,
   updateChildAction,
-  uploadChildPhotoAction,
+  commitChildPhotoAction,
+  prepareChildPhotoAction,
   type ParentInviteResult,
 } from "../actions";
 import { ParentInvites } from "../add-child";
@@ -281,11 +283,19 @@ export function AddGuardian({ childId }: { childId: string }) {
   );
 }
 
+/** Photo bytes go straight to storage (D-035); the actions check permission and the stored file. */
+const uploadChildPhoto = (childId: string, file: File) =>
+  directUpload(
+    file,
+    (f) => prepareChildPhotoAction(childId, f),
+    (ticket) => commitChildPhotoAction(childId, ticket),
+  );
+
 export function PhotoUpload({ childId }: { childId: string }) {
   const t = useTranslations("children");
   const tc = useTranslations("common");
   const inputRef = React.useRef<HTMLInputElement>(null);
-  const { run, pending } = useAction(uploadChildPhotoAction, { success: tc("saved") });
+  const { run, pending } = useAction(uploadChildPhoto, { success: tc("saved") });
   return (
     <>
       <button
@@ -309,9 +319,7 @@ export function PhotoUpload({ childId }: { childId: string }) {
             toast.error(t("photo"));
             return;
           }
-          const fd = new FormData();
-          fd.set("file", file);
-          run(childId, fd);
+          run(childId, file);
           e.target.value = "";
         }}
       />

@@ -42,9 +42,14 @@ the foreground without redirection.
 - Settings already present in `kindergarten_settings`: `timezone`, `late_threshold_minutes`,
   `attendance_reminder_time`, `attendance_escalation_time`, `meals text[]`, `payment_due_day`,
   `quiet_hours_*`, `default_locale`. Kindergarten days off: table `holidays` (+ `kg_is_working_day`).
-- Storage: buckets are private and only the service role touches them. Upload in a server action
-  **after** checking permission, path `<kindergarten_id>/<entity>/<uuid>.<ext>`, read through
-  `signedUrl(s)` from `src/lib/kg-assets.ts` (short expiry). Create your bucket in your migration:
+- Storage: buckets are private and only the service role touches them. Files never pass through a server action
+  (Vercel caps a request body at 4.5 MB; `serverActions.bodySizeLimit` is 1 MB) — upload directly (D-035): a
+  *prepare* action checks permission and calls `prepareUpload(kind, ctx, …)` from `src/lib/uploads.ts` (limits in
+  `UPLOAD_SPECS`, `src/lib/uploads-core.ts`; the server picks the path `<kindergarten_id>/<entity>/<uuid>.<ext>`),
+  the browser sends the bytes with `directUpload()` from `src/lib/upload-client.ts`, and a *commit* action re-checks
+  permission, calls `commitUpload(...)` (verifies the ticket, real size and type; removes a bad object) and writes the
+  rows. Read through `signedUrl(s)` from `src/lib/kg-assets.ts` (short expiry). Give the bucket
+  `file_size_limit`/`allowed_mime_types` too. Create your bucket in your migration:
   `insert into storage.buckets (id, name, public) values ('x', 'x', false) on conflict do nothing;`
 
 ## 3. Server code
@@ -65,7 +70,9 @@ the foreground without redirection.
 - Cron jobs: `src/app/api/cron/<job>/route.ts`, `GET`, first line
   `const denied = cronUnauthorized(req); if (denied) return denied;` (`@/lib/cron`), then work with the
   service client per kindergarten in its own time zone. Must be idempotent (runs every 5–15 min).
-  Add the schedule to `vercel.json` `crons` (create the file if missing).
+  Add the schedule to `supabase/cron/schedule.sql` (pg_cron, the source of truth — D-036) and the same line to
+  `docker/cron/crontab`; `tests/unit/deploy-config.test.ts` checks both. `vercel.json` has no `crons` (Vercel Hobby
+  allows only daily jobs).
 - Exports: route handler `src/app/(app)/<module>/export/route.ts` that calls `loadContext()` and checks
   roles itself; `.xlsx` via `exceljs`, `.pdf` via `pdfkit`.
 - Dates/times: always in the kindergarten time zone — `todayIn(ctx.settings.timezone)`, `formatDate`
@@ -123,7 +130,7 @@ the foreground without redirection.
 - `src/app/(app)/settings/sections.tsx`, `src/app/(app)/profile/sections.tsx` — extra cards.
 - `src/lib/nav.ts` — routes for all modules already exist; change only if your module needs it.
 - `scripts/seed/e2e.ts` — one call to your seed function.
-- `vercel.json` — your cron entry.
+- `supabase/cron/schedule.sql` + `docker/cron/crontab` — your cron entry (one line each).
 
 ## 7. Finish
 Commit in your worktree (`git add -A && git commit`, message `Stage <N><letter>: <module>`). Your final

@@ -1,4 +1,4 @@
-# Happy Steps background jobs — the same schedules as vercel.json (time zone UTC).
+# Happy Steps background jobs — the same schedules as supabase/cron/schedule.sql (time zone UTC; D-036).
 # min  hour dom mon dow  command
 */15   *    *   *   *    sh /cron/call.sh /api/cron/attendance-reminders
 5      *    *   *   *    sh /cron/call.sh /api/cron/event-reminders
