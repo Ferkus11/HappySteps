@@ -82,8 +82,9 @@ async function PendingReceipts({ ctx }: { ctx: KgContext }) {
               </li>
             ))}
           </ul>
-          <Button asChild className="mt-3 w-full">
-            <Link href="/payments">{t("check")}</Link>
+          {/* Secondary: «Начать рабочий день» is the one primary action of the dashboard (SPEC §8). */}
+          <Button asChild variant="secondary" className="mt-3 w-full">
+            <Link href="/payments" data-testid="receipts-check">{t("check")}</Link>
           </Button>
         </>
       )}

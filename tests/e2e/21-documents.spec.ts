@@ -172,11 +172,14 @@ test("teacher uploads own med book with expiry → head sees it in «Истек�
   await expect(page.getByTestId("my-expiring-documents")).toContainText(MED_BOOK);
 
   await login(page, PHONES.head);
-  const widget = page.getByTestId("expiring-documents");
-  await expect(widget).toContainText(MED_BOOK);
-  await expect(widget).toContainText("Нурланова Асель");
-  await page.goto("/documents?tab=staff&filter=expiring");
+  // the head's «Требует внимания» has the expiring-documents line (no separate card) leading to the list
+  await expect(page.getByTestId("expiring-documents")).toHaveCount(0);
+  const line = page.locator('[data-testid="attention-item"][data-kind="documents"]');
+  await expect(line).toBeVisible();
+  await line.click();
+  await page.waitForURL("**/documents?tab=staff&filter=expiring");
   await expect(page.getByTestId("staff-documents")).toContainText(MED_BOOK);
+  await expect(page.getByTestId("staff-documents")).toContainText("Нурланова Асель");
   // employee card shows the documents too
   await page.goto(`/staff/${teacherId}`);
   await expect(page.getByTestId("staff-documents-card")).toContainText(MED_BOOK);

@@ -78,10 +78,18 @@ type StaffRow = {
   person: { full_name: string } | null;
 };
 
+/** Users with an active staff (non-parent) membership in the garden (RLS: staff see staff memberships). */
+async function activeStaffIds(supabase: SupabaseClient, kgId: string): Promise<Set<string>> {
+  const { data } = await supabase.from("memberships").select("user_id").eq("kindergarten_id", kgId).eq("status", "active").neq("role", "parent");
+  return new Set((data ?? []).map((m) => m.user_id as string));
+}
+
 /**
  * Staff documents visible to the current user (RLS: owner/head/accountant all, others own).
  * `expiringFrom` (today) keeps only documents expired or expiring within 30 days, soonest first,
- * skipping copies a newer document of the same type has replaced (`superseded`).
+ * skipping copies a newer document of the same type has replaced (`superseded`) and documents of people
+ * who are no longer active staff of the garden (archived) — the same rule as the reminder cron
+ * (`document_expiry_due`). Without `expiringFrom` archived people's documents stay listed (their folders).
  */
 export async function listStaffDocuments(
   supabase: SupabaseClient,
@@ -98,8 +106,9 @@ export async function listStaffDocuments(
   } else {
     q = q.order("created_at", { ascending: false });
   }
-  const { data } = await q;
-  return ((data ?? []) as unknown as StaffRow[]).map((r) => ({
+  const [{ data }, active] = await Promise.all([q, opts.expiringFrom ? activeStaffIds(supabase, kgId) : null]);
+  const rows = ((data ?? []) as unknown as StaffRow[]).filter((r) => !active || active.has(r.user_id));
+  return rows.map((r) => ({
     id: r.id,
     userId: r.user_id,
     personName: r.person?.full_name ?? "—",

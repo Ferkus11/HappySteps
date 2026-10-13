@@ -32,7 +32,10 @@ async function WorktimeTodayWidget({ ctx }: { ctx: KgContext }) {
   );
 }
 
-/** Accountant: «Табель» — this month so far (hours, lates, absences) + open / export (SPEC §6). */
+/**
+ * Accountant: «Табель» — this month so far (hours, lates, misses) + open / export (SPEC §6).
+ * «Пропусков» counts only days without a mark (`missed`); vacation/sick days (`absences`) are not misses.
+ */
 async function TimesheetWidget({ ctx }: { ctx: KgContext }) {
   const t = await getTranslations("worktime");
   const supabase = await createClient();
@@ -40,7 +43,7 @@ async function TimesheetWidget({ ctx }: { ctx: KgContext }) {
   const month = today.slice(0, 7);
   const people = buildTimesheet(await loadDays(supabase, ctx.kg.id, `${month}-01`, today));
   const sum = people.reduce(
-    (s, p) => ({ minutes: s.minutes + p.totals.minutes, lates: s.lates + p.totals.lates, missed: s.missed + p.totals.missed + p.totals.absences }),
+    (s, p) => ({ minutes: s.minutes + p.totals.minutes, lates: s.lates + p.totals.lates, missed: s.missed + p.totals.missed }),
     { minutes: 0, lates: 0, missed: 0 },
   );
   return (
@@ -49,7 +52,7 @@ async function TimesheetWidget({ ctx }: { ctx: KgContext }) {
       <div className="grid grid-cols-3 gap-3">
         <Stat value={<span className="text-[24px]">{formatHours(sum.minutes)}</span>} label={t("timesheetWidget.hours")} />
         <Stat value={<span className="text-[24px]">{sum.lates}</span>} label={t("timesheetWidget.lates")} />
-        <Stat value={<span className="text-[24px]">{sum.missed}</span>} label={t("timesheetWidget.missed")} />
+        <Stat value={<span className="text-[24px]" data-testid="timesheet-widget-missed">{sum.missed}</span>} label={t("timesheetWidget.missed")} />
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         <Button asChild variant="secondary" className="flex-1">

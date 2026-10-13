@@ -95,7 +95,7 @@ test("documents · teacher", async ({ page }) => {
 
 test("documents · head", async ({ page }) => {
   await login(page, PHONES.head);
-  await page.getByTestId("expiring-documents").waitFor();
+  await page.locator('[data-testid="attention-item"][data-kind="documents"]').waitFor();
   await snap(page, S, "documents-head-dashboard");
   await page.goto("/documents");
   await page.getByTestId("doc-search").waitFor();

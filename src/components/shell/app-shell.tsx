@@ -65,32 +65,35 @@ export function AppShell(props: ShellProps) {
 
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[260px_1fr]">
-      {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh flex-col border-r border-border bg-surface md:flex" aria-label={t("mainNavigation")}>
-        <div className="px-5 pt-5 pb-4">
-          <Logo name={kgName} logoUrl={props.kindergarten?.logoUrl} />
-        </div>
-        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-6">
-          {props.nav.all.map((item) => {
-            const Icon = navIcons[item.key];
-            const active = isActive(pathname, item.href);
-            return (
-              <Link
-                key={item.key}
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex h-11 items-center gap-3 rounded-xl px-3 text-[14px] font-semibold transition-colors",
-                  active ? "bg-brand-soft text-brand" : "text-muted hover:bg-surface-muted hover:text-text",
-                )}
-              >
-                <Icon className="size-[18px]" aria-hidden />
-                {t(item.key)}
-              </Link>
-            );
-          })}
-        </nav>
-      </aside>
+      {/* Desktop sidebar: the grid column carries the white background and border down the whole page
+          (it stretches with the content); the menu inside stays sticky at viewport height. */}
+      <div className="hidden border-r border-border bg-surface md:block" data-testid="sidebar-column">
+        <aside className="sticky top-0 flex h-dvh flex-col" aria-label={t("mainNavigation")}>
+          <div className="px-5 pt-5 pb-4">
+            <Logo name={kgName} logoUrl={props.kindergarten?.logoUrl} />
+          </div>
+          <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-6">
+            {props.nav.all.map((item) => {
+              const Icon = navIcons[item.key];
+              const active = isActive(pathname, item.href);
+              return (
+                <Link
+                  key={item.key}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "flex h-11 items-center gap-3 rounded-xl px-3 text-[14px] font-semibold transition-colors",
+                    active ? "bg-brand-soft text-brand" : "text-muted hover:bg-surface-muted hover:text-text",
+                  )}
+                >
+                  <Icon className="size-[18px]" aria-hidden />
+                  {t(item.key)}
+                </Link>
+              );
+            })}
+          </nav>
+        </aside>
+      </div>
 
       <div className="flex min-w-0 flex-col">
         {/* Header */}

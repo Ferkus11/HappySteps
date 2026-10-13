@@ -120,7 +120,8 @@ async function AttentionCard({ ctx }: { ctx: KgContext }) {
         ? isWorkingDayDb(supabase, ctx.kg.id, today)
         : Promise.resolve(false),
       late ? loadPortions(supabase, ctx.kg.id, today) : Promise.resolve([]),
-      countPending(supabase, ctx.kg.id),
+      // Receipts are the accountant's (and owner's) job: the head can't act on them, so no line for her.
+      ctx.role === "owner" ? countPending(supabase, ctx.kg.id) : Promise.resolve(null),
       loadClubAttention(supabase, ctx.kg.id),
       listStaffDocuments(supabase, ctx.kg.id, { expiringFrom: today }),
       supabase
@@ -177,9 +178,7 @@ async function AttentionCard({ ctx }: { ctx: KgContext }) {
                     {t(`items.${i.kind}`, { count: i.count })}
                   </span>
                   <span className="block truncate text-xs text-muted">
-                    {i.kind === "receipts" && ctx.role === "head"
-                      ? t("hints.receiptsHead")
-                      : t(`hints.${i.kind}`)}
+                    {t(`hints.${i.kind}`)}
                   </span>
                 </span>
                 <ChevronRight
