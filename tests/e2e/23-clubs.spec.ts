@@ -16,6 +16,7 @@ const users: Record<string, string> = {};
 let clubs: Record<string, string> = {};
 let toddler = ""; // a temporary second child of the parent (2 years old) for the age filter / child switch
 const TODDLER = "Ахметова Аружан Даниярқызы";
+const LEAVER = "Тестов Архип Е2Е"; // a temporary child archived by the head (place frees → «Освободилось место»)
 
 const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Almaty", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const yearsAgo = (n: number, days = 30) => {
@@ -37,7 +38,7 @@ test.beforeAll(async () => {
   }
   // Re-runnable: drop clubs made by earlier runs, rebuild the fixtures, forget old club notifications.
   await db.from("clubs").delete().eq("kindergarten_id", A).like("name", "E2E %");
-  await db.from("children").delete().eq("kindergarten_id", A).eq("full_name", TODDLER);
+  await db.from("children").delete().eq("kindergarten_id", A).in("full_name", [TODDLER, LEAVER]);
   clubs = await seedClubs(db, { users, kindergartens: { A } });
   await db.from("notifications").delete().eq("kindergarten_id", A).like("type", "club.%");
   const { data: g } = await db.from("groups").select("id").eq("kindergarten_id", A).eq("name", "Солнышко").single();
@@ -171,7 +172,8 @@ test("club teacher: own clubs only, confirms a request, roster with phones and �
   // roster of «Шахматы»: Алихан with his parent's phone; write to the parent
   await page.goto(`/clubs/${clubs["Шахматы"]}`);
   const row = page.getByTestId("club-attending").getByTestId("roster-row").filter({ hasText: "Алихан" });
-  await expect(row.getByTestId("parent-phone")).toHaveText("+77010000007");
+  await expect(row.getByTestId("parent-phone")).toHaveText("+7 (701) 000-00-07");
+  await expect(row.getByTestId("parent-phone")).toHaveAttribute("href", "tel:+77010000007");
   await expect(row.getByTestId("exclude-enrollment")).toHaveCount(0); // administration only
   await row.getByTestId("write-parent").click();
   await page.waitForURL(/\/chats\/[0-9a-f-]{36}/);
@@ -183,6 +185,33 @@ test("parent can write first to the club teacher of an attended club", async ({ 
   await page.goto("/chats");
   await page.getByTestId("new-chat").click();
   await expect(page.getByRole("dialog")).toContainText("Петров Игорь Сергеевич");
+});
+
+test("archiving an enrolled child frees the place and tells the head about the queue", async ({ page }) => {
+  const name = `E2E Архив ${Date.now() % 100000}`;
+  const club = (await db.from("clubs").insert({ kindergarten_id: A, name, age_from: 0, age_to: 17, capacity: 1 }).select("id").single()).data!.id as string;
+  const { data: g } = await db.from("groups").select("id").eq("kindergarten_id", A).eq("name", "Солнышко").single();
+  const leaver = (await db.from("children").insert({ kindergarten_id: A, full_name: LEAVER, birth_date: yearsAgo(4), group_id: g!.id, monthly_fee: 0 }).select("id").single()).data!.id as string;
+  const { data: ailin } = await db.from("children").select("id").eq("kindergarten_id", A).ilike("full_name", "%Айлин%").single();
+  await db.from("club_enrollments").insert([
+    { kindergarten_id: A, club_id: club, child_id: leaver, status: "active", started_on: new Date().toISOString() },
+    { kindergarten_id: A, club_id: club, child_id: ailin!.id, status: "queued", queue_no: 1 },
+  ]);
+  try {
+    await login(page, PHONES.head);
+    await page.goto(`/children/${leaver}`);
+    await page.getByTestId("archive-child").click();
+    await page.getByTestId("archive-child-submit").click();
+    await expect.poll(async () => (await db.from("children").select("status").eq("id", leaver).single()).data!.status).toBe("archived");
+    await expect.poll(async () => (await notifications("club.spot_free", users.head)).filter((n) => n.params.club === name)).toEqual([{ params: { club: name, count: 1 } }]);
+    const { data: rows } = await db.from("club_enrollments").select("status").eq("club_id", club).eq("child_id", leaver);
+    expect(rows!.map((r) => r.status)).toEqual(["left"]);
+    await page.goto(`/clubs/${club}`);
+    await expect(page.getByTestId("club-places").first()).toHaveAttribute("data-free", "1");
+  } finally {
+    await db.from("children").delete().eq("id", leaver);
+    await db.from("clubs").delete().eq("id", club);
+  }
 });
 
 test("teacher and accountant: read-only; cook: no access", async ({ page }) => {

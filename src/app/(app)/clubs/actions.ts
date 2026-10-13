@@ -6,6 +6,8 @@ import { ActionError } from "@/lib/actions/result";
 import { audit } from "@/lib/audit";
 import { memberIds, notify } from "@/lib/notify";
 import { createServiceClient } from "@/lib/supabase/service";
+import { adminRecipients, notifySpotFree } from "@/lib/clubs-notify";
+import { sniffMime } from "@/lib/documents-logic";
 import { normalizeSchedule, scheduleValid, type EnrollmentStatus } from "@/lib/clubs";
 import { zOptionalText, zTime, zUuid } from "@/lib/validation";
 
@@ -36,12 +38,6 @@ interface TransitionResult {
   queued: number;
 }
 
-/** Heads of the garden get club notifications; when there is none — the owners. */
-async function adminRecipients(kg: string) {
-  const heads = await memberIds(kg, ["head"]);
-  return heads.length ? heads : memberIds(kg, ["owner"]);
-}
-
 /** Names for notification texts + guardians (active parents) of the child. Service role: only after a successful, permission-checked transition. */
 async function names(kg: string, clubId: string, childId: string) {
   const db = createServiceClient();
@@ -60,9 +56,7 @@ async function names(kg: string, clubId: string, childId: string) {
 }
 
 async function spotFree(kg: string, r: TransitionResult, clubName: string) {
-  if (r.freed && r.queued > 0) {
-    await notify({ kindergartenId: kg, userIds: await adminRecipients(kg), type: "club.spot_free", params: { club: clubName, count: r.queued }, url: `/clubs/${r.club_id}` });
-  }
+  if (r.freed) await notifySpotFree(kg, r.club_id, clubName, r.queued);
 }
 
 async function decision(kg: string, r: TransitionResult) {
@@ -105,7 +99,7 @@ export async function saveClubAction(id: string | null, input: z.input<typeof cl
   });
 }
 
-const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const PHOTO_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 
 export async function uploadClubPhotoAction(id: string, form: FormData) {
   return kgAction(["owner", "head"], async (ctx, supabase) => {
@@ -113,13 +107,15 @@ export async function uploadClubPhotoAction(id: string, form: FormData) {
     const file = form.get("file");
     if (!(file instanceof File) || file.size === 0) throw new ActionError("invalid");
     if (file.size > 5 * 1024 * 1024) throw new ActionError("photoTooLarge");
-    if (!PHOTO_TYPES.includes(file.type)) throw new ActionError("fileType");
+    // Trust the bytes, not the browser's `file.type`.
+    const mime = sniffMime(new Uint8Array(await file.slice(0, 16).arrayBuffer()));
+    const ext = mime ? PHOTO_TYPES[mime] : undefined;
+    if (!mime || !ext) throw new ActionError("fileType");
     const club = check(await supabase.from("clubs").select("id, photo_path").eq("id", id).eq("kindergarten_id", ctx.kg.id).maybeSingle());
     if (!club) throw new ActionError("notFound");
-    const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
     const path = `${ctx.kg.id}/clubs/${id}-${crypto.randomUUID()}.${ext}`;
     const service = createServiceClient();
-    const up = await service.storage.from("club-photos").upload(path, file, { contentType: file.type });
+    const up = await service.storage.from("club-photos").upload(path, file, { contentType: mime });
     if (up.error) throw new ActionError("generic");
     // RLS-checked: the update succeeds only for owner/head of this garden.
     const upd = await supabase.from("clubs").update({ photo_path: path }).eq("id", id).select("id");

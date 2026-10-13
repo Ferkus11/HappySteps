@@ -215,15 +215,17 @@ describe("clubs · enrolment flow (SPEC §5.10, scenario 6)", () => {
       expect(await call(c, "club_confirm", a.id)).toMatchObject({ status: "active", queued: 1 });
       await failsWith(c, "select club_confirm($1)", [b.id], /hs:clubFull/);
       await failsWith(c, "select club_confirm($1)", [a.id], /hs:clubStateChanged/);
-      // the parent of Миша sees his history; the new active child is visible to the club teacher
+      // the club teacher's roster now lists Алихан (enrolled) and no longer Миша
       await become(F.users.clubTeacher);
-      expect((await one(c, "select child_visible($1) v", [F.children["Алихан"]])).v).toBe(true);
-      expect((await one(c, "select child_visible($1) v", [F.children["Миша"]])).v).toBe(false);
+      const names = (await c.query("select child_name from club_roster($1)", [clubs["Шахматы"]])).rows.map((r) => r.child_name as string);
+      expect(names.some((n) => n.includes("Алихан"))).toBe(true);
+      expect(names.some((n) => n.includes("Миша"))).toBe(false);
     });
   });
 
   it("a request confirmed when no place is left goes to the end of the queue; new requests respect the queue", async () => {
     await inTx(async (c, become) => {
+      await c.query("update club_enrollments set status = 'left' where club_id = $1 and child_id = $2", [clubs["Рисование"], F.children["Миша"]]);
       await c.query("update clubs set capacity = 2 where id = $1", [clubs["Рисование"]]); // Сабина active, Айлин requested
       await become(F.users.parent);
       const a = await call(c, "club_request", clubs["Рисование"], F.children["Алихан"]);
@@ -280,7 +282,7 @@ describe("clubs · enrolment flow (SPEC §5.10, scenario 6)", () => {
 });
 
 describe("clubs · cross-module access stays narrow", () => {
-  it("club teacher: enrolled children become visible, but not their card, attendance or documents", async () => {
+  it("club teacher: enrolled children only through the roster — not their card, history, attendance or documents", async () => {
     await inTx(async (c, become) => {
       const misha = F.children["Миша"];
       await c.query("insert into child_attendance (kindergarten_id, child_id, date, status) values ($1, $2, kg_today($1), 'present') on conflict do nothing", [F.A, misha]);
@@ -290,18 +292,68 @@ describe("clubs · cross-module access stays narrow", () => {
         [doc, F.A, misha, `${F.A}/${misha}/${randomUUID()}.pdf`, F.users.head],
       );
       await become(F.users.clubTeacher);
-      expect((await one(c, "select child_visible($1) v", [misha])).v).toBe(true);
-      expect((await one(c, "select child_visible($1) v", [F.children["Алихан"]])).v).toBe(false);
+      // child_visible is not widened for clubs (only the roster function shows the enrolled children)
+      expect((await one(c, "select child_visible($1) v", [misha])).v).toBe(false);
+      expect((await c.query("select 1 from child_group_history where child_id = $1", [misha])).rowCount).toBe(0);
       expect((await c.query("select 1 from children where id = $1", [misha])).rowCount).toBe(0);
       expect((await c.query("select 1 from child_guardians where child_id = $1", [misha])).rowCount).toBe(0);
       expect((await c.query("select 1 from child_attendance where child_id = $1", [misha])).rowCount).toBe(0);
       expect((await c.query("select 1 from child_documents where id = $1", [doc])).rowCount).toBe(0);
       expect((await c.query("select 1 from invoices where child_id = $1", [misha])).rowCount).toBe(0);
-      // a left child is no longer visible
+      expect((await c.query("select 1 from club_roster($1) where child_id = $2", [clubs["Шахматы"], misha])).rowCount).toBe(1);
+      // a left child drops off the roster
       await c.query("reset role");
       await c.query("update club_enrollments set status = 'left' where child_id = $1", [misha]);
       await become(F.users.clubTeacher);
-      expect((await one(c, "select child_visible($1) v", [misha])).v).toBe(false);
+      expect((await c.query("select 1 from club_roster($1) where child_id = $2", [clubs["Шахматы"], misha])).rowCount).toBe(0);
+    });
+  });
+
+  it("club teacher: contacts, allergies and group only for enrolled children; requests and the queue — name and age", async () => {
+    await inTx(async (c, become) => {
+      const alikhan = F.children["Алихан"]; // allergy «орехи», parent +77010000007
+      await c.query("insert into club_enrollments (kindergarten_id, club_id, child_id, status) values ($1, $2, $3, 'requested')", [F.A, clubs["Рисование"], alikhan]);
+      const row = async () => one(c, "select * from club_roster($1) where child_id = $2", [clubs["Рисование"], alikhan]);
+      await become(F.users.clubTeacher);
+      let r = await row();
+      expect(r).toMatchObject({ status: "requested", group_name: null, allergies: null, parents: [] });
+      expect(r.age).toBeGreaterThanOrEqual(3);
+      expect(r).not.toHaveProperty("birth_date");
+      // queued: the same
+      await c.query("reset role");
+      await c.query("update club_enrollments set status = 'queued', queue_no = 1 where club_id = $1 and child_id = $2", [clubs["Рисование"], alikhan]);
+      await become(F.users.clubTeacher);
+      expect(await row()).toMatchObject({ status: "queued", allergies: null, parents: [] });
+      // owner / head / accountant see the full card for requests and the queue
+      for (const w of ["owner", "head", "accountant"] as Who[]) {
+        await become(F.users[w]);
+        r = await row();
+        expect(r.allergies).toMatch(/орехи/);
+        expect(r.parents.map((p: { phone: string }) => p.phone)).toEqual(["+77010000007"]);
+        expect(r.group_name).toBe("Солнышко");
+      }
+      // enrolled: the club teacher gets contacts and allergies
+      await c.query("reset role");
+      await c.query("update club_enrollments set status = 'active' where club_id = $1 and child_id = $2", [clubs["Рисование"], alikhan]);
+      await become(F.users.clubTeacher);
+      r = await row();
+      expect(r.allergies).toMatch(/орехи/);
+      expect(r.parents.map((p: { phone: string }) => p.phone)).toEqual(["+77010000007"]);
+    });
+  });
+
+  it("internal counters (free places, queue length, child's age) are not callable by any client", async () => {
+    await inTx(async (c, become) => {
+      for (const w of ["owner", "head", "clubTeacher", "parent", "teacherParent", "ownerB", "parentB"] as Who[]) {
+        await become(F.users[w]);
+        await failsWith(c, "select club_free_places($1)", [clubs["Шахматы"]], /permission denied/);
+        await failsWith(c, "select club_queued_count($1)", [clubs["Шахматы"]], /permission denied/);
+        await failsWith(c, "select club_child_age($1)", [F.children["Миша"]], /permission denied/);
+      }
+      await failsWith(c, "select club_teaches_child($1)", [F.children["Миша"]], /does not exist/);
+      // the transitions that use them keep working (SECURITY DEFINER)
+      await become(F.users.parent);
+      expect(await call(c, "club_request", clubs["Английский язык"], F.children["Алихан"])).toMatchObject({ status: "requested", queued: 0 });
     });
   });
 

@@ -2,7 +2,8 @@
  * Clubs fixtures (stage 4A). Re-runnable: the four clubs are found by name and refreshed; their enrollments are
  * rebuilt from scratch on every run.
  * - «Шахматы» 4–7 лет, педагог кружка +77010000005, 1 место — занято Мишей (полный кружок, сценарий 6);
- * - «Рисование» 3–6 лет, тот же педагог, 8 мест: Сабина записана, Айлин — заявка на рассмотрении; с фото;
+ * - «Рисование» 3–6 лет, тот же педагог, 8 мест: Сабина и Миша (родитель +77010000008) записаны, Айлин — заявка на
+ *   рассмотрении; с фото;
  * - «Английский язык» 5–7 лет, без педагога, 10 мест, пусто;
  * - «Танцы» 2–3 года — не подходит по возрасту ни одному ребёнку родителя.
  */
@@ -95,6 +96,7 @@ export async function seedClubs(db: SupabaseClient, ids: Ids) {
     await db.from("club_enrollments").insert([
       row(CLUB_NAMES.chess, "Миша", "active"),
       row(CLUB_NAMES.art, "Сабина", "active"),
+      row(CLUB_NAMES.art, "Миша", "active"),
       row(CLUB_NAMES.art, "Айлин", "requested"),
     ]).select("id"),
     "enrollments",

@@ -27,7 +27,8 @@ export interface RosterRow {
   enrollment_id: string;
   child_id: string;
   child_name: string;
-  birth_date: string;
+  /** full years today (garden time zone); birth dates are not exposed by club_roster */
+  age: number;
   group_name: string | null;
   allergies: string | null;
   status: EnrollmentStatus;

@@ -2,7 +2,8 @@ import { getTranslations } from "next-intl/server";
 import { Phone, Users } from "lucide-react";
 import type { Club, RosterRow } from "@/lib/clubs-data";
 import { confirmOutcome, type ClubStats } from "@/lib/clubs";
-import { ageOn, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
+import { formatPhone } from "@/lib/phone";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,7 @@ export interface RosterRights {
   decide: boolean; // confirm / reject (owner, head, the club's teacher)
   exclude: boolean; // owner, head
   write: boolean; // «Написать» parents
+  contactsAll: boolean; // owner, head, accountant: contacts/allergies for requests and the queue too (club teacher: enrolled only)
 }
 
 function Parents({ row, rights }: { row: RosterRow; rights: RosterRights }) {
@@ -23,9 +25,9 @@ function Parents({ row, rights }: { row: RosterRow; rights: RosterRights }) {
         <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl bg-surface-muted px-3 py-2" data-testid="roster-parent">
           <div className="min-w-0 flex-1 text-sm">
             <div className="truncate font-semibold">{p.name}</div>
-            <a href={`tel:${p.phone}`} className="inline-flex min-h-8 items-center gap-1.5 text-[13px] text-sky-strong" data-testid="parent-phone">
+            <a href={`tel:${p.phone}`} className="inline-flex min-h-11 items-center gap-1.5 text-[13px] text-sky-strong" data-testid="parent-phone" data-phone={p.phone}>
               <Phone className="size-3.5" aria-hidden />
-              {p.phone}
+              {formatPhone(p.phone)}
             </a>
           </div>
           {rights.write ? <WriteButton userId={p.id} /> : null}
@@ -35,10 +37,10 @@ function Parents({ row, rights }: { row: RosterRow; rights: RosterRights }) {
   );
 }
 
-async function Row({ row, club, stats, rights, today, tz }: { row: RosterRow; club: Club; stats: ClubStats; rights: RosterRights; today: string; tz: string }) {
+async function Row({ row, club, stats, rights, tz }: { row: RosterRow; club: Club; stats: ClubStats; rights: RosterRights; tz: string }) {
   const t = await getTranslations("clubs");
   const outcome = confirmOutcome({ status: row.status, position: row.queue_position }, stats);
-  const age = ageOn(row.birth_date, today);
+  const age = row.age;
   return (
     <li className="py-3 first:pt-0 last:pb-0" data-testid="roster-row" data-child={row.child_name} data-status={row.status}>
       <div className="flex items-start gap-3">
@@ -58,7 +60,11 @@ async function Row({ row, club, stats, rights, today, tz }: { row: RosterRow; cl
           {row.allergies ? <div className="mt-0.5 text-[13px] font-semibold text-warning">{t("allergies", { text: row.allergies })}</div> : null}
         </div>
       </div>
-      {row.parents.length ? <Parents row={row} rights={rights} /> : <p className="mt-2 text-[13px] text-faint">{t("noParents")}</p>}
+      {row.parents.length ? (
+        <Parents row={row} rights={rights} />
+      ) : row.status === "active" || rights.contactsAll ? (
+        <p className="mt-2 text-[13px] text-faint">{t("noParents")}</p>
+      ) : null}
       {(rights.decide && row.status !== "active") || (rights.exclude && row.status === "active") ? (
         <div className="mt-2 flex flex-wrap justify-end gap-2">
           {rights.decide && row.status !== "active" ? (
@@ -75,7 +81,7 @@ async function Row({ row, club, stats, rights, today, tz }: { row: RosterRow; cl
 }
 
 /** Requests, queue and the attending children of one club. */
-export async function ClubRoster({ club, rows, stats, rights, today, tz }: { club: Club; rows: RosterRow[]; stats: ClubStats; rights: RosterRights; today: string; tz: string }) {
+export async function ClubRoster({ club, rows, stats, rights, tz }: { club: Club; rows: RosterRow[]; stats: ClubStats; rights: RosterRights; tz: string }) {
   const t = await getTranslations("clubs");
   const requests = rows.filter((r) => r.status === "requested");
   const queue = rows.filter((r) => r.status === "queued");
@@ -86,7 +92,7 @@ export async function ClubRoster({ club, rows, stats, rights, today, tz }: { clu
         <CardHeader title={title} action={extra} />
         <ul className="divide-y divide-border">
           {list.map((r) => (
-            <Row key={r.enrollment_id} row={r} club={club} stats={stats} rights={rights} today={today} tz={tz} />
+            <Row key={r.enrollment_id} row={r} club={club} stats={stats} rights={rights} tz={tz} />
           ))}
         </ul>
       </Card>

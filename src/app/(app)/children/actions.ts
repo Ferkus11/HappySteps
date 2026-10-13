@@ -7,6 +7,7 @@ import { audit } from "@/lib/audit";
 import { groupOverCapacity, insertChild, linkParent, type ParentInviteResult } from "@/lib/children";
 import { createServiceClient } from "@/lib/supabase/service";
 import { zDate, zMoney, zName, zOptionalText, zPhone, zUuid } from "@/lib/validation";
+import { activeClubsOf, notifyFreedClubs } from "@/lib/clubs-notify";
 
 const parentSchema = z.object({ fullName: zName, phone: zPhone, relation: zOptionalText(40) });
 
@@ -123,6 +124,8 @@ export async function archiveChildAction(id: string, reason: (typeof reasons)[nu
   return kgAction(["owner", "head"], async (ctx, supabase) => {
     zUuid.parse(id);
     z.enum(reasons).parse(reason);
+    // Clubs: the archive trigger releases the child's places — tell the head where a queue is waiting (SPEC §5.10).
+    const clubs = await activeClubsOf(supabase, ctx.kg.id, id);
     check(
       await supabase
         .from("children")
@@ -131,6 +134,7 @@ export async function archiveChildAction(id: string, reason: (typeof reasons)[nu
         .eq("kindergarten_id", ctx.kg.id),
     );
     await audit(supabase, ctx.kg.id, "child.archive", "child", id, { reason });
+    await notifyFreedClubs(supabase, ctx.kg.id, clubs);
   });
 }
 

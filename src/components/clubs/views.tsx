@@ -171,7 +171,7 @@ export async function PendingList({ items, ctx, canDecide }: { items: PendingIte
                 <div className="min-w-0">
                   <div className="truncate font-semibold">{r.child_name}</div>
                   <div className="truncate text-[13px] text-muted">
-                    {r.club.name} · {t("childAge", { count: ageOn(r.birth_date, todayIn(ctx.settings.timezone)) })} · {formatDate(r.requested_at, ctx.settings.timezone)}
+                    {r.club.name} · {t("childAge", { count: r.age })} · {formatDate(r.requested_at, ctx.settings.timezone)}
                   </div>
                 </div>
               </Link>

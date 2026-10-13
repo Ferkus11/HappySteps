@@ -147,8 +147,7 @@ export default async function ClubPage({ params, searchParams }: { params: Promi
             club={club}
             rows={rows}
             stats={stats}
-            rights={{ decide: admin || ctx.role === "club_teacher", exclude: admin, write: admin || ctx.role === "club_teacher" }}
-            today={todayIn(ctx.settings.timezone)}
+            rights={{ decide: admin || ctx.role === "club_teacher", exclude: admin, write: admin || ctx.role === "club_teacher", contactsAll: admin || ctx.role === "accountant" }}
             tz={ctx.settings.timezone}
           />
         ) : null}

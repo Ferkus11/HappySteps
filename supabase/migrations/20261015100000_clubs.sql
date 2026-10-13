@@ -86,16 +86,6 @@ create or replace function public.club_teaches(p_club uuid) returns boolean
       and public.has_role(c.kindergarten_id, array['club_teacher']::public.app_role[]))
 $$;
 
--- Is the child actively enrolled in a club the current user teaches? (SPEC §3.4 «Дети и группы»: club_teacher 🔸 записанные)
-create or replace function public.club_teaches_child(p_child uuid) returns boolean
-  language sql stable security definer set search_path = public as $$
-  select exists (
-    select 1 from club_enrollments e
-    join clubs c on c.id = e.club_id
-    where e.child_id = p_child and e.status = 'active' and c.teacher_id = auth.uid()
-      and public.has_role(c.kindergarten_id, array['club_teacher']::public.app_role[]))
-$$;
-
 -- May the current user see the whole catalog of this garden? Cook: no; club teacher: only own clubs (SPEC §3.4).
 create or replace function public.club_catalog_visible(kg uuid) returns boolean
   language sql stable security definer set search_path = public as $$
@@ -122,9 +112,11 @@ create or replace function public.club_child_age(p_child uuid) returns int
   select extract(year from age(public.kg_today(ch.kindergarten_id), ch.birth_date))::int from children ch where ch.id = p_child
 $$;
 
-revoke execute on function public.club_free_places(uuid) from public, anon;
-revoke execute on function public.club_queued_count(uuid) from public, anon;
-revoke execute on function public.club_child_age(uuid) from public, anon;
+-- Internal: no caller check inside, so only the SECURITY DEFINER transitions below may call them (they run as the owner).
+-- Clients read counters through club_stats / club_roster, which check the caller.
+revoke execute on function public.club_free_places(uuid) from public, anon, authenticated;
+revoke execute on function public.club_queued_count(uuid) from public, anon, authenticated;
+revoke execute on function public.club_child_age(uuid) from public, anon, authenticated;
 
 -- ───────────────────────────── Integrity ─────────────────────────────
 create or replace function public.tg_club_guard() returns trigger
@@ -216,20 +208,8 @@ create policy club_enrollments_select on public.club_enrollments for select to a
 revoke insert, update, delete on public.club_enrollments from authenticated;
 
 -- ───────────────────────────── Cross-module access (only additions) ─────────────────────────────
--- Foundation: club teachers see children actively enrolled in their clubs (read-only; SPEC §3.4).
--- Branches copied verbatim from 20261012100000_foundation.sql; only the last one is new.
-create or replace function public.child_visible(c uuid) returns boolean
-  language sql stable security definer set search_path = public as $$
-  select exists (
-    select 1 from children ch
-    where ch.id = c and (
-      public.has_role(ch.kindergarten_id, array['owner','head','accountant']::public.app_role[])
-      or public.teaches_group(ch.group_id)
-      or public.is_guardian(ch.id)
-      or public.club_teaches_child(ch.id)
-    )
-  )
-$$;
+-- Children: no widening of child_visible / children policies. A club teacher reads the children of own clubs only
+-- through club_roster (name, age; contacts and allergies for enrolled children) — SPEC §3.4 «записанные».
 
 -- Chats: a parent may also start a direct chat with the club teacher of a club their child attends.
 -- Branches copied verbatim from 20261014100000_chats.sql; only the last one is new.
@@ -455,24 +435,33 @@ create or replace function public.club_queue_positions(p_kg uuid)
 $$;
 
 -- Children of a club (open enrollments) with their parents' contacts — for owner/head/accountant and the club's teacher.
+-- The club teacher gets group, allergies and parents' contacts only for enrolled («записанные», status active) children;
+-- for requests and the queue — name and age only (SPEC §3.4). Birth dates are never returned, only the age.
 create or replace function public.club_roster(p_club uuid)
-  returns table (enrollment_id uuid, child_id uuid, child_name text, birth_date date, group_name text, allergies text,
+  returns table (enrollment_id uuid, child_id uuid, child_name text, age int, group_name text, allergies text,
                  status text, queue_position int, requested_at timestamptz, started_on timestamptz, parents jsonb)
   language sql stable security definer set search_path = public as $$
-  select e.id, ch.id, ch.full_name, ch.birth_date, g.name, ch.allergies, e.status,
+  select e.id, ch.id, ch.full_name,
+    extract(year from age(public.kg_today(c.kindergarten_id), ch.birth_date))::int,
+    case when x.full then g.name end,
+    case when x.full then ch.allergies end,
+    e.status,
     case when e.status = 'queued' then (row_number() over (partition by e.status order by e.queue_no))::int end,
     e.created_at, e.started_on,
-    coalesce((select jsonb_agg(jsonb_build_object('id', p.id, 'name', p.full_name, 'phone', p.phone, 'relation', cg.relation) order by p.full_name)
-              from child_guardians cg
-              join profiles p on p.id = cg.user_id
-              join memberships m on m.user_id = cg.user_id and m.kindergarten_id = cg.kindergarten_id and m.role = 'parent' and m.status = 'active'
-              where cg.child_id = ch.id), '[]'::jsonb)
+    case when x.full then
+      coalesce((select jsonb_agg(jsonb_build_object('id', p.id, 'name', p.full_name, 'phone', p.phone, 'relation', cg.relation) order by p.full_name)
+                from child_guardians cg
+                join profiles p on p.id = cg.user_id
+                join memberships m on m.user_id = cg.user_id and m.kindergarten_id = cg.kindergarten_id and m.role = 'parent' and m.status = 'active'
+                where cg.child_id = ch.id), '[]'::jsonb)
+    else '[]'::jsonb end
   from clubs c
+  cross join lateral (select public.has_role(c.kindergarten_id, array['owner','head','accountant']::public.app_role[]) as admin) r
   join club_enrollments e on e.club_id = c.id and e.status in ('requested', 'queued', 'active')
+  cross join lateral (select r.admin or e.status = 'active' as full) x
   join children ch on ch.id = e.child_id and ch.status = 'active'
   left join groups g on g.id = ch.group_id
-  where c.id = p_club
-    and (public.has_role(c.kindergarten_id, array['owner','head','accountant']::public.app_role[]) or public.club_teaches(c.id))
+  where c.id = p_club and (r.admin or public.club_teaches(c.id))
   order by case e.status when 'requested' then 0 when 'queued' then 1 else 2 end, e.queue_no, e.created_at, ch.full_name
 $$;
 
@@ -480,7 +469,7 @@ do $$
 declare f text;
 begin
   foreach f in array array[
-    'club_teaches(uuid)', 'club_teaches_child(uuid)', 'club_catalog_visible(uuid)',
+    'club_teaches(uuid)', 'club_catalog_visible(uuid)',
     'club_request(uuid, uuid)', 'club_confirm(uuid)', 'club_reject(uuid, text)', 'club_leave(uuid)', 'club_exclude(uuid, text)',
     'club_stats(uuid)', 'club_queue_positions(uuid)', 'club_roster(uuid)'] loop
     execute format('revoke execute on function public.%s from public, anon', f);
