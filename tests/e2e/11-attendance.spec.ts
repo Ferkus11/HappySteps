@@ -92,7 +92,9 @@ test("scenario 3: parent reports «болеет» for 3 days → teacher sees th
 test("scenario 4: teacher marks → parent sees «Сегодня в саду» → owner's attendance card updates", async ({ page }) => {
   await cleanToday();
   await login(page, PHONES.owner);
-  const before = Number(await page.getByTestId("dash-attendance-present").innerText());
+  // the card is neutral («—», dashed ring) until the first mark; the count stays in data-present
+  const before = Number(await page.getByTestId("dash-attendance-present").getAttribute("data-present"));
+  await expect(page.getByTestId("dash-attendance")).toHaveAttribute("data-state", /pending|off/);
 
   await login(page, PHONES.teacher);
   await page.goto("/attendance");
@@ -108,6 +110,7 @@ test("scenario 4: teacher marks → parent sees «Сегодня в саду» �
 
   await login(page, PHONES.owner);
   await expect(page.getByTestId("dash-attendance-present")).toHaveText(String(before + 1));
+  await expect(page.getByTestId("dash-attendance")).toHaveAttribute("data-state", "marked");
 });
 
 test("«Все пришли», then unmark the absent one", async ({ page }) => {

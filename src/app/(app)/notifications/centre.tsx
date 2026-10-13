@@ -60,6 +60,11 @@ const ICONS: Record<string, LucideIcon> = {
 
 const changed = () => window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED));
 
+/** A chat message notification whose message was deleted (params.deleted = "yes", set by delete_chat_message). */
+export function isDeletedMessage(i: Pick<NotificationItem, "type" | "params">) {
+  return i.type === "message.new" && i.params?.deleted === "yes";
+}
+
 function dayKey(iso: string, tz: string) {
   return todayIn(tz, new Date(iso));
 }
@@ -172,7 +177,9 @@ export function NotificationCentre(props: { items: NotificationItem[]; more: boo
   const today = todayIn(props.timeZone);
   const yesterday = addDays(today, -1);
   const groups: { key: string; items: NotificationItem[] }[] = [];
-  for (const item of items) {
+  // A chat message deleted after its notification arrived is noise («Сообщение удалено»): the server leaves such
+  // rows out and a row that turns deleted while the page is open (live update) disappears here too.
+  for (const item of items.filter((i) => !isDeletedMessage(i))) {
     const key = dayKey(item.created_at, props.timeZone);
     const last = groups[groups.length - 1];
     if (last?.key === key) last.items.push(item);
@@ -181,7 +188,8 @@ export function NotificationCentre(props: { items: NotificationItem[]; more: boo
   const label = (key: string) => (key === today ? t("today") : key === yesterday ? t("yesterday") : formatDate(key));
 
   return (
-    <>
+    // one column: the header actions line up with the list instead of the far right edge at 1440
+    <div className="max-w-3xl">
       <PageHeader
         title={t("title")}
         actions={
@@ -193,7 +201,8 @@ export function NotificationCentre(props: { items: NotificationItem[]; more: boo
               </Link>
             </Button>
             {unread > 0 ? (
-              <Button onClick={readAll} disabled={markingAll} data-testid="notifications-read-all">
+              // secondary: reading everything is housekeeping, not the main action of the screen (SPEC §8)
+              <Button variant="secondary" onClick={readAll} disabled={markingAll} data-testid="notifications-read-all">
                 <CheckCheck aria-hidden />
                 {t("markAllRead")}
               </Button>
@@ -206,12 +215,12 @@ export function NotificationCentre(props: { items: NotificationItem[]; more: boo
           {t("otherGardens", { count: props.elsewhere })}
         </p>
       ) : null}
-      {items.length === 0 ? (
+      {groups.length === 0 ? (
         <Card>
           <EmptyState icon={Bell} title={t("empty")} hint={t("emptyHint")} />
         </Card>
       ) : (
-        <div className="max-w-3xl space-y-5" data-testid="notification-list">
+        <div className="space-y-5" data-testid="notification-list">
           {groups.map((g) => (
             <section key={g.key} aria-labelledby={`day-${g.key}`}>
               <h2 id={`day-${g.key}`} className="mb-2 px-1 text-[13px] font-bold tracking-wide text-faint uppercase">
@@ -269,6 +278,6 @@ export function NotificationCentre(props: { items: NotificationItem[]; more: boo
           {loading ? <Skeleton className="h-16 w-full" /> : null}
         </div>
       )}
-    </>
+    </div>
   );
 }

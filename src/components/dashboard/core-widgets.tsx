@@ -267,8 +267,12 @@ async function ParentChildCard({ ctx }: { ctx: KgContext }) {
             src={k.photo_path ? photos[k.photo_path] : null}
             size={56}
           />
+          {/* first name large, the full name small (wraps instead of «Ахметов Алихан Дания…») */}
           <span className="min-w-0 flex-1">
-            <span data-user-content className="block truncate text-[17px] font-extrabold">
+            <span data-user-content className="block truncate text-[18px] leading-tight font-extrabold">
+              {firstName(k.full_name)}
+            </span>
+            <span data-user-content className="mt-0.5 block text-[13px] leading-snug break-words text-muted">
               {k.full_name}
             </span>
             <span className="block truncate text-sm text-muted">

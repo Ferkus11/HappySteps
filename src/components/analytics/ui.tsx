@@ -2,7 +2,7 @@ import * as React from "react";
 import Link from "next/link";
 import { BarChart3, ChevronLeft, ChevronRight, Download, type LucideIcon } from "lucide-react";
 import { MAX_CUSTOM_DAYS, PERIOD_KINDS, calendarPeriod, periodQuery, shiftPeriod, type Change, type Period, type PeriodProblem, type Section } from "@/lib/analytics";
-import { formatCell, type Column, type DataTable, type T } from "@/lib/analytics-view";
+import { changeTone, formatCell, type ChangeTone, type Column, type DataTable, type T } from "@/lib/analytics-view";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -25,7 +25,7 @@ export function SectionTabs({ t, tabs, active, period }: { t: T; tabs: Section[]
   if (tabs.length < 2) return null;
   return (
     <nav
-      className="scrollbar-none mb-4 flex w-full gap-1 overflow-x-auto rounded-2xl bg-surface-muted p-1 sm:inline-flex sm:w-auto sm:max-w-full"
+      className="scrollbar-none scroll-shadow-x mb-4 flex w-full gap-1 overflow-x-auto rounded-2xl p-1 [--fade-bg:var(--surface-muted)] sm:inline-flex sm:w-auto sm:max-w-full"
       aria-label={t("title")}
     >
       {tabs.map((k) => (
@@ -35,7 +35,8 @@ export function SectionTabs({ t, tabs, active, period }: { t: T; tabs: Section[]
           aria-current={active === k ? "page" : undefined}
           data-testid={`analytics-tab-${k}`}
           className={cn(
-            "inline-flex h-11 min-w-0 flex-auto items-center justify-center rounded-xl px-2 text-sm font-semibold whitespace-nowrap text-muted sm:h-10 sm:flex-none sm:shrink-0 sm:px-4",
+            // phones: 13px and tight padding so the four tabs fit 358px with air on both sides (ru «Посещаемость» is long)
+            "inline-flex h-11 shrink-0 grow items-center justify-center rounded-xl px-2 text-[13px] font-semibold whitespace-nowrap text-muted sm:h-10 sm:grow-0 sm:px-4 sm:text-sm",
             active === k && "bg-surface text-text shadow-sm",
           )}
         >
@@ -144,13 +145,26 @@ export interface KpiProps {
   /** «%» for amounts and counts, « п.п.» for rates (percentage points), « дн.» for days */
   unit: string;
   danger?: boolean;
+  /**
+   * Which direction of change is good news for this KPI — decided per KPI by the section (e.g. attendance «up»,
+   * sickness and debt «down»). Omitted = neutral: the change is shown in grey (e.g. charged amount, manual edits).
+   */
+  better?: "up" | "down";
+  /** a bad change of this KPI is about money owed — the only bad trend shown in red (SPEC §8); others are amber */
+  debt?: boolean;
   testId?: string;
 }
 
-/** Big number, small caption, ▲▼ change against the previous period in neutral ink (red only for a debt value). */
+const TONE_CLASS: Record<ChangeTone, string> = { good: "text-success", bad: "text-warning", neutral: "text-muted" };
+
+/**
+ * Big number, small caption, ▲▼ change against the previous period. The arrow keeps the direction; the colour says
+ * whether it is good (green) or bad (amber; red only for a growing debt), grey when the KPI has no good direction.
+ */
 export function Kpi({ t, k }: { t: T; k: KpiProps }) {
   const c = k.change;
   const arrow = c ? (c.dir === "up" ? "▲" : c.dir === "down" ? "▼" : "=") : "";
+  const tone = changeTone(c, k.better);
   return (
     <div className="min-w-0 rounded-2xl border border-border/70 bg-surface p-4 shadow-card" data-testid={k.testId}>
       <div className="text-[13px] font-semibold text-muted">{k.label}</div>
@@ -159,11 +173,18 @@ export function Kpi({ t, k }: { t: T; k: KpiProps }) {
       </div>
       <div className="mt-1 flex flex-wrap items-baseline gap-x-2 text-xs text-faint">
         {c ? (
-          <span className="font-bold text-muted tabular-nums" data-testid={k.testId ? `${k.testId}-delta` : undefined}>
+          <span
+            className={cn("font-bold tabular-nums", tone === "bad" && k.debt ? "text-danger" : TONE_CLASS[tone])}
+            data-testid={k.testId ? `${k.testId}-delta` : undefined}
+            data-tone={tone}
+          >
             <span aria-hidden>
               {arrow} {c.dir === "same" ? "" : `${c.value}${k.unit}`}
             </span>
-            <span className="sr-only">{c.dir === "same" ? t("delta.same") : t(`delta.${c.dir}`, { value: c.value, unit: k.unit })}</span>
+            <span className="sr-only">
+              {c.dir === "same" ? t("delta.same") : t(`delta.${c.dir}`, { value: c.value, unit: k.unit })}
+              {tone !== "neutral" ? ` (${t(tone === "good" ? "kpi.better" : "kpi.worse")})` : ""}
+            </span>
           </span>
         ) : null}
         {k.sub ? <span>{k.sub}</span> : null}
@@ -253,11 +274,10 @@ export function TableView({ table }: { table: DataTable }) {
   const num = (k: string) => k !== "text";
   const phoneHidden = (c: Column) => (c.phone ? "hidden sm:table-cell" : "");
   const subs = table.columns.filter((c) => c.phone === "sub");
-  // a table with phone columns fits the phone width; the others scroll sideways inside the card
-  const fits = table.columns.some((c) => c.phone);
   return (
-    <div className="-mx-4 overflow-x-auto px-4 md:-mx-5 md:px-5" data-testid={`table-${table.id}`} tabIndex={0} role="region" aria-label={table.title}>
-      <table className={cn("w-full border-collapse text-sm", fits ? "sm:min-w-max" : "min-w-max")}>
+    // scroll-shadow-x: a shadow at the edge while columns are hidden behind it (wide tables on phones and tablets)
+    <div className="scroll-shadow-x -mx-4 overflow-x-auto px-4 md:-mx-5 md:px-5" data-testid={`table-${table.id}`} tabIndex={0} role="region" aria-label={table.title}>
+      <table className="w-full border-collapse text-sm">
         <caption className="sr-only">{table.title}</caption>
         <thead>
           <tr className="border-b border-border text-left text-xs text-muted">
@@ -266,7 +286,9 @@ export function TableView({ table }: { table: DataTable }) {
                 key={c.key}
                 scope="col"
                 data-col={c.key}
-                className={cn("px-2 py-2 font-semibold first:pl-0 last:pr-0", fits ? "sm:whitespace-nowrap" : "whitespace-nowrap", num(c.kind) && "text-right", i === 0 && "max-w-56", phoneHidden(c))}
+                // headers wrap at spaces (never inside a word), so a wide table fits the card at 1440 instead of
+                // cutting off its last columns; a table that still does not fit scrolls with an edge shadow
+                className={cn("px-2 py-2 align-bottom font-semibold first:pl-0 last:pr-0", num(c.kind) && "text-right", i === 0 && "max-w-56", phoneHidden(c))}
               >
                 {c.label}
               </th>
@@ -292,7 +314,7 @@ export function TableView({ table }: { table: DataTable }) {
                   >
                     {i === 0 ? (
                       <>
-                        <span className="block truncate" data-user-content={USER_COLUMNS.includes(c.key) ? "" : undefined}>
+                        <span className="line-clamp-2 break-words" data-user-content={USER_COLUMNS.includes(c.key) ? "" : undefined}>
                           {formatCell(r[c.key] ?? null, c.kind)}
                         </span>
                         {subline ? (

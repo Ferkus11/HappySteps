@@ -11,7 +11,10 @@ export async function audienceText(a: { audience: AnnouncementListItem["audience
   return t(`audiences.${a.audience}`);
 }
 
-/** One announcement in a list. "Важное" is the single accent: tinted card + pin. */
+/**
+ * One announcement in a list. "Важное" is the single accent: a thin crimson bar on the left + the pin, on a white
+ * card — a pink fill looked like an error or «отсутствует» and outshouted every dashboard (SPEC §8).
+ */
 export async function AnnouncementCard({ a, timezone, compact }: { a: AnnouncementListItem; timezone: string; compact?: boolean }) {
   const t = await getTranslations("announcements");
   const audience = await audienceText(a);
@@ -24,7 +27,8 @@ export async function AnnouncementCard({ a, timezone, compact }: { a: Announceme
       data-important={a.important ? "true" : undefined}
       className={cn(
         "block rounded-2xl border p-4 transition-shadow hover:shadow-md",
-        a.important ? "border-brand/30 bg-brand-soft" : "border-border/70 bg-surface",
+        "border-border/70 bg-surface",
+        a.important && "border-l-4 border-l-brand",
         compact && "p-3",
       )}
     >

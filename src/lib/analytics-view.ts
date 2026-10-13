@@ -15,6 +15,7 @@ import {
   periodFacts,
   staffTotals,
   financeTotals,
+  type Change,
   type Granularity,
   type Insight,
   type Period,
@@ -218,19 +219,20 @@ export function buildTables<S extends Section>(section: S, data: SectionData[S],
       {
         id: "staff",
         title: name("staff"),
+        // phones: employee, lates, absences, hours vs schedule (the key numbers); the rest on wider screens and in the .xlsx
         columns: [
           col("employee", "text"),
           col("late", "int"),
-          col("lateMinutes", "int"),
+          hide(col("lateMinutes", "int")),
           col("absentDays", "int"),
-          col("unmarkedDays", "int"),
-          col("worked", "hours"),
-          col("planned", "hours"),
+          hide(col("unmarkedDays", "int")),
+          hide(col("worked", "hours")),
+          hide(col("planned", "hours")),
           col("hoursRate", "pct"),
-          col("scheduled", "int"),
-          col("outside", "int"),
-          col("autoClosed", "int"),
-          col("edited", "int"),
+          hide(col("scheduled", "int")),
+          hide(col("outside", "int")),
+          hide(col("autoClosed", "int")),
+          hide(col("edited", "int")),
         ],
         rows: sorted.map((r) => ({
           employee: r.archived ? `${r.full_name} (${t("archived")})` : r.full_name,
@@ -322,13 +324,14 @@ export function buildTables<S extends Section>(section: S, data: SectionData[S],
     {
       id: "churn",
       title: name("churn"),
-      columns: [col("reason", "text"), col("kids", "int")],
+      // «Пришли / Выбыли» are not reasons: the first column is the movement (leave reasons are its sub-rows)
+      columns: [col("movement", "text"), col("kids", "int")],
       rows: [
-        { reason: t("churnRows.joined"), kids: f.joined },
-        { reason: t("churnRows.left"), kids: f.left },
+        { movement: t("churnRows.joined"), kids: f.joined },
+        { movement: t("churnRows.left"), kids: f.left },
         ...Object.entries(f.left_reasons)
           .sort((a, b) => b[1] - a[1])
-          .map(([k, n]) => ({ reason: `— ${t(`leaveReasons.${k}`)}`, kids: n })),
+          .map(([k, n]) => ({ movement: `— ${t(`leaveReasons.${k}`)}`, kids: n })),
       ],
     },
     {
@@ -338,6 +341,14 @@ export function buildTables<S extends Section>(section: S, data: SectionData[S],
       rows: points.map((p) => ({ label: bucketLabel(t, p.d, g), active: p.n })),
     },
   ];
+}
+
+export type ChangeTone = "good" | "bad" | "neutral";
+
+/** Good/bad of a KPI change: the same direction as `better` is good, the opposite is bad; no change or no `better` is neutral. */
+export function changeTone(c: Change | null, better?: "up" | "down"): ChangeTone {
+  if (!c || !better || c.dir === "same") return "neutral";
+  return c.dir === better ? "good" : "bad";
 }
 
 /** Text of a cell on screen (the .xlsx keeps raw numbers with number formats). */

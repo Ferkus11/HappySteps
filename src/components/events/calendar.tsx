@@ -170,9 +170,9 @@ export function EventsCalendar({
                     </>
                   ) : null}
                 </span>
-                {/* phone: dots */}
+                {/* phone: dots in the legend's two colours only — every event blue, birthdays crimson (the kind is in the list below) */}
                 <span className="mt-0.5 flex h-1.5 gap-0.5 lg:hidden" aria-hidden>
-                  {info?.events.slice(0, 3).map((e) => <span key={e.id} className={cn("size-1.5 rounded-full", KIND_DOT[e.kind])} />)}
+                  {info?.events.slice(0, 3).map((e) => <span key={e.id} className="size-1.5 rounded-full bg-sky" data-testid="calendar-dot" />)}
                   {info?.birthdays.length ? <span className="size-1.5 rounded-full bg-brand" /> : null}
                 </span>
                 {/* desktop: chips */}
@@ -249,8 +249,12 @@ function Legend() {
       <span className="inline-flex items-center gap-1.5">
         <span className="size-2.5 rounded-full bg-brand" aria-hidden /> {t("legendBirthday")}
       </span>
+      {/* days off and weekends are shown by a lavender day number, so the legend shows one */}
       <span className="inline-flex items-center gap-1.5">
-        <span className="size-2.5 rounded-sm bg-tile-unmarked" aria-hidden /> {t("legendDayOff")}
+        <span className="text-[11px] leading-none font-bold text-tile-unmarked-fg" aria-hidden>
+          31
+        </span>{" "}
+        {t("legendDayOff")}
       </span>
       <span className="inline-flex items-center gap-1.5">
         <span className="size-2.5 rounded-full bg-sky" aria-hidden /> {t("legendEvent")}
