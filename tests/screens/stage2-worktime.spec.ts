@@ -58,7 +58,7 @@ test("worktime · head", async ({ page }) => {
 
 test("worktime · accountant and owner", async ({ page }) => {
   await login(page, PHONES.accountant);
-  await settle(page, "tile-late");
+  await settle(page, "timesheet-widget");
   await snap(page, S, "worktime-accountant-dashboard");
   await page.goto("/worktime/timesheet");
   await settle(page, "timesheet");

@@ -102,6 +102,6 @@ async function TeacherClubsWidget({ ctx }: { ctx: KgContext }) {
 }
 
 export const clubsWidgets: DashboardWidget[] = [
-  { id: "clubs-parent", roles: ["parent"], slot: "main", order: 40, Component: ParentClubsWidget },
+  { id: "clubs-parent", roles: ["parent"], slot: "main", order: 50, Component: ParentClubsWidget },
   { id: "clubs-teacher", roles: ["club_teacher"], slot: "main", order: 1, Component: TeacherClubsWidget },
 ];

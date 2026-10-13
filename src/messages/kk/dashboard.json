@@ -5,11 +5,30 @@
   "activeChildren": "белсенді",
   "groups": "Топтар",
   "fill": "толымдылық",
-  "staff": "Қызметкерлер",
+  "fillLabel": "Топтардың толымдылығы",
   "myChildren": "Менің балаларым",
   "noChildren": "Аккаунтыңызға әзірге балалар байланыстырылмаған",
   "noChildrenHint": "Бақша әкімшілігіне хабарласыңыз.",
-  "quickActions": "Жылдам әрекеттер",
-  "attention": "Назар аударыңыз",
-  "nothingNeeded": "Бәрі ретте"
+  "attention": {
+    "title": "Назар аударыңыз",
+    "allGood": "Бәрі ретте",
+    "allGoodHint": "Жаңа істер жоқ — шай ішуге болады.",
+    "items": {
+      "unmarkedGroups": "{count, plural, one {топ белгіленбеген} other {топ белгіленбеген}}",
+      "receipts": "{count, plural, one {чек тексеруде} other {чек тексеруде}}",
+      "clubRequests": "{count, plural, one {үйірмеге өтінім} other {үйірмеге өтінім}}",
+      "clubQueue": "{count, plural, one {үйірмеде кезекке бос орын} other {үйірмелерде кезекке бос орын}}",
+      "documents": "{count, plural, one {қызметкер құжатының мерзімі бітеді} other {қызметкерлер құжатының мерзімі бітеді}}",
+      "waitlist": "{count, plural, one {күту парағына жаңа өтінім} other {күту парағына жаңа өтінім}}"
+    },
+    "hints": {
+      "unmarkedGroups": "Бүгінгі қатысу",
+      "receipts": "Төлемді растаңыз немесе қабылдамаңыз",
+      "receiptsHead": "Бухгалтер тексереді",
+      "clubRequests": "Растаңыз немесе қабылдамаңыз",
+      "clubQueue": "Орын босады — кезекті растаңыз",
+      "documents": "Мерзімі 30 күн ішінде бітеді",
+      "waitlist": "Ата-аналармен хабарласыңыз"
+    }
+  }
 }

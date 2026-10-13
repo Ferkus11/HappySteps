@@ -154,5 +154,11 @@
     "schedule": "График",
     "overrides": "Изменения",
     "absences": "Отсутствия"
+  },
+  "timesheetOpen": "Открыть табель",
+  "timesheetWidget": {
+    "hours": "часов отработано",
+    "lates": "опозданий",
+    "missed": "пропусков"
   }
 }

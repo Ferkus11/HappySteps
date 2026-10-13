@@ -26,7 +26,9 @@ async function ExpiringDocuments({ ctx }: { ctx: KgContext }) {
                 <span className="block truncate text-sm font-semibold">{d.personName}</span>
                 <span className="block truncate text-[13px] text-muted">{d.title}</span>
               </span>
-              <ExpiryBadge expiresOn={d.expiresOn} today={today} />
+              <span className="shrink-0 whitespace-nowrap">
+                <ExpiryBadge expiresOn={d.expiresOn} today={today} />
+              </span>
             </Link>
           </li>
         ))}
@@ -60,6 +62,6 @@ async function MyExpiringDocuments({ ctx }: { ctx: KgContext }) {
 }
 
 export const documentsWidgets: DashboardWidget[] = [
-  { id: "expiring-documents", roles: ["owner", "head"], slot: "main", order: 60, Component: ExpiringDocuments },
+  { id: "expiring-documents", roles: ["owner", "head"], slot: "main", order: 60, wide: true, Component: ExpiringDocuments },
   { id: "my-expiring-documents", roles: ["accountant", "teacher", "club_teacher", "cook"], slot: "main", order: 60, Component: MyExpiringDocuments },
 ];

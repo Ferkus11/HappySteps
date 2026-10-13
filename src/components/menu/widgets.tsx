@@ -81,7 +81,7 @@ async function KitchenMenu({ ctx }: { ctx: KgContext }) {
 }
 
 export const menuWidgets: DashboardWidget[] = [
-  { id: "menu-today", roles: ["owner", "head", "accountant", "teacher", "club_teacher", "parent"], slot: "main", order: 30, Component: MenuToday },
+  { id: "menu-today", roles: ["owner", "head", "teacher", "parent"], slot: "main", order: 20, Component: MenuToday },
   { id: "menu-kitchen", roles: ["cook"], slot: "top", order: 20, Component: KitchenMenu },
   { id: "menu-allergies", roles: ["cook"], slot: "main", order: 25, Component: AllergiesCard },
 ];

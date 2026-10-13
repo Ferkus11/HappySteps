@@ -1,47 +1,40 @@
-import Link from "next/link";
-import { getTranslations } from "next-intl/server";
 import type { KgContext } from "@/lib/auth/context";
-import { createClient } from "@/lib/supabase/server";
-import { groupSummaries } from "@/lib/queries/groups";
-import { Card } from "@/components/ui/card";
-import { Stat } from "@/components/ui/stat";
-import { Ring } from "@/components/ui/ring";
+import { cn } from "@/lib/utils";
 import { Greeting } from "./greeting";
-import { DashboardWidgets } from "./widgets";
+import { DashboardWidgets, WidgetSlot, widgetsFor } from "./widgets";
 
+/**
+ * Owner / head (SPEC §6): top row of numbers, then work time, menu and events in the main column and
+ * «Требует внимания», important announcements and the waitlist in the right column (desktop).
+ * Phones get one column: main and side cards are interleaved by `phoneOrder` (the columns use
+ * `display: contents` below xl, so their cards become items of one flex column).
+ */
 export async function AdminDashboard({ ctx }: { ctx: KgContext }) {
-  const t = await getTranslations("dashboard");
-  const supabase = await createClient();
-  const [groups, { count: staffCount }] = await Promise.all([
-    groupSummaries(supabase, ctx.kg.id),
-    supabase.from("memberships").select("id", { count: "exact", head: true }).eq("kindergarten_id", ctx.kg.id).eq("status", "active").neq("role", "parent"),
-  ]);
-  const children = groups.reduce((s, g) => s + g.activeCount, 0);
-  const capacity = groups.reduce((s, g) => s + g.capacity, 0);
+  const stats = widgetsFor(ctx.role, "stat");
+  const main = widgetsFor(ctx.role, "main");
+  const side = widgetsFor(ctx.role, "side");
+  const order = "order-(--phone-order) xl:order-none";
   return (
-    <>
+    <div data-testid="dashboard" data-role={ctx.role}>
       <Greeting name={ctx.profile.full_name} timezone={ctx.settings.timezone} />
       <DashboardWidgets ctx={ctx} slot="top" />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Link href="/children">
-          <Card className="h-full hover:shadow-md">
-            <Stat value={<span data-testid="dash-children">{children}</span>} label={t("children")} sub={t("activeChildren")} />
-          </Card>
-        </Link>
-        <Link href="/groups">
-          <Card className="flex h-full items-center justify-between hover:shadow-md">
-            <Stat value={groups.length} label={t("groups")} sub={t("fill")} />
-            <Ring value={capacity ? (children / capacity) * 100 : 0} />
-          </Card>
-        </Link>
-        <Link href="/staff">
-          <Card className="h-full hover:shadow-md">
-            <Stat value={staffCount ?? 0} label={t("staff")} />
-          </Card>
-        </Link>
-        <DashboardWidgets ctx={ctx} slot="stat" />
+      <div className={cn("grid grid-cols-2 gap-3 sm:gap-4", stats.length >= 4 ? "xl:grid-cols-4" : "xl:grid-cols-3")} data-testid="dash-stats">
+        {stats.map((w) => (
+          <WidgetSlot key={w.id} ctx={ctx} w={w} className={cn(w.wide && "col-span-2 xl:col-span-1")} />
+        ))}
       </div>
-      <DashboardWidgets ctx={ctx} slot="main" />
-    </>
+      <div className="mt-4 flex flex-col gap-4 xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(320px,360px)] xl:items-start">
+        <div className="contents xl:grid xl:grid-cols-2 xl:content-start xl:gap-4" data-slot="main">
+          {main.map((w) => (
+            <WidgetSlot key={w.id} ctx={ctx} w={w} className={cn(order, w.wide && "xl:col-span-2")} />
+          ))}
+        </div>
+        <div className="contents xl:flex xl:flex-col xl:gap-4" data-slot="side">
+          {side.map((w) => (
+            <WidgetSlot key={w.id} ctx={ctx} w={w} className={order} />
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

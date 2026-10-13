@@ -74,7 +74,7 @@ test("stage 2 · attendance · cook, owner, head, accountant", async ({ page }) 
   await page.getByTestId("portions-card").waitFor();
   await snap(page, "stage2", "attendance-cook-dashboard");
   await login(page, PHONES.owner);
-  await page.getByTestId("portions-card").waitFor();
+  await page.getByTestId("dash-attendance-present").waitFor();
   await snap(page, "stage2", "attendance-owner-dashboard");
   await login(page, PHONES.head);
   await page.goto("/attendance");

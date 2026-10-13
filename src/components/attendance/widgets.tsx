@@ -1,21 +1,17 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { CalendarOff, CheckCircle2, CircleDashed, ClipboardCheck, Sun } from "lucide-react";
+import { CalendarOff, CheckCircle2, CircleDashed, ClipboardCheck } from "lucide-react";
 import type { KgContext } from "@/lib/auth/context";
 import type { DashboardWidget } from "@/components/dashboard/widgets";
 import { createClient } from "@/lib/supabase/server";
 import { attendanceGroups, isWorkingDayDb, loadGroupDay, loadPortions } from "@/lib/attendance";
-import { effectiveStatus, reportCovering, type AbsenceReport, type AttendanceRow } from "@/lib/attendance-logic";
 import { todayIn } from "@/lib/format";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Stat } from "@/components/ui/stat";
 import { Ring } from "@/components/ui/ring";
 import { Button } from "@/components/ui/button";
-import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { PortionsCard } from "./portions-card";
-import { ReportAbsenceButton } from "./absence-dialog";
-import { AbsenceList } from "./absence-list";
 import { ReasonIcon } from "./reason";
 
 /** Owner/head top row (and accountant main): present / absent today with a ring (% of active). */
@@ -133,111 +129,9 @@ async function TeacherToday({ ctx }: { ctx: KgContext }) {
   );
 }
 
-/** Own active children (kept local to avoid an import cycle with the dashboard). */
-async function myKids(ctx: KgContext) {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("child_guardians")
-    .select("children!inner(id, full_name, status)")
-    .eq("user_id", ctx.userId)
-    .eq("kindergarten_id", ctx.kg.id)
-    .eq("children.status", "active");
-  return ((data ?? []) as unknown as { children: { id: string; full_name: string } }[])
-    .map((r) => r.children)
-    .sort((a, b) => a.full_name.localeCompare(b.full_name, "ru"));
-}
-
-/** Parent: is my child in the kindergarten today + "Ребёнок не придёт" + upcoming reports. */
-async function ParentToday({ ctx }: { ctx: KgContext }) {
-  const t = await getTranslations("attendance");
-  const kids = await myKids(ctx);
-  if (!kids.length) return null;
-  const supabase = await createClient();
-  const today = todayIn(ctx.settings.timezone);
-  const ids = kids.map((k) => k.id);
-  const [working, { data: rows }, { data: reports }] = await Promise.all([
-    isWorkingDayDb(supabase, ctx.kg.id, today),
-    supabase.from("child_attendance").select("child_id, date, status, reason").in("child_id", ids).eq("date", today),
-    supabase
-      .from("absence_reports")
-      .select("id, child_id, date_from, date_to, reason, comment")
-      .in("child_id", ids)
-      .is("cancelled_at", null)
-      .gte("date_to", today)
-      .order("date_from"),
-  ]);
-  const reps = (reports ?? []) as AbsenceReport[];
-  const rowBy = new Map(((rows ?? []) as AttendanceRow[]).map((r) => [r.child_id, r]));
-  const name = (id: string) => kids.find((k) => k.id === id)?.full_name.split(" ").slice(1, 2).join(" ") || kids.find((k) => k.id === id)?.full_name;
-  return (
-    <Card data-testid="parent-today">
-      <CardHeader title={t("todayInKg")} />
-      <ul className="space-y-2.5">
-        {kids.map((k) => {
-          const e = effectiveStatus(rowBy.get(k.id), reportCovering(reps, k.id, today));
-          const tone = !working ? "off" : e.status;
-          return (
-            <li
-              key={k.id}
-              className={cn(
-                "flex items-center gap-3 rounded-2xl p-3",
-                tone === "present" && "bg-tile-work",
-                tone === "absent" && "bg-tile-absent",
-                tone === "none" && "bg-tile-unmarked",
-                tone === "off" && "bg-surface-muted",
-              )}
-            >
-              <Avatar name={k.full_name} size={44} />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-muted">{k.full_name}</div>
-                <div
-                  className={cn(
-                    "flex items-center gap-1.5 text-[17px] font-extrabold",
-                    tone === "present" && "text-tile-work-fg",
-                    tone === "absent" && "text-tile-absent-fg",
-                    tone === "none" && "text-tile-unmarked-fg",
-                  )}
-                  data-testid="child-today-status"
-                  data-status={tone}
-                >
-                  {tone === "off" ? (
-                    <>
-                      <Sun className="size-4" aria-hidden /> {t("dayOffToday")}
-                    </>
-                  ) : tone === "present" ? (
-                    t("inKgToday")
-                  ) : tone === "absent" ? (
-                    t("notInKgToday")
-                  ) : (
-                    t("notMarkedYet")
-                  )}
-                </div>
-                {e.status === "absent" && e.reason ? <div className="text-xs font-semibold text-tile-absent-fg/80">{t(`reasons.${e.reason}`)}</div> : null}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-      <ReportAbsenceButton
-        kids={kids.map((k) => ({ id: k.id, name: k.full_name }))}
-        today={today}
-        variant="primary"
-        className="mt-4 h-14 w-full rounded-2xl text-base sm:w-auto sm:px-8"
-      />
-      {reps.length ? (
-        <div className="mt-4">
-          <div className="mb-2 text-xs font-semibold text-faint">{t("reportedAbsences")}</div>
-          <AbsenceList today={today} items={reps.map((r) => ({ ...r, childName: kids.length > 1 ? name(r.child_id) : undefined }))} />
-        </div>
-      ) : null}
-    </Card>
-  );
-}
-
 export const attendanceWidgets: DashboardWidget[] = [
-  { id: "attendance-today", roles: ["owner", "head"], slot: "stat", order: 10, Component: AttendanceTodayStat },
-  { id: "attendance-today-accountant", roles: ["accountant"], slot: "main", order: 10, Component: AttendanceTodayStat },
+  { id: "attendance-today", roles: ["owner", "head"], slot: "stat", order: 10, wide: true, Component: AttendanceTodayStat },
   { id: "attendance-teacher", roles: ["teacher"], slot: "top", order: 20, Component: TeacherToday },
-  { id: "attendance-parent", roles: ["parent"], slot: "top", order: 10, Component: ParentToday },
-  { id: "attendance-portions", roles: ["cook", "owner", "head"], slot: "main", order: 20, Component: PortionsCard },
+  // The parent's «today» lives in the dashboard's child card (components/dashboard/core-widgets.tsx).
+  { id: "attendance-portions", roles: ["cook"], slot: "main", order: 20, Component: PortionsCard },
 ];

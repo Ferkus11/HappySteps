@@ -58,5 +58,5 @@ async function WaitlistWidget({ ctx }: { ctx: KgContext }) {
 }
 
 export const waitlistWidgets: DashboardWidget[] = [
-  { id: "waitlist", roles: ["owner", "head"], slot: "main", order: 35, Component: WaitlistWidget },
+  { id: "waitlist", roles: ["owner", "head"], slot: "side", order: 20, phoneOrder: 50, Component: WaitlistWidget },
 ];

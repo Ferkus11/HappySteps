@@ -7,7 +7,7 @@ import { signedUrls } from "@/lib/kg-assets";
 import { ageOn, formatDate, todayIn } from "@/lib/format";
 import { ageFits, confirmOutcome, sortCatalog, type ClubStats } from "@/lib/clubs";
 import { emptyStats, loadChildEnrollments, loadClubs, loadPending, loadStats, type Club, type PendingItem } from "@/lib/clubs-data";
-import { myChildren } from "@/components/dashboard/parent";
+import { myChildren } from "@/components/dashboard/children-data";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";

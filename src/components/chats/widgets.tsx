@@ -149,14 +149,14 @@ export const chatsWidgets: DashboardWidget[] = [
     id: "chat-group",
     roles: ["teacher"],
     slot: "main",
-    order: 15,
+    order: 25,
     Component: GroupChatWidget,
   },
   {
     id: "chats",
     roles: ["club_teacher"],
     slot: "main",
-    order: 15,
+    order: 25,
     Component: ChatsWidget,
   },
 ];

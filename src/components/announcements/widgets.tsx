@@ -6,7 +6,7 @@ import { listAnnouncements } from "@/lib/announcements";
 import { Card, CardHeader } from "@/components/ui/card";
 import { AnnouncementCard } from "./announcement-card";
 
-const ALL_ROLES: DashboardWidget["roles"] = ["owner", "head", "accountant", "teacher", "club_teacher", "cook", "parent"];
+const STAFF_AND_PARENTS: DashboardWidget["roles"] = ["accountant", "teacher", "club_teacher", "cook", "parent"];
 
 /** "Важные объявления": hidden when there are none. */
 async function ImportantAnnouncements({ ctx }: { ctx: KgContext }) {
@@ -29,5 +29,6 @@ async function ImportantAnnouncements({ ctx }: { ctx: KgContext }) {
 }
 
 export const announcementsWidgets: DashboardWidget[] = [
-  { id: "important-announcements", roles: ALL_ROLES, slot: "main", order: 30, Component: ImportantAnnouncements },
+  { id: "important-announcements", roles: ["owner", "head"], slot: "side", order: 10, phoneOrder: 15, Component: ImportantAnnouncements },
+  { id: "important-announcements-main", roles: STAFF_AND_PARENTS, slot: "main", order: 30, Component: ImportantAnnouncements },
 ];

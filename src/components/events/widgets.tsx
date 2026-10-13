@@ -20,7 +20,7 @@ async function UpcomingEvents({ ctx }: { ctx: KgContext }) {
   const tomorrow = addDays(today, 1);
   const items = await upcomingEvents(supabase, ctx, today, 4);
   return (
-    <Card data-testid="upcoming-events">
+    <Card className="@container" data-testid="upcoming-events">
       <CardHeader title={t("upcoming")} href="/events" />
       {items.length ? (
         <ul className="space-y-2">
@@ -37,7 +37,7 @@ async function UpcomingEvents({ ctx }: { ctx: KgContext }) {
                     {[e.date === today ? tc("today") : e.date === tomorrow ? tc("tomorrow") : formatDate(e.date), timeRange(e), e.place].filter(Boolean).join(" · ")}
                   </span>
                 </span>
-                <span className={cn("hidden rounded-lg px-2 py-1 text-[11px] font-bold sm:inline", KIND_STYLE[e.kind])}>{t(`kinds.${e.kind}`)}</span>
+                <span className={cn("hidden shrink-0 rounded-lg px-2 py-1 text-[11px] font-bold @md:inline", KIND_STYLE[e.kind])}>{t(`kinds.${e.kind}`)}</span>
               </Link>
             </li>
           ))}
@@ -82,6 +82,6 @@ async function BirthdaysWeek({ ctx }: { ctx: KgContext }) {
 }
 
 export const eventsWidgets: DashboardWidget[] = [
-  { id: "upcoming-events", roles: ["owner", "head", "accountant", "teacher", "parent"], slot: "main", order: 40, Component: UpcomingEvents },
-  { id: "birthdays-week", roles: ["owner", "head", "teacher"], slot: "main", order: 45, Component: BirthdaysWeek },
+  { id: "upcoming-events", roles: ["owner", "head", "teacher", "parent"], slot: "main", order: 40, Component: UpcomingEvents },
+  { id: "birthdays-week", roles: ["teacher"], slot: "main", order: 35, Component: BirthdaysWeek },
 ];

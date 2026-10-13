@@ -130,6 +130,9 @@ test("head corrects time: a comment is required, the day is marked «Измен�
 test("accountant: timesheet and today's statuses read-only, exports work; teacher and parent are kept out", async ({ page }) => {
   const { teacher } = await ids();
   await login(page, PHONES.accountant);
+  // Dashboard: the timesheet card (SPEC §6); today's statuses live on /worktime.
+  await expect(page.getByTestId("timesheet-widget")).toBeVisible();
+  await page.goto("/worktime");
   await expect(page.getByTestId("tile-late")).toBeVisible();
   await page.goto("/worktime/timesheet");
   await expect(page.getByTestId("timesheet")).toBeVisible();

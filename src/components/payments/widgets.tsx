@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { ChevronRight, Inbox } from "lucide-react";
+import { cache } from "react";
+import { ChevronRight, Inbox, PartyPopper } from "lucide-react";
 import type { KgContext } from "@/lib/auth/context";
 import type { DashboardWidget } from "@/components/dashboard/widgets";
 import { createClient } from "@/lib/supabase/server";
@@ -16,18 +17,19 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { CurrentInvoice, loadParentPayments } from "./parent-view";
 import { monthLabel } from "./month";
 
-async function monthNumbers(ctx: KgContext) {
+/** This month's totals and the debtors — loaded once per request for every payments card. */
+const monthNumbers = cache(async (kgId: string, timezone: string) => {
   const supabase = await createClient();
-  const today = todayIn(ctx.settings.timezone);
-  const [rows, debtors] = await Promise.all([loadMonth(supabase, ctx.kg.id, periodOf(today.slice(0, 7))), loadDebtors(supabase, ctx.kg.id)]);
+  const today = todayIn(timezone);
+  const [rows, debtors] = await Promise.all([loadMonth(supabase, kgId, periodOf(today.slice(0, 7))), loadDebtors(supabase, kgId)]);
   const sum = totals(rows);
-  return { sum, percent: collectedPercent(sum), debt: debtors.reduce((s, d) => s + d.debt, 0), debtors: debtors.length, month: today.slice(0, 7) };
-}
+  return { sum, percent: collectedPercent(sum), debt: debtors.reduce((s, d) => s + d.debt, 0), debtors, month: today.slice(0, 7) };
+});
 
 /** Owner top row: «Оплаты месяца» — paid % of accrued + total debt (red only when there is debt). */
 async function OwnerPaymentsStat({ ctx }: { ctx: KgContext }) {
   const t = await getTranslations("payments");
-  const n = await monthNumbers(ctx);
+  const n = await monthNumbers(ctx.kg.id, ctx.settings.timezone);
   return (
     <Link href="/payments?tab=month" className="block h-full">
       <Card className="flex h-full items-center justify-between gap-3 hover:shadow-md">
@@ -92,7 +94,7 @@ async function PendingReceipts({ ctx }: { ctx: KgContext }) {
 /** Accountant: «Начислено / оплачено» for the current month + debtors. */
 async function AccruedPaid({ ctx }: { ctx: KgContext }) {
   const t = await getTranslations("payments");
-  const n = await monthNumbers(ctx);
+  const n = await monthNumbers(ctx.kg.id, ctx.settings.timezone);
   return (
     <Card data-testid="accrued-paid">
       <CardHeader title={`${t("widgets.accruedPaid")} · ${monthLabel(t, n.month)}`} href="/payments?tab=month" />
@@ -103,14 +105,41 @@ async function AccruedPaid({ ctx }: { ctx: KgContext }) {
         </div>
         <Ring value={n.percent} color="var(--success)" label={t("widgets.paidOfAccrued")} />
       </div>
-      <Link
-        href="/payments?tab=debtors"
-        className="mt-4 flex min-h-11 items-center justify-between gap-2 rounded-2xl bg-surface-muted px-3.5 text-sm font-semibold"
-        data-testid="dash-debtors"
-      >
-        <span>{t("widgets.debtors", { count: n.debtors })}</span>
-        <span className={n.debt > 0 ? "text-danger" : "text-muted"}>{n.debt > 0 ? formatMoney(n.debt) : ""}</span>
-      </Link>
+    </Card>
+  );
+}
+
+/** Accountant: «Должники» — total debt and the biggest debts (red: debts are the one place for it, SPEC §8). */
+async function DebtorsWidget({ ctx }: { ctx: KgContext }) {
+  const t = await getTranslations("payments");
+  const n = await monthNumbers(ctx.kg.id, ctx.settings.timezone);
+  const top = [...n.debtors].sort((a, b) => b.debt - a.debt).slice(0, 4);
+  return (
+    <Card data-testid="dash-debtors" data-count={n.debtors.length}>
+      <CardHeader title={t("tabs.debtors")} href="/payments?tab=debtors" />
+      {n.debtors.length === 0 ? (
+        <EmptyState icon={PartyPopper} title={t("widgets.noDebts")} className="py-4" />
+      ) : (
+        <>
+          <div className="mb-3 flex items-baseline gap-2">
+            <span className="text-[26px] leading-none font-extrabold whitespace-nowrap text-danger" data-testid="dash-debtors-total">
+              {formatMoney(n.debt)}
+            </span>
+            <span className="text-[13px] font-medium text-muted">{t("widgets.debtors", { count: n.debtors.length })}</span>
+          </div>
+          <ul className="space-y-1">
+            {top.map((d) => (
+              <li key={d.invoice_id}>
+                <Link href={`/payments/${d.invoice_id}`} className="-mx-2 flex min-h-11 items-center gap-3 rounded-xl px-2 hover:bg-surface-muted">
+                  <Avatar name={d.full_name} size={32} />
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">{d.full_name}</span>
+                  <span className="shrink-0 text-sm font-semibold whitespace-nowrap text-danger">{formatMoney(d.debt)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </Card>
   );
 }
@@ -136,8 +165,10 @@ async function ParentPayment({ ctx }: { ctx: KgContext }) {
 }
 
 export const paymentsWidgets: DashboardWidget[] = [
-  { id: "payments-month", roles: ["owner"], slot: "stat", order: 30, Component: OwnerPaymentsStat },
+  // Owner only: the head has payments read-only and no money in her top row (SPEC §6).
+  { id: "payments-month", roles: ["owner"], slot: "stat", order: 30, wide: true, Component: OwnerPaymentsStat },
   { id: "payments-pending", roles: ["accountant"], slot: "main", order: 1, Component: PendingReceipts },
   { id: "payments-accrued", roles: ["accountant"], slot: "main", order: 2, Component: AccruedPaid },
-  { id: "payments-parent", roles: ["parent"], slot: "main", order: 5, Component: ParentPayment },
+  { id: "payments-debtors", roles: ["accountant"], slot: "main", order: 3, Component: DebtorsWidget },
+  { id: "payments-parent", roles: ["parent"], slot: "main", order: 35, Component: ParentPayment },
 ];

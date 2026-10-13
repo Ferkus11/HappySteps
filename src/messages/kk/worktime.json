@@ -154,5 +154,11 @@
     "schedule": "Кесте",
     "overrides": "Өзгерістер",
     "absences": "Болмаған күндер"
+  },
+  "timesheetOpen": "Табельді ашу",
+  "timesheetWidget": {
+    "hours": "жұмыс сағаты",
+    "lates": "кешігу",
+    "missed": "келмеу"
   }
 }
