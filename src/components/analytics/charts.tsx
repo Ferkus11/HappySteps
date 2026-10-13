@@ -29,6 +29,8 @@ export const CHART = {
 } as const;
 
 const axisTick = { fill: CHART.axis, fontSize: 12 };
+/** Legend text in neutral ink — Recharts colours it like the series, and the light «plan» blue is unreadable on white. */
+const legendText = (value: unknown) => <span style={{ color: "#1d2330" }}>{String(value)}</span>;
 const tooltipStyle: React.CSSProperties = {
   borderRadius: 12,
   border: "1px solid #e6e9ef",
@@ -39,7 +41,9 @@ const tooltipStyle: React.CSSProperties = {
 
 function Frame({ label, height, children, testId }: { label: string; height: number; children: React.ReactElement; testId?: string }) {
   return (
-    <div role="img" aria-label={label} className="w-full min-w-0" style={{ height }} data-testid={testId}>
+    // overflow-hidden: Recharts keeps its (hidden) tooltip at the last hover position; after a resize or a rotation
+    // that position can lie outside the new, narrower chart and widen the whole page (tooltips stay inside the chart).
+    <div role="img" aria-label={label} className="w-full min-w-0 overflow-hidden" style={{ height }} data-testid={testId}>
       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         {children}
       </ResponsiveContainer>
@@ -144,7 +148,7 @@ export function HPairBars({
         <XAxis type="number" hide />
         <YAxis type="category" dataKey="name" tick={axisTick} tickLine={false} axisLine={false} width={104} tickFormatter={(v) => clip(String(v), 14)} />
         <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "#f2f5f9" }} />
-        <Legend itemSorter={null} iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12, color: CHART.axis }} />
+        <Legend itemSorter={null} iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12 }} formatter={legendText} />
         <Bar dataKey="a" name={names.a} fill={CHART.light} radius={[0, 4, 4, 0]} maxBarSize={16} isAnimationActive={false}>
           <LabelList dataKey="a" position="right" style={{ fill: "#5f6878", fontSize: 11 }} />
         </Bar>
@@ -177,7 +181,7 @@ export function MoneyStack({
         <XAxis dataKey="name" tick={axisTick} tickLine={false} axisLine={{ stroke: CHART.grid }} interval="preserveStartEnd" minTickGap={8} />
         <YAxis tick={axisTick} tickLine={false} axisLine={false} width={48} tickFormatter={(v) => short(Number(v))} />
         <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "#f2f5f9" }} formatter={(v, n) => [money(v), n]} />
-        <Legend itemSorter={null} iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12, color: CHART.axis }} />
+        <Legend itemSorter={null} iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12 }} formatter={legendText} />
         <Bar dataKey="paid" name={names.paid} stackId="m" fill={CHART.primary} maxBarSize={48} isAnimationActive={false} />
         <Bar dataKey="debt" name={names.debt} stackId="m" fill={CHART.debt} radius={[4, 4, 0, 0]} maxBarSize={48} isAnimationActive={false} />
       </BarChart>

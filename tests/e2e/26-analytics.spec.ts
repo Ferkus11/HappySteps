@@ -65,6 +65,12 @@ test("owner sees all four sections with insights, period picker works", async ({
   await page.getByTestId("custom-apply").click();
   await expect(page).toHaveURL(new RegExp(`p=custom&from=${CUR}&to=${today}`));
   await expect(page.getByTestId("section-finance")).toBeVisible();
+  await expect(page.getByTestId("period-problem")).toHaveCount(0);
+  // a range that cannot be used says so instead of silently showing the current month
+  await page.goto("/analytics?tab=finance&p=custom&from=2020-01-01&to=2026-01-01");
+  await expect(page.getByTestId("period-problem")).toContainText("366");
+  await page.goto("/analytics?tab=finance&p=custom&from=2026-02-30&to=x");
+  await expect(page.getByTestId("period-problem")).toBeVisible();
 });
 
 test("finance numbers match the invoices: debt of the month and the debtors total", async ({ page }) => {
@@ -95,7 +101,7 @@ test("xlsx export of a table (download) with the same numbers", async ({ page })
   ws.eachRow((r) => rows.push((r.values as unknown[]).slice(1)));
   expect(rows[0][0]).toContain("Аналитика");
   const header = rows.find((r) => r[0] === "Ребёнок")!;
-  expect(header).toEqual(["Ребёнок", "Группа", "Долг", "Долг с", "Просрочка, дн.", "Месяцев"]);
+  expect(header).toEqual(["Ребёнок", "Группа", "Долг", "Просрочка, дн.", "Долг с", "Месяцев"]);
   const sabina = rows.find((r) => String(r[0]).startsWith("Бекова Сабина"))!;
   expect(sabina[2]).toBe(120000);
 

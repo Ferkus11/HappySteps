@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { requireKg } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
-import { comparison, isSection, parsePeriod, sectionsFor, type PeriodParams } from "@/lib/analytics";
+import { comparison, isSection, parsePeriodChecked, sectionsFor, type PeriodParams } from "@/lib/analytics";
 import { periodLabel, rangeLabel, type T } from "@/lib/analytics-view";
 import { formatDate, todayIn } from "@/lib/format";
 import { PageHeader } from "@/components/ui/page-header";
@@ -24,7 +24,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const tabs = sectionsFor(ctx.role);
   const tab = isSection(sp.tab) && tabs.includes(sp.tab) ? sp.tab : tabs[0];
   const today = todayIn(ctx.settings.timezone);
-  const period = parsePeriod(sp, today);
+  const { period, problem } = parsePeriodChecked(sp, today);
   const { cur, prev, running } = comparison(period, today);
   const t = (await getTranslations("analytics")) as unknown as T;
   const supabase = await createClient();
@@ -32,7 +32,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     <>
       <PageHeader title={t("title")} description={t("subtitle")} />
       <SectionTabs t={t} tabs={tabs} active={tab} period={period} />
-      <PeriodPicker t={t} tab={tab} period={period} label={periodLabel(t, period)} today={today} />
+      <PeriodPicker t={t} tab={tab} period={period} label={periodLabel(t, period)} today={today} problem={problem} />
       {cur.from <= today ? (
         <p className="-mt-2 mb-4 px-1 text-xs text-faint" data-testid="period-compare">
           {running ? `${t("period.running", { date: formatDate(today) })}. ` : ""}

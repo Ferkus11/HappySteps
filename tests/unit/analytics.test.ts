@@ -3,8 +3,10 @@ import { IntlMessageFormat } from "intl-messageformat";
 import {
   activeInsight,
   attendanceTotals,
+  bucketKey,
   bucketize,
   calendarPeriod,
+  closedDaysPrev,
   change,
   churnInsight,
   comparison,
@@ -15,8 +17,11 @@ import {
   granularity,
   groupsInsight,
   hoursInsight,
+  isOverdue,
   overdueDays,
+  paidUntilPrev,
   parsePeriod,
+  parsePeriodChecked,
   payDaysInsight,
   pct,
   periodQuery,
@@ -30,7 +35,8 @@ import {
   type StaffRow,
 } from "@/lib/analytics";
 import { formatMoney } from "@/lib/format";
-import { periodLabel, periodThan, periodWhen, renderInsight, type T } from "@/lib/analytics-view";
+import { buildTables, formatCell, periodLabel, periodThan, periodWhen, renderInsight, type T } from "@/lib/analytics-view";
+import type { FinanceData } from "@/lib/analytics-data";
 import ru from "@/messages/ru/analytics.json";
 import kk from "@/messages/kk/analytics.json";
 
@@ -157,6 +163,88 @@ describe("analytics · comparison numbers", () => {
     ]);
     expect(bucketize(pts, "month", "last")).toEqual([{ d: "2026-10-01", n: 7, days: 3 }]);
   });
+
+  it("buckets never start before the period: a custom range from Wednesday labels its first week with that Wednesday", () => {
+    expect(bucketKey("2026-10-15", "week", "2026-10-14")).toBe("2026-10-14");
+    expect(bucketKey("2026-10-20", "week", "2026-10-14")).toBe("2026-10-19");
+    expect(bucketKey("2026-08-20", "month", "2026-08-15")).toBe("2026-08-15");
+    expect(bucketize([{ d: "2026-10-14", n: 1 }, { d: "2026-10-16", n: 2 }, { d: "2026-10-19", n: 4 }], "week", "sum", "2026-10-14")).toEqual([
+      { d: "2026-10-14", n: 3, days: 2 },
+      { d: "2026-10-19", n: 4, days: 1 },
+    ]);
+  });
+});
+
+describe("analytics · fair comparison while the period runs (review stage 5)", () => {
+  const oct = calendarPeriod("month", "2026-10-13");
+  const { prev, running } = comparison(oct, "2026-10-13");
+
+  it("staff: the previous period gets the same number of CLOSED days (1–12 ↔ 1–12 on the 13th)", () => {
+    expect(running).toBe(true);
+    expect(prev).toEqual({ from: "2026-09-01", to: "2026-09-13" });
+    expect(closedDaysPrev(oct, prev, "2026-10-13")).toEqual({ from: "2026-09-01", to: "2026-09-12" });
+    // first day of the period: no closed day yet → nothing to compare with
+    expect(closedDaysPrev(oct, comparison(oct, "2026-10-01").prev, "2026-10-01")).toBeNull();
+    // the last day of the month is not «running» for comparison(), but today is still not closed
+    const last = comparison(oct, "2026-10-31");
+    expect(last.running).toBe(false);
+    expect(closedDaysPrev(oct, last.prev, "2026-10-31")).toEqual({ from: "2026-09-01", to: "2026-09-30" });
+    expect(closedDaysPrev(calendarPeriod("month", "2026-03-31"), comparison(calendarPeriod("month", "2026-03-31"), "2026-03-31").prev, "2026-03-31")).toEqual({
+      from: "2026-02-01",
+      to: "2026-02-28",
+    });
+    // a finished period keeps the whole previous one
+    const sep = calendarPeriod("month", "2026-09-01");
+    expect(closedDaysPrev(sep, shiftPeriod(sep, -1), "2026-10-13")).toMatchObject({ from: "2026-08-01", to: "2026-08-31" });
+  });
+
+  it("finance: the previous period is read «as of» the same day while the current one is not over", () => {
+    expect(paidUntilPrev(oct, prev, "2026-10-13")).toBe("2026-09-13");
+    expect(paidUntilPrev(oct, comparison(oct, "2026-10-31").prev, "2026-10-31")).toBe("2026-09-30");
+    const sep = calendarPeriod("month", "2026-09-01");
+    expect(paidUntilPrev(sep, shiftPeriod(sep, -1), "2026-10-13")).toBeNull();
+  });
+
+  it("an invalid or too long custom range says why it fell back to the current month", () => {
+    expect(parsePeriodChecked({ p: "custom", from: "2026-02-30", to: "2026-03-10" }, "2026-10-13")).toEqual({
+      period: { kind: "month", from: "2026-10-01", to: "2026-10-31" },
+      problem: "invalidRange",
+    });
+    expect(parsePeriodChecked({ p: "custom", from: "2024-01-01", to: "2026-01-01" }, "2026-10-13").problem).toBe("tooLong");
+    expect(parsePeriodChecked({ p: "custom", from: "2026-10-01", to: "2026-10-05" }, "2026-10-13")).toEqual({ period: { kind: "custom", from: "2026-10-01", to: "2026-10-05" }, problem: null });
+    expect(parsePeriodChecked({ p: "week" }, "2026-10-13").problem).toBeNull();
+  });
+
+  it("debtors: debt first on phones, «срок не наступил» before the due date", () => {
+    expect(isOverdue("2026-10-13", "2026-10-13")).toBe(false);
+    expect(isOverdue("2026-10-12", "2026-10-13")).toBe(true);
+    const f: FinanceData = {
+      today: "2026-10-13",
+      paid_until: "2026-10-13",
+      months: [],
+      debtors: [
+        { child_id: "1", full_name: "Бекова Сабина", status: "active", group_name: "Солнышко", debt: 120000, since: "2026-09-10", months: 2 },
+        { child_id: "2", full_name: "Касымова Айлин", status: "active", group_name: null, debt: 20000, since: "2026-10-15", months: 1 },
+      ],
+    };
+    const debtors = buildTables("finance", f, { t: tRu, range: { from: "2026-10-01", to: "2026-10-13" } })[1];
+    const visible = debtors.columns.filter((c) => !c.phone).map((c) => c.key);
+    expect(visible).toEqual(["child", "debt", "overdueDays"]);
+    expect(debtors.columns.find((c) => c.key === "group")?.phone).toBe("sub");
+    expect(debtors.rows.map((r) => r.overdueDays)).toEqual([33, "срок не наступил"]);
+    expect(formatCell("срок не наступил", "int")).toBe("срок не наступил");
+    expect(formatCell(33, "int")).toBe("33");
+  });
+
+  it("KPI captions use plurals (no «1 дни»); rate changes are points", () => {
+    expect(tRu("kpi.daysSub", { count: 1 })).toBe("день");
+    expect(tRu("kpi.daysSub", { count: 3 })).toBe("дня");
+    expect(tRu("kpi.daysSub", { count: 5 })).toBe("дней");
+    expect(tRu("kpi.absencesSub", { count: 21 })).toBe("детодень");
+    expect(tKk("kpi.daysSub", { count: 1 })).toBe("күн");
+    expect(tRu("delta.pp")).toBe(" п.п.");
+    expect(tKk("kpi.collection")).toBe("Жинау деңгейі");
+  });
 });
 
 describe("analytics · insights (ru + kk, plurals)", () => {
@@ -165,9 +253,9 @@ describe("analytics · insights (ru + kk, plurals)", () => {
   const ph = (t: T) => ({ when: periodWhen(t, "month", oct), than: periodThan(t, "month", sep) });
 
   it("the spec example: attendance in October vs September", () => {
-    expect(renderInsight(tRu, rateInsight("attendance", 87.2, 83.1), ph(tRu))).toBe("Посещаемость в октябре — 87%, на 4% выше сентября");
-    expect(renderInsight(tKk, rateInsight("attendance", 87.2, 83.1), ph(tKk))).toBe("Қатысу қазанда — 87%, қыркүйектен 4% жоғары");
-    expect(renderInsight(tRu, rateInsight("attendance", 80, 83), ph(tRu))).toBe("Посещаемость в октябре — 80%, на 3% ниже сентября");
+    expect(renderInsight(tRu, rateInsight("attendance", 87.2, 83.1), ph(tRu))).toBe("Посещаемость в октябре — 87%, на 4 п.п. выше сентября");
+    expect(renderInsight(tKk, rateInsight("attendance", 87.2, 83.1), ph(tKk))).toBe("Қатысу қазанда — 87%, қыркүйектен 4 пайыздық тармаққа жоғары");
+    expect(renderInsight(tRu, rateInsight("attendance", 80, 83), ph(tRu))).toBe("Посещаемость в октябре — 80%, на 3 п.п. ниже сентября");
     expect(renderInsight(tRu, rateInsight("attendance", 80, 80.2), ph(tRu))).toBe("Посещаемость в октябре — 80%, на уровне сентября");
     expect(renderInsight(tRu, rateInsight("attendance", 80, null), ph(tRu))).toBe("Посещаемость в октябре — 80%");
     expect(rateInsight("attendance", null, 80)).toBeNull();
@@ -177,10 +265,10 @@ describe("analytics · insights (ru + kk, plurals)", () => {
     const q = calendarPeriod("quarter", "2026-10-01");
     const prevQ = shiftPeriod(q, -1);
     expect(renderInsight(tRu, rateInsight("attendance", 90, 85), { when: periodWhen(tRu, "quarter", q), than: periodThan(tRu, "quarter", prevQ) })).toBe(
-      "Посещаемость в 4 квартале — 90%, на 5% выше 3 квартала",
+      "Посещаемость в 4 квартале — 90%, на 5 п.п. выше 3 квартала",
     );
     expect(renderInsight(tKk, rateInsight("attendance", 90, 85), { when: periodWhen(tKk, "year", q), than: periodThan(tKk, "year", { from: "2025-01-01", to: "2025-12-31" }) })).toBe(
-      "Қатысу 2026 жылы — 90%, 2025 жылдан 5% жоғары",
+      "Қатысу 2026 жылы — 90%, 2025 жылдан 5 пайыздық тармаққа жоғары",
     );
     expect(periodLabel(tRu, oct)).toBe("Октябрь 2026");
     expect(periodLabel(tKk, oct)).toBe("2026 ж. Қазан");

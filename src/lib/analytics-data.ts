@@ -15,14 +15,16 @@ export interface AttendanceData {
 }
 export interface FinanceData {
   today: string;
+  /** the date the money is counted up to (today, or the cut-off of the previous period) */
+  paid_until: string;
   months: FinanceMonth[];
   debtors: Debtor[];
 }
 
 export class AnalyticsForbidden extends Error {}
 
-async function rpc<T>(supabase: SupabaseClient, fn: string, kg: string, r: Range): Promise<T> {
-  const { data, error } = await supabase.rpc(fn, { kg, p_from: r.from, p_to: r.to });
+async function rpc<T>(supabase: SupabaseClient, fn: string, kg: string, r: Range, extra: Record<string, unknown> = {}): Promise<T> {
+  const { data, error } = await supabase.rpc(fn, { kg, p_from: r.from, p_to: r.to, ...extra });
   if (error) {
     if (error.code === "42501" || error.message.includes("hs:forbidden")) throw new AnalyticsForbidden(fn);
     throw new Error(`${fn}: ${error.message}`);
@@ -41,10 +43,12 @@ export async function loadStaff(supabase: SupabaseClient, kg: string, r: Range):
   return (await rpc<StaffRow[] | null>(supabase, "analytics_staff", kg, r)) ?? [];
 }
 
-export async function loadFinance(supabase: SupabaseClient, kg: string, r: Range): Promise<FinanceData> {
-  const d = await rpc<FinanceData>(supabase, "analytics_finance", kg, r);
+/** `paidUntil` — read the money «as of» that local date (the previous period while the current one runs). */
+export async function loadFinance(supabase: SupabaseClient, kg: string, r: Range, paidUntil: string | null = null): Promise<FinanceData> {
+  const d = await rpc<FinanceData>(supabase, "analytics_finance", kg, r, paidUntil ? { p_paid_until: paidUntil } : {});
   return {
     today: d.today,
+    paid_until: d.paid_until,
     months: d.months.map((m) => ({
       ...m,
       charged: num(m.charged),

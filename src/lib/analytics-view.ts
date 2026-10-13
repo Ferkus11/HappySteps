@@ -7,6 +7,7 @@ import {
   bucketize,
   daysIn,
   granularity,
+  isOverdue,
   overdueDays,
   pct,
   periodFacts,
@@ -75,6 +76,11 @@ export interface Column {
   kind: ColKind;
   /** debt columns: red when > 0 (SPEC §8 — red only for errors and debts) */
   danger?: boolean;
+  /**
+   * Phones (< 640px): «hide» — the column is left out; «sub» — left out as a column and shown as a small line under
+   * the first cell instead. Desktop and the .xlsx keep every column.
+   */
+  phone?: "hide" | "sub";
 }
 export type Cell = string | number | null;
 export interface DataTable {
@@ -105,7 +111,7 @@ export function monthName(t: T, period: string): string {
 
 export function attendanceSeries(data: AttendanceData, r: Range) {
   const g = granularity(daysIn(r.from, r.to));
-  return { g, points: bucketize(data.days, g).map((x) => ({ ...x, rate: pct(x.present, x.present + x.absent) })) };
+  return { g, points: bucketize(data.days, g, "sum", r.from).map((x) => ({ ...x, rate: pct(x.present, x.present + x.absent) })) };
 }
 
 export function groupsByAbsences(data: AttendanceData) {
@@ -114,11 +120,11 @@ export function groupsByAbsences(data: AttendanceData) {
 
 export function activeSeries(f: SectionData["funnel"], r: Range) {
   const g = granularity(daysIn(r.from, r.to));
-  return { g, points: bucketize(f.active, g, "last") };
+  return { g, points: bucketize(f.active, g, "last", r.from) };
 }
 
 export function debtorRows(f: FinanceData) {
-  return f.debtors.map((d) => ({ ...d, overdue: overdueDays(d.since, f.today) }));
+  return f.debtors.map((d) => ({ ...d, overdue: overdueDays(d.since, f.today), due: !isOverdue(d.since, f.today) }));
 }
 
 export interface TableCtx {
@@ -128,7 +134,9 @@ export interface TableCtx {
 
 export function buildTables<S extends Section>(section: S, data: SectionData[S], ctx: TableCtx): DataTable[] {
   const { t } = ctx;
-  const col = (key: string, kind: ColKind, label = t(`cols.${key}`), danger = false): Column => ({ key, label, kind, danger });
+  const col = (key: string, kind: ColKind, label = t(`cols.${key}`), danger = false, phone?: Column["phone"]): Column => ({ key, label, kind, danger, phone });
+  const hide = (c: Column): Column => ({ ...c, phone: "hide" });
+  const sub = (c: Column): Column => ({ ...c, phone: "sub" });
   const name = (id: string) => t(`tableNames.${id}`);
 
   if (section === "attendance") {
@@ -147,7 +155,18 @@ export function buildTables<S extends Section>(section: S, data: SectionData[S],
       {
         id: "groups",
         title: name("groups"),
-        columns: [col("group", "text"), col("absent", "int"), col("sick", "int"), col("present", "int"), col("rate", "pct"), col("sickShare", "pct"), col("children", "int"), col("capacity", "int"), col("fill", "pct")],
+        // phones: group, absences, attendance % (the key numbers); the rest on wider screens and in the .xlsx
+        columns: [
+          col("group", "text"),
+          col("absent", "int"),
+          col("rate", "pct"),
+          hide(col("sick", "int")),
+          hide(col("sickShare", "pct")),
+          hide(col("present", "int")),
+          hide(col("children", "int")),
+          hide(col("capacity", "int")),
+          hide(col("fill", "pct")),
+        ],
         rows: groupsByAbsences(d).map((x) => ({
           group: x.name,
           absent: x.absent,
@@ -252,16 +271,24 @@ export function buildTables<S extends Section>(section: S, data: SectionData[S],
       {
         id: "debtors",
         title: name("debtors"),
-        columns: [col("child", "text"), col("group", "text"), col("debt", "money", undefined, true), col("since", "date"), col("overdueDays", "int"), col("months", "int")],
+        // phones: child (group as a small line under the name), debt, days overdue
+        columns: [
+          col("child", "text"),
+          sub(col("group", "text")),
+          col("debt", "money", undefined, true),
+          col("overdueDays", "int"),
+          hide(col("since", "date")),
+          hide(col("months", "int")),
+        ],
         rows: debtors.map((d) => ({
           child: d.status === "archived" ? `${d.full_name} (${t("archived")})` : d.full_name,
           group: d.group_name ?? "",
           debt: d.debt,
+          overdueDays: d.due ? t("notDue") : d.overdue,
           since: d.since,
-          overdueDays: d.overdue,
           months: d.months,
         })),
-        total: { child: t("total"), group: "", debt: debtors.reduce((s, d) => s + d.debt, 0), since: null, overdueDays: null, months: debtors.reduce((s, d) => s + d.months, 0) },
+        total: { child: t("total"), group: "", debt: debtors.reduce((s, d) => s + d.debt, 0), overdueDays: null, since: null, months: debtors.reduce((s, d) => s + d.months, 0) },
       },
     ];
   }
@@ -299,6 +326,7 @@ export function buildTables<S extends Section>(section: S, data: SectionData[S],
 /** Text of a cell on screen (the .xlsx keeps raw numbers with number formats). */
 export function formatCell(v: Cell, kind: ColKind): string {
   if (v == null || v === "") return "—";
+  if (typeof v === "string" && kind !== "text" && kind !== "date") return v; // a word in a number column («срок не наступил»)
   switch (kind) {
     case "money":
       return formatMoney(v);

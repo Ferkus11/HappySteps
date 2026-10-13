@@ -1,8 +1,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { BarChart3, ChevronLeft, ChevronRight, Download, type LucideIcon } from "lucide-react";
-import { PERIOD_KINDS, calendarPeriod, periodQuery, shiftPeriod, type Change, type Period, type Section } from "@/lib/analytics";
-import { formatCell, type DataTable, type T } from "@/lib/analytics-view";
+import { MAX_CUSTOM_DAYS, PERIOD_KINDS, calendarPeriod, periodQuery, shiftPeriod, type Change, type Period, type PeriodProblem, type Section } from "@/lib/analytics";
+import { formatCell, type Column, type DataTable, type T } from "@/lib/analytics-view";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -32,12 +32,11 @@ export function SectionTabs({ t, tabs, active, period }: { t: T; tabs: Section[]
           aria-current={active === k ? "page" : undefined}
           data-testid={`analytics-tab-${k}`}
           className={cn(
-            "inline-flex h-11 min-w-0 flex-1 items-center justify-center rounded-xl px-2 text-sm font-semibold whitespace-nowrap text-muted sm:h-10 sm:flex-none sm:shrink-0 sm:px-4",
+            "inline-flex h-11 min-w-0 flex-auto items-center justify-center rounded-xl px-2 text-sm font-semibold whitespace-nowrap text-muted sm:h-10 sm:flex-none sm:shrink-0 sm:px-4",
             active === k && "bg-surface text-text shadow-sm",
           )}
         >
-          <span className="sm:hidden">{t(`tabsShort.${k}`)}</span>
-          <span className="hidden sm:inline">{t(`tabs.${k}`)}</span>
+          {t(`tabs.${k}`)}
         </Link>
       ))}
     </nav>
@@ -49,7 +48,22 @@ export function SectionTabs({ t, tabs, active, period }: { t: T; tabs: Section[]
  * Kind (week … year, custom) as links, ‹ label › to step, and a plain GET form for a custom range — works
  * without client JavaScript. The label is what the period is called on the page.
  */
-export function PeriodPicker({ t, tab, period, label, today }: { t: T; tab: Section; period: Period; label: string; today: string }) {
+export function PeriodPicker({
+  t,
+  tab,
+  period,
+  label,
+  today,
+  problem = null,
+}: {
+  t: T;
+  tab: Section;
+  period: Period;
+  label: string;
+  today: string;
+  /** a custom range from the URL could not be used — say why instead of silently showing the current month */
+  problem?: PeriodProblem | null;
+}) {
   const prev = shiftPeriod(period, -1);
   const next = shiftPeriod(period, 1);
   return (
@@ -109,6 +123,11 @@ export function PeriodPicker({ t, tab, period, label, today }: { t: T; tab: Sect
           </div>
         )}
       </div>
+      {problem ? (
+        <p className="mt-3 rounded-xl bg-warning-soft px-3 py-2 text-sm font-semibold text-warning" role="status" data-testid="period-problem">
+          {t(`period.problems.${problem}`, { max: MAX_CUSTOM_DAYS })}
+        </p>
+      ) : null}
     </Card>
   );
 }
@@ -119,7 +138,7 @@ export interface KpiProps {
   value: string;
   sub?: string;
   change: Change | null;
-  /** «%» for rates/amounts, « дн.» for days */
+  /** «%» for amounts and counts, « п.п.» for rates (percentage points), « дн.» for days */
   unit: string;
   danger?: boolean;
   testId?: string;
@@ -222,40 +241,65 @@ export function ChartCard({
   );
 }
 
-/** Table that scrolls horizontally inside its card only; first column stays readable. */
+/**
+ * Table that scrolls horizontally inside its card only; first column stays readable. On phones the columns marked
+ * `phone: "hide"` are left out and `phone: "sub"` ones move under the first cell as a small line, so the key numbers
+ * (e.g. the debt) stay on screen at 390px without scrolling.
+ */
 export function TableView({ table }: { table: DataTable }) {
   const num = (k: string) => k !== "text";
+  const phoneHidden = (c: Column) => (c.phone ? "hidden sm:table-cell" : "");
+  const subs = table.columns.filter((c) => c.phone === "sub");
+  // a table with phone columns fits the phone width; the others scroll sideways inside the card
+  const fits = table.columns.some((c) => c.phone);
   return (
     <div className="-mx-4 overflow-x-auto px-4 md:-mx-5 md:px-5" data-testid={`table-${table.id}`}>
-      <table className="w-full min-w-max border-collapse text-sm">
+      <table className={cn("w-full border-collapse text-sm", fits ? "sm:min-w-max" : "min-w-max")}>
         <caption className="sr-only">{table.title}</caption>
         <thead>
           <tr className="border-b border-border text-left text-xs text-muted">
             {table.columns.map((c, i) => (
-              <th key={c.key} scope="col" className={cn("px-2 py-2 font-semibold whitespace-nowrap first:pl-0 last:pr-0", num(c.kind) && "text-right", i === 0 && "max-w-56")}>
+              <th
+                key={c.key}
+                scope="col"
+                data-col={c.key}
+                className={cn("px-2 py-2 font-semibold first:pl-0 last:pr-0", fits ? "sm:whitespace-nowrap" : "whitespace-nowrap", num(c.kind) && "text-right", i === 0 && "max-w-56", phoneHidden(c))}
+              >
                 {c.label}
               </th>
             ))}
           </tr>
         </thead>
         <tbody className="divide-y divide-border/70">
-          {table.rows.map((r, idx) => (
-            <tr key={idx}>
-              {table.columns.map((c, i) => (
-                <td
-                  key={c.key}
-                  className={cn(
-                    "px-2 py-2 whitespace-nowrap tabular-nums first:pl-0 last:pr-0",
-                    num(c.kind) && "text-right",
-                    i === 0 && "max-w-56 truncate font-semibold",
-                    c.danger && Number(r[c.key] ?? 0) > 0 && "font-bold text-danger",
-                  )}
-                >
-                  {formatCell(r[c.key] ?? null, c.kind)}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {table.rows.map((r, idx) => {
+            const subline = subs.map((c) => r[c.key]).filter((v) => v != null && v !== "").join(" · ");
+            return (
+              <tr key={idx}>
+                {table.columns.map((c, i) => (
+                  <td
+                    key={c.key}
+                    data-col={c.key}
+                    className={cn(
+                      "px-2 py-2 tabular-nums first:pl-0 last:pr-0",
+                      i === 0 ? "max-w-44 font-semibold sm:max-w-56" : "whitespace-nowrap",
+                      num(c.kind) && "text-right",
+                      c.danger && Number(r[c.key] ?? 0) > 0 && "font-bold text-danger",
+                      phoneHidden(c),
+                    )}
+                  >
+                    {i === 0 ? (
+                      <>
+                        <span className="block truncate">{formatCell(r[c.key] ?? null, c.kind)}</span>
+                        {subline ? <span className="block truncate text-xs font-normal text-muted sm:hidden">{subline}</span> : null}
+                      </>
+                    ) : (
+                      formatCell(r[c.key] ?? null, c.kind)
+                    )}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
         </tbody>
         {table.total ? (
           <tfoot>
@@ -263,7 +307,12 @@ export function TableView({ table }: { table: DataTable }) {
               {table.columns.map((c, i) => (
                 <td
                   key={c.key}
-                  className={cn("px-2 py-2 whitespace-nowrap tabular-nums first:pl-0 last:pr-0", num(c.kind) && "text-right", c.danger && Number(table.total?.[c.key] ?? 0) > 0 && "text-danger")}
+                  className={cn(
+                    "px-2 py-2 whitespace-nowrap tabular-nums first:pl-0 last:pr-0",
+                    num(c.kind) && "text-right",
+                    c.danger && Number(table.total?.[c.key] ?? 0) > 0 && "text-danger",
+                    phoneHidden(c),
+                  )}
                   data-col={c.key}
                 >
                   {i === 0 ? String(table.total?.[c.key] ?? "") : formatCell(table.total?.[c.key] ?? null, c.kind)}

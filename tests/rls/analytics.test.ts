@@ -239,6 +239,77 @@ describe("analytics · numbers on a known dataset", () => {
     });
   });
 
+  it("staff: the same days as worktime_range / the timesheet — expected only from joining the garden (D-017)", async () => {
+    await inTx(async (c, become) => {
+      await dataset(c);
+      // the owner of B joined on 08.09.2025 (no marks before 15.09)
+      await c.query("update memberships set created_at = '2025-09-08T09:00:00+05:00' where kindergarten_id = $1 and user_id = $2", [F.B, F.users.ownerB]);
+      await become(F.users.ownerB);
+      const a = (await c.query("select * from analytics_staff($1, '2025-09-01', '2025-09-12')", [F.B])).rows;
+      expect(a).toHaveLength(1);
+      expect(a[0]).toMatchObject({ scheduled_days: 5, unmarked_days: 5, worked_days: 0 }); // 08–12.09, not 01–05.09
+      const ts = (await c.query("select status from worktime_range($1, '2025-09-01', '2025-09-12') where user_id = $2", [F.B, F.users.ownerB])).rows;
+      expect(ts.filter((r) => r.status === "unmarked")).toHaveLength(5);
+    });
+  });
+
+  it("finance «as of» a date: only money accepted by then, FIFO, debt and overdue at that date", async () => {
+    await inTx(async (c, become) => {
+      const { k1 } = await dataset(c);
+      const oct = (await c.query("select id from invoices where child_id = $1 and period = '2025-10-01'", [k1])).rows[0].id;
+      await c.query(
+        "insert into payment_receipts (kindergarten_id, invoice_id, child_id, file_path, mime, size, status, confirmed_amount, reviewed_at) values ($1, $2, $3, $4, 'image/png', 100, 'accepted', 20000, '2025-10-20T10:00:00+05:00')",
+        [F.B, oct, k1, `${F.B}/${k1}/analytics-test-2.png`],
+      );
+      await become(F.users.ownerB);
+      const at = async (from: string, to: string, until: string | null) =>
+        (await c.query("select analytics_finance($1, $2, $3, $4) as r", [F.B, from, to, until])).rows[0].r;
+      const row = (m: Record<string, unknown>) => [m.period, Number(m.charged), Number(m.paid), Number(m.debt), Number(m.overdue), m.paid_invoices];
+      // today: everything paid
+      expect((await at("2025-09-01", "2025-10-31", null)).months.map(row)).toEqual([
+        ["2025-09-01", 50000, 50000, 0, 0, 1],
+        ["2025-10-01", 50000, 50000, 0, 0, 1],
+      ]);
+      // September «as of 13.09» (the previous period on 13 October): nothing paid yet, overdue since the 10th
+      const sep13 = await at("2025-09-01", "2025-09-13", "2025-09-13");
+      expect(sep13.paid_until).toBe("2025-09-13");
+      expect(sep13.months.map(row)).toEqual([["2025-09-01", 50000, 0, 50000, 50000, 0]]);
+      // as of 10.10: the 80 000 receipt pays September in full and 30 000 of October (oldest first)
+      const oct10 = await at("2025-09-01", "2025-10-31", "2025-10-10");
+      expect(oct10.months.map(row)).toEqual([
+        ["2025-09-01", 50000, 50000, 0, 0, 1],
+        ["2025-10-01", 50000, 30000, 20000, 0, 0],
+      ]);
+      // the invoices were accrued today (paid_at = not before the invoice), so the delay is capped at the cut-off: 01.09 → 10.10
+      expect(Number(oct10.months[0].avg_days)).toBe(39);
+      // without a cut-off the same call equals the 3-argument one
+      expect(await at("2025-09-01", "2025-10-31", null)).toEqual((await c.query("select analytics_finance($1, '2025-09-01', '2025-10-31') as r", [F.B])).rows[0].r);
+    });
+  });
+
+  it("funnel: a child who left and came back counts once as left and once as joined; no guessed leave dates", async () => {
+    await inTx(async (c, become) => {
+      const { k2, k3 } = await dataset(c);
+      // k3: archived 25.09.2025 (journal says «moved»), restored 06.10.2025 — the triggers write today's date, so the
+      // history is moved back to the real days
+      await c.query("update children set status = 'archived', archive_reason = 'moved', archived_at = '2025-09-25T12:00:00+05:00' where id = $1", [k3]);
+      await c.query("update child_group_history set to_date = '2025-09-25' where child_id = $1", [k3]);
+      await c.query("insert into audit_log (kindergarten_id, action, entity, entity_id, details, created_at) values ($1, 'child.archive', 'child', $2, '{\"reason\": \"moved\"}', '2025-09-25T12:00:00+05:00')", [F.B, k3]);
+      await c.query("update children set status = 'active', archive_reason = null, archived_at = null where id = $1", [k3]);
+      await c.query("update child_group_history set from_date = '2025-10-06' where child_id = $1 and to_date is null", [k3]);
+      // k2: archived without archived_at (an old row) — its leave day is the day the history was closed (today), not the period end
+      await c.query("update children set status = 'archived', archive_reason = 'family' where id = $1", [k2]);
+      await become(F.users.ownerB);
+      const sep = (await c.query("select analytics_funnel($1, '2025-09-01', '2025-09-30') as r", [F.B])).rows[0].r;
+      expect({ j: sep.joined, l: sep.left, reasons: sep.left_reasons }).toEqual({ j: 3, l: 1, reasons: { moved: 1 } });
+      expect(sep.active.find((x: { d: string }) => x.d === "2025-09-25").n).toBe(2);
+      const oct = (await c.query("select analytics_funnel($1, '2025-10-01', '2025-10-31') as r", [F.B])).rows[0].r;
+      expect({ j: oct.joined, l: oct.left }).toEqual({ j: 1, l: 0 });
+      expect(oct.active.find((x: { d: string }) => x.d === "2025-10-05").n).toBe(2);
+      expect(oct.active.find((x: { d: string }) => x.d === "2025-10-06").n).toBe(3);
+    });
+  });
+
   it("funnel: applications → contacted (timeline) → accepted; joined, left with reasons, active children per day", async () => {
     await inTx(async (c, become) => {
       const { k3 } = await dataset(c);

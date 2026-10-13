@@ -1,8 +1,7 @@
 {
   "title": "Аналитика",
   "subtitle": "Как идут дела в саду и что изменилось по сравнению с прошлым периодом",
-  "tabs": { "attendance": "Посещаемость", "staff": "Сотрудники", "finance": "Финансы", "funnel": "Приём и отток" },
-  "tabsShort": { "attendance": "Дети", "staff": "Персонал", "finance": "Финансы", "funnel": "Приём" },
+  "tabs": { "attendance": "Посещаемость", "staff": "Персонал", "finance": "Финансы", "funnel": "Приём" },
   "period": {
     "kinds": { "week": "Неделя", "month": "Месяц", "quarter": "Квартал", "year": "Год", "custom": "Период" },
     "prev": "Предыдущий период",
@@ -11,7 +10,11 @@
     "to": "По",
     "apply": "Показать",
     "compare": "Сравнение: {range}",
-    "running": "Период ещё идёт — данные по {date}, сравнение с тем же числом дней"
+    "running": "Период ещё идёт — данные по {date}, сравнение с тем же числом дней",
+    "problems": {
+      "invalidRange": "Не удалось прочитать даты периода — показан текущий месяц. Укажите обе даты.",
+      "tooLong": "Период длиннее {max} дней — показан текущий месяц. Выберите период короче."
+    }
   },
   "label": {
     "week": "{from} – {to}",
@@ -31,21 +34,22 @@
     "down": "меньше на {value}{unit}, чем в прошлом периоде",
     "same": "как в прошлом периоде",
     "none": "нет данных за прошлый период",
-    "days": " дн."
+    "days": " дн.",
+    "pp": " п.п."
   },
   "kpi": {
     "attendance": "Посещаемость",
     "fill": "Заполненность",
     "sickness": "Заболеваемость",
     "absences": "Пропуски",
-    "absencesSub": "детодни",
+    "absencesSub": "{count, plural, one {детодень} few {детодня} many {детодней} other {детодня}}",
     "late": "Опоздания",
     "missed": "Пропуски",
     "missedSub": "отсутствие и без отметки",
     "hours": "Часов от графика",
     "autoClosed": "Закрыто автоматически",
     "edited": "Ручные правки",
-    "daysSub": "дни",
+    "daysSub": "{count, plural, one {день} few {дня} many {дней} other {дня}}",
     "charged": "Начислено",
     "paid": "Оплачено",
     "debt": "Долг",
@@ -145,9 +149,10 @@
   "stages": { "applications": "Заявки", "contacted": "Связались", "accepted": "Приняты", "declined": "Отказались" },
   "churnRows": { "joined": "Пришли", "left": "Выбыли" },
   "archived": "в архиве",
+  "notDue": "срок не наступил",
   "insights": {
-    "attendance": "Посещаемость {when} — {rate}%{dir, select, up {, на {diff}% выше {than}} down {, на {diff}% ниже {than}} same {, на уровне {than}} other {}}",
-    "sickness": "Болезнь — причина {rate}% пропусков{dir, select, up {, на {diff}% больше {than}} down {, на {diff}% меньше {than}} same {, на уровне {than}} other {}}",
+    "attendance": "Посещаемость {when} — {rate}%{dir, select, up {, на {diff} п.п. выше {than}} down {, на {diff} п.п. ниже {than}} same {, на уровне {than}} other {}}",
+    "sickness": "Болезнь — причина {rate}% пропусков{dir, select, up {, на {diff} п.п. больше {than}} down {, на {diff} п.п. меньше {than}} same {, на уровне {than}} other {}}",
     "groups": "Лучше всех ходят в «{best}» ({bestRate}%), реже всего — в «{worst}» ({worstRate}%)",
     "groupsEven": "Посещаемость во всех группах — {rate}%",
     "fill": "Сад заполнен на {fill}%: {free, plural, =0 {свободных мест нет} one {свободно # место} few {свободно # места} many {свободно # мест} other {свободно # места}}",
@@ -158,7 +163,7 @@
     "staffClean": "Ни опозданий, ни пропусков",
     "hours": "Отработано {rate}% часов по графику: {worked} ч из {planned} ч",
     "hoursNoPlan": "Отработано {worked} ч вне графика",
-    "collection": "Собрано {rate}% начисленного{dir, select, up {, на {diff}% больше {than}} down {, на {diff}% меньше {than}} same {, на уровне {than}} other {}}",
+    "collection": "Собрано {rate}% начисленного{dir, select, up {, на {diff} п.п. больше {than}} down {, на {diff} п.п. меньше {than}} same {, на уровне {than}} other {}}",
     "debtors": "{count, plural, one {# должник} few {# должника} many {# должников} other {# должника}} на {sum}; дольше всех — {name}, {days, plural, =0 {срок ещё не прошёл} one {просрочка # день} few {просрочка # дня} many {просрочка # дней} other {просрочка # дня}}",
     "debtorsNone": "Должников нет — все счета оплачены",
     "payDays": "В среднем платят через {days, plural, one {# день} few {# дня} many {# дней} other {# дня}} после начала месяца{dir, select, up {, на {diff} дн. позже {than}} down {, на {diff} дн. раньше {than}} same {, на уровне {than}} other {}}",
@@ -170,7 +175,8 @@
   "notes": {
     "staff": "Учитываются завершённые дни — по вчерашний день.",
     "finance": "Счета за месяцы периода; оплата распределяется на самые старые долги. Должники — на сегодня.",
-    "fill": "На {date}"
+    "fill": "На {date}",
+    "financeAsOf": "Прошлый период — с оплатами по {date}, как и сейчас."
   },
   "empty": {
     "title": "За этот период данных нет",

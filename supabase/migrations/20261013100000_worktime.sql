@@ -278,6 +278,8 @@ end $$;
 -- status: work (on time, still in) · done (on time / outside schedule, finished) · late · absent ·
 --         unmarked (expected, no mark) · upcoming (expected later today or in the future) · off (not expected)
 -- outside_schedule: worked on a day without a shift (never late).
+-- Rows exist only for the days a person belongs to the garden — from joining (or their first mark) until archiving —
+-- plus any day with marks, so the timesheet, today's tiles, the accountant's card and analytics count the same days (D-017).
 create or replace function public.worktime_range(kg uuid, p_from date, p_to date)
   returns table (
     user_id uuid,
@@ -310,16 +312,20 @@ create or replace function public.worktime_range(kg uuid, p_from date, p_to date
   days as (
     select g::date as d from generate_series(p_from::timestamp, least(p_to, p_from + 92)::timestamp, interval '1 day') g
   ),
+  -- since: the first day a person is expected at work — the day they joined the garden (first staff membership,
+  -- local date), or their first mark if that is earlier (history entered before the account existed).
   people as (
     select m.user_id,
            bool_or(m.status = 'active') as active,
-           max((m.archived_at at time zone cfg.tz)::date) as archived_on
+           max((m.archived_at at time zone cfg.tz)::date) as archived_on,
+           least(min((m.created_at at time zone cfg.tz)::date),
+                 (select min(w.work_date) from work_sessions w where w.kindergarten_id = kg and w.user_id = m.user_id)) as since
     from memberships m, cfg
     where m.kindergarten_id = kg and m.role <> 'parent' and cfg.staff and (cfg.sees_all or m.user_id = auth.uid())
     group by m.user_id
   ),
   grid as (
-    select p.user_id, p.active, p.archived_on, dd.d, not public.kg_is_working_day(kg, dd.d) as hol
+    select p.user_id, p.active, p.archived_on, p.since, dd.d, not public.kg_is_working_day(kg, dd.d) as hol
     from people p cross join days dd
   ),
   base as (
@@ -350,8 +356,8 @@ create or replace function public.worktime_range(kg uuid, p_from date, p_to date
       where w.kindergarten_id = kg and w.user_id = g.user_id and w.work_date = g.d
       having count(*) > 0
     ) ws on true
-    -- employed that day (archived people keep their past), or has marks that day
-    where g.active or g.archived_on is null or g.d < g.archived_on or ws.first_start is not null
+    -- employed that day: joined already and not archived yet (archived people keep their past), or has marks that day
+    where (g.d >= g.since and (g.active or g.archived_on is null or g.d < g.archived_on)) or ws.first_start is not null
   ),
   shifts as (
     select b.*,

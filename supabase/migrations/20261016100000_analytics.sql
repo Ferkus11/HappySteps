@@ -11,7 +11,7 @@
 --                Rate = present / (present + absent); unmarked days are left out.
 --   staff      — worktime_range() (D-017), the single source of day statuses; closed days only (up to yesterday).
 --   finance    — invoice columns of the FIFO balance model (D-025): amount / paid_amount / balance per month.
---   funnel     — waitlist statuses and their timeline (D-028), children enrolled_on / archived_at / archive_reason.
+--   funnel     — waitlist statuses and their timeline (D-028); children's stays from child_group_history + archive events.
 -- Periods are local dates of the kindergarten (its time zone); the server caps them at 400 days.
 
 create or replace function public.analytics_guard(kg uuid, p_section text, p_from date, p_to date) returns void
@@ -126,8 +126,8 @@ revoke execute on function public.analytics_attendance(uuid, date, date) from pu
 grant execute on function public.analytics_attendance(uuid, date, date) to authenticated, service_role;
 
 -- ───────────────────────────── 2. Staff discipline ─────────────────────────────
--- One row per person with a schedule, marks or absences in the period. Closed days only: p_from … min(p_to, yesterday),
--- and only days since the person joined the garden (see `starts`).
+-- One row per person with a schedule, marks or absences in the period. Closed days only: p_from … min(p_to, yesterday).
+-- The app compares with the same number of closed days of the previous period (analytics.ts staffRanges).
 -- worktime_range() covers at most 93 days per call, so longer periods are read in 93-day chunks.
 create or replace function public.analytics_staff(kg uuid, p_from date, p_to date)
   returns table (user_id uuid, full_name text, archived boolean, scheduled_days int, worked_days int,
@@ -147,19 +147,10 @@ begin
       select c::date as f, least(c::date + 92, t) as e
       from generate_series(p_from::timestamp, t::timestamp, interval '93 days') c
     ),
-    -- worktime_range applies today's weekly template to every past day; analytics counts a person's days only from
-    -- when they joined the garden (first staff membership) or from their first mark, whichever is earlier.
-    starts as (
-      select m.user_id as uid,
-             least(min((m.created_at at time zone public.worktime_tz(kg))::date),
-                   (select min(w.work_date) from work_sessions w where w.kindergarten_id = kg and w.user_id = m.user_id)) as since
-      from memberships m where m.kindergarten_id = kg and m.role <> 'parent'
-      group by m.user_id
-    ),
+    -- worktime_range itself leaves out the days before a person joined the garden and after archiving (D-017),
+    -- so these numbers match the timesheet and the accountant's card.
     r as (
       select w.* from chunks ch cross join lateral public.worktime_range(kg, ch.f, ch.e) w
-      join starts s on s.uid = w.user_id
-      where w.work_date >= s.since or w.first_start is not null
     )
     select r.user_id, max(r.full_name), bool_or(r.archived),
            count(*) filter (where r.shift_start is not null)::int,
@@ -186,30 +177,49 @@ grant execute on function public.analytics_staff(uuid, date, date) to authentica
 -- ───────────────────────────── 3. Finance ─────────────────────────────
 -- { months: [{period, invoices, charged, paid, debt, overdue, paid_invoices, avg_days}],   months that intersect the period
 --   debtors: [{child_id, full_name, status, group_name, debt, since, months}],              open debts as of today
---   today }
+--   today, paid_until }
 -- avg_days — days from the 1st of the month to the moment the invoice became fully paid (local date of paid_at).
-create or replace function public.analytics_finance(kg uuid, p_from date, p_to date) returns jsonb
+-- p_paid_until (optional) — money «as of» that local date: only receipts accepted up to it count, allocated with the
+-- same FIFO rule as invoices_recalc (D-025): paid = clamp(child's money accepted by then − charges of the older
+-- invoices, 0, amount); debt and overdue follow (overdue = due before that date). The page passes it for the
+-- previous period while the current one is still running, so «1–13 October» compares with «September as of
+-- 13 September», not with September's invoices and every payment made since.
+create or replace function public.analytics_finance(kg uuid, p_from date, p_to date, p_paid_until date default null)
+  returns jsonb
   language plpgsql stable security definer set search_path = public as $$
 declare
   today date;
   tz text;
+  cut date;
   res jsonb;
 begin
   perform public.analytics_guard(kg, 'finance', p_from, p_to);
   today := public.kg_today(kg);
+  cut := least(coalesce(p_paid_until, today), today);
   tz := coalesce((select timezone from kindergarten_settings where kindergarten_id = kg), 'Asia/Almaty');
   with months as (
     select g::date as period
     from generate_series(date_trunc('month', p_from)::timestamp, date_trunc('month', p_to)::timestamp, interval '1 month') g
   ),
-  per as (
-    select i.period, count(*)::int as invoices, sum(i.amount) as charged, sum(i.paid_amount) as paid, sum(i.balance) as debt,
-           coalesce(sum(i.balance) filter (where i.due_date < today), 0) as overdue,
-           count(*) filter (where i.balance <= 0)::int as paid_invoices,
-           avg(greatest(0, (i.paid_at at time zone tz)::date - i.period)) filter (where i.balance <= 0 and i.paid_at is not null) as avg_days
+  inv as (
+    select i.period, i.amount, i.due_date, i.paid_at,
+           case when p_paid_until is null then i.paid_amount
+                else least(i.amount, greatest(0,
+                       coalesce((select sum(r.confirmed_amount) from payment_receipts r
+                                 where r.child_id = i.child_id and r.status = 'accepted' and (r.reviewed_at at time zone tz)::date <= cut), 0)
+                     - coalesce((select sum(o.amount) from invoices o where o.child_id = i.child_id and o.period < i.period), 0)))
+           end as paid
     from invoices i
     where i.kindergarten_id = kg and i.period in (select period from months)
-    group by i.period
+  ),
+  per as (
+    select x.period, count(*)::int as invoices, sum(x.amount) as charged, sum(x.paid) as paid, sum(x.amount - x.paid) as debt,
+           coalesce(sum(x.amount - x.paid) filter (where x.due_date < cut), 0) as overdue,
+           count(*) filter (where x.amount - x.paid <= 0)::int as paid_invoices,
+           avg(greatest(0, least((x.paid_at at time zone tz)::date, cut) - x.period))
+             filter (where x.amount - x.paid <= 0 and x.paid_at is not null) as avg_days
+    from inv x
+    group by x.period
   ),
   debt as (
     select c.id, c.full_name, c.status, g.name as group_name, sum(i.balance) as debt, min(i.due_date) as since, count(*)::int as months
@@ -221,6 +231,7 @@ begin
   )
   select jsonb_build_object(
     'today', today,
+    'paid_until', cut,
     'months', coalesce((
       select jsonb_agg(jsonb_build_object('period', m.period, 'invoices', coalesce(p.invoices, 0), 'charged', coalesce(p.charged, 0),
                                           'paid', coalesce(p.paid, 0), 'debt', coalesce(p.debt, 0), 'overdue', coalesce(p.overdue, 0),
@@ -235,14 +246,24 @@ begin
   ) into res;
   return res;
 end $$;
-revoke execute on function public.analytics_finance(uuid, date, date) from public, anon;
-grant execute on function public.analytics_finance(uuid, date, date) to authenticated, service_role;
+revoke execute on function public.analytics_finance(uuid, date, date, date) from public, anon;
+grant execute on function public.analytics_finance(uuid, date, date, date) to authenticated, service_role;
 
 -- ───────────────────────────── 4. Funnel and churn ─────────────────────────────
 -- { applications, contacted, accepted, declined,       applications created in the period (cohort) and how far they got
---   joined, left, left_reasons: {reason: n},           children enrolled / archived in the period
+--   joined, left, left_reasons: {reason: n},           stays that started / ended in the period
 --   active: [{d, n}] }                                 active children per day, p_from … min(p_to, today)
 -- «contacted» counts every application that reached «Связались» at some point (timeline) or was accepted.
+--
+-- Stays. A child can leave and come back (archive → restore), so joining and leaving are read from the group history
+-- (child_group_history — the archive trigger closes the open stay on the archive day, a restore opens a new one; transfers
+-- are back-to-back stays and do not break a stay). Consecutive history rows are merged into stays; a gap — or an archive
+-- event in the journal on the last day of a row followed by a row the next day — ends a stay.
+--   start   = first day of the stay, not before enrolled_on;
+--   left_on = the archive day (archived_at of a currently archived child for its last stay); the child is not active
+--             from that day on. A child archived without a known date is left out (no guessing a date).
+--   reason  = archive_reason for the current archive, otherwise the reason recorded in the journal on that day.
+-- Children who never had a group: one stay from enrolled_on to the archive date.
 create or replace function public.analytics_funnel(kg uuid, p_from date, p_to date) returns jsonb
   language plpgsql stable security definer set search_path = public as $$
 declare
@@ -260,25 +281,68 @@ begin
     from waitlist_applications a
     where a.kindergarten_id = kg and (a.created_at at time zone tz)::date between p_from and p_to
   ),
-  kids as (
-    select c.id, c.enrolled_on, c.status, c.archive_reason,
-           case when c.status = 'archived' then coalesce((c.archived_at at time zone tz)::date, t) end as left_on
-    from children c where c.kindergarten_id = kg
+  archives as (
+    select a.entity_id as child, (a.created_at at time zone tz)::date as d, a.details ->> 'reason' as reason, a.created_at
+    from audit_log a
+    where a.kindergarten_id = kg and a.action = 'child.archive' and a.entity = 'child'
+  ),
+  rows_ as (
+    select h.child_id, h.from_date as f, h.to_date as e
+    from child_group_history h where h.kindergarten_id = kg
+    union all
+    select c.id, c.enrolled_on, case when c.status = 'archived' then (c.archived_at at time zone tz)::date end
+    from children c
+    where c.kindergarten_id = kg and not exists (select 1 from child_group_history h where h.child_id = c.id)
+  ),
+  ordered as (
+    select r.*,
+           max(r.e) over w as prev_end,
+           bool_or(r.e is null) over w as prev_open,
+           count(*) over w as prev_n
+    from rows_ r
+    window w as (partition by r.child_id order by r.f, r.e nulls last rows between unbounded preceding and 1 preceding)
+  ),
+  marked as (
+    select o.*,
+           sum(case when o.prev_n = 0 then 1
+                    when o.prev_open then 0
+                    when o.f > o.prev_end + 1 then 1
+                    when o.f = o.prev_end + 1 and exists (select 1 from archives x where x.child = o.child_id::text and x.d = o.prev_end) then 1
+                    else 0 end) over (partition by o.child_id order by o.f, o.e nulls last rows unbounded preceding) as isl
+    from ordered o
+  ),
+  merged as (
+    select m.child_id, m.isl, min(m.f) as f, case when bool_or(m.e is null) then null else max(m.e) end as e,
+           m.isl = max(m.isl) over (partition by m.child_id) as last
+    from marked m group by m.child_id, m.isl
+  ),
+  stays as (
+    select x.* from (
+      select c.id as child_id,
+             greatest(mg.f, c.enrolled_on) as start,
+             case when mg.last and c.status = 'archived' then coalesce((c.archived_at at time zone tz)::date, mg.e) else mg.e end as left_on,
+             case when mg.last and c.status = 'archived' then coalesce(c.archive_reason, 'other')
+                  else coalesce((select ar.reason from archives ar where ar.child = c.id::text and ar.d = mg.e order by ar.created_at desc limit 1), 'other')
+             end as reason,
+             mg.last and c.status = 'archived' as archived_now
+      from merged mg join children c on c.id = mg.child_id
+    ) x
+    where not (x.archived_now and x.left_on is null) and (x.left_on is null or x.left_on >= x.start)
   )
   select jsonb_build_object(
     'applications', (select count(*) from apps),
     'contacted', (select count(*) from apps where reached),
     'accepted', (select count(*) from apps where status = 'accepted'),
     'declined', (select count(*) from apps where status = 'declined'),
-    'joined', (select count(*) from kids where enrolled_on between p_from and p_to),
-    'left', (select count(*) from kids where left_on between p_from and p_to),
+    'joined', (select count(*) from stays where start between p_from and p_to),
+    'left', (select count(*) from stays where left_on between p_from and p_to),
     'left_reasons', coalesce((
       select jsonb_object_agg(r, n) from (
-        select coalesce(archive_reason, 'other') as r, count(*) as n from kids where left_on between p_from and p_to group by 1
+        select reason as r, count(*) as n from stays where left_on between p_from and p_to group by 1
       ) x), '{}'::jsonb),
     'active', coalesce((
       select jsonb_agg(jsonb_build_object('d', g::date,
-               'n', (select count(*) from kids k where k.enrolled_on <= g::date and (k.left_on is null or k.left_on > g::date)))
+               'n', (select count(*) from stays s where s.start <= g::date and (s.left_on is null or s.left_on > g::date)))
              order by g)
       from generate_series(p_from::timestamp, t::timestamp, interval '1 day') g), '[]'::jsonb)
   ) into res;

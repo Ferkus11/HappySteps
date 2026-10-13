@@ -5,6 +5,7 @@ import {
   attendanceTotals,
   change,
   churnInsight,
+  closedDaysPrev,
   debtorsInsight,
   fillInsight,
   financeTotals,
@@ -12,6 +13,7 @@ import {
   funnelTotals,
   groupsInsight,
   hoursInsight,
+  paidUntilPrev,
   payDaysInsight,
   pct,
   rateInsight,
@@ -23,7 +25,7 @@ import {
   type Section,
 } from "@/lib/analytics";
 import { loadAttendance, loadFinance, loadFunnel, loadStaff } from "@/lib/analytics-data";
-import { activeSeries, attendanceSeries, buildTables, periodThan, periodWhen, renderInsight, type T } from "@/lib/analytics-view";
+import { activeSeries, attendanceSeries, buildTables, periodThan, periodWhen, rangeLabel, renderInsight, type T } from "@/lib/analytics-view";
 import { formatDate, formatMoney } from "@/lib/format";
 import { HBars, HPairBars, MoneyStack, TrendLine } from "./charts";
 import { ChartCard, ChartEmpty, KpiGrid, SectionEmpty, exportHref, type KpiProps } from "./ui";
@@ -69,13 +71,14 @@ async function AttendanceSection(p: SectionProps) {
   const tp = attendanceTotals(prev.days, prev.groups);
   if (tc.marked === 0 && tc.children === 0) return <SectionEmpty title={t("empty.title")} hint={t("empty.attendance")} />;
   const ph = phrases(p);
+  const pp = t("delta.pp");
   const [days, groups, reasons] = buildTables("attendance", cur, { t, range: p.cur });
   const series = attendanceSeries(cur, p.cur);
   const kpis: KpiProps[] = [
-    { label: t("kpi.attendance"), value: pctText(tc.rate), change: change(tc.rate, tp.rate, "points"), unit: "%", testId: "kpi-attendance" },
-    { label: t("kpi.fill"), value: pctText(tc.fill), sub: `${tc.children} / ${tc.capacity}`, change: change(tc.fill, tp.fill, "points"), unit: "%", testId: "kpi-fill" },
-    { label: t("kpi.sickness"), value: pctText(tc.sickShare), change: change(tc.sickShare, tp.sickShare, "points"), unit: "%", testId: "kpi-sickness" },
-    { label: t("kpi.absences"), value: String(tc.absent), sub: t("kpi.absencesSub"), change: change(tc.absent, tp.absent, "relative"), unit: "%", testId: "kpi-absences" },
+    { label: t("kpi.attendance"), value: pctText(tc.rate), change: change(tc.rate, tp.rate, "points"), unit: pp, testId: "kpi-attendance" },
+    { label: t("kpi.fill"), value: pctText(tc.fill), sub: `${tc.children} / ${tc.capacity}`, change: change(tc.fill, tp.fill, "points"), unit: pp, testId: "kpi-fill" },
+    { label: t("kpi.sickness"), value: pctText(tc.sickShare), change: change(tc.sickShare, tp.sickShare, "points"), unit: pp, testId: "kpi-sickness" },
+    { label: t("kpi.absences"), value: String(tc.absent), sub: t("kpi.absencesSub", { count: tc.absent }), change: change(tc.absent, tp.absent, "relative"), unit: "%", testId: "kpi-absences" },
   ];
   const rated = cur.groups.map((g) => ({ name: g.name, value: pct(g.present, g.present + g.absent) }));
   const fills = cur.groups.map((g) => ({ name: g.name, value: pct(g.children, g.capacity) }));
@@ -104,7 +107,7 @@ async function AttendanceSection(p: SectionProps) {
           <ChartEmpty text={t("empty.chart")} />
         )}
       </ChartCard>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
         <ChartCard t={t} testId="chart-groups" title={t("charts.groups")} insight={renderInsight(t, groupsInsight(cur.groups), ph)}>
           {rated.some((r) => r.value != null) ? <HBars label={t("charts.groups")} seriesName={t("series.attendance")} percent rows={rated} /> : <ChartEmpty text={t("empty.chart")} />}
         </ChartCard>
@@ -128,15 +131,16 @@ async function AttendanceSection(p: SectionProps) {
         >
           {reasonRows.length ? <HBars label={t("charts.reasons")} seriesName={t("series.absences")} rows={reasonRows} /> : <ChartEmpty text={t("empty.chart")} />}
         </ChartCard>
-        <ChartCard
-          t={t}
-          testId="chart-top"
-          title={t("charts.topAbsences")}
-          insight={renderInsight(t, topAbsenceInsight(cur.groups), ph)}
-          table={groups}
-          exportUrl={exportHref("attendance", "groups", p.period)}
-        />
       </div>
+      {/* full width: nine columns do not fit a half-width card at 1440 */}
+      <ChartCard
+        t={t}
+        testId="chart-top"
+        title={t("charts.topAbsences")}
+        insight={renderInsight(t, topAbsenceInsight(cur.groups), ph)}
+        table={groups}
+        exportUrl={exportHref("attendance", "groups", p.period)}
+      />
     </div>
   );
 }
@@ -144,19 +148,22 @@ async function AttendanceSection(p: SectionProps) {
 // ───────────────────────────── 2. Staff discipline ─────────────────────────────
 async function StaffSection(p: SectionProps) {
   const { t } = p;
-  const [cur, prev] = await Promise.all([loadStaff(p.supabase, p.kgId, p.cur), loadStaff(p.supabase, p.kgId, p.prev)]);
+  // closed days only: the previous period gets the same number of closed days (1–12 ↔ 1–12 on the 13th)
+  const prevRange = closedDaysPrev(p.period, p.prev, p.today);
+  const [cur, prev] = await Promise.all([loadStaff(p.supabase, p.kgId, p.cur), prevRange ? loadStaff(p.supabase, p.kgId, prevRange) : Promise.resolve([])]);
   if (!cur.length) return <SectionEmpty title={t("empty.title")} hint={`${t("empty.staff")} ${t("notes.staff")}`} />;
   const tc = staffTotals(cur);
   const tp = staffTotals(prev);
   const has = prev.length > 0;
-  const ph = phrases(p);
+  const ph = { ...phrases(p), than: periodThan(t, p.period.kind, prevRange ?? p.prev) };
+  const pp = t("delta.pp");
   const [table] = buildTables("staff", cur, { t, range: p.cur });
   const kpis: KpiProps[] = [
-    { label: t("kpi.late"), value: String(tc.late), sub: t("kpi.daysSub"), change: has ? change(tc.late, tp.late, "relative") : null, unit: "%", testId: "kpi-late" },
+    { label: t("kpi.late"), value: String(tc.late), sub: t("kpi.daysSub", { count: tc.late }), change: has ? change(tc.late, tp.late, "relative") : null, unit: "%", testId: "kpi-late" },
     { label: t("kpi.missed"), value: String(tc.missed), sub: t("kpi.missedSub"), change: has ? change(tc.missed, tp.missed, "relative") : null, unit: "%", testId: "kpi-missed" },
-    { label: t("kpi.hours"), value: pctText(tc.hoursRate), sub: `${Math.round(tc.worked / 60)} / ${Math.round(tc.planned / 60)}`, change: change(tc.hoursRate, tp.hoursRate, "points"), unit: "%", testId: "kpi-hours" },
-    { label: t("kpi.autoClosed"), value: String(tc.autoClosed), sub: t("kpi.daysSub"), change: has ? change(tc.autoClosed, tp.autoClosed, "relative") : null, unit: "%", testId: "kpi-auto" },
-    { label: t("kpi.edited"), value: String(tc.edited), sub: t("kpi.daysSub"), change: has ? change(tc.edited, tp.edited, "relative") : null, unit: "%", testId: "kpi-edited" },
+    { label: t("kpi.hours"), value: pctText(tc.hoursRate), sub: `${Math.round(tc.worked / 60)} / ${Math.round(tc.planned / 60)}`, change: change(tc.hoursRate, tp.hoursRate, "points"), unit: pp, testId: "kpi-hours" },
+    { label: t("kpi.autoClosed"), value: String(tc.autoClosed), sub: t("kpi.daysSub", { count: tc.autoClosed }), change: has ? change(tc.autoClosed, tp.autoClosed, "relative") : null, unit: "%", testId: "kpi-auto" },
+    { label: t("kpi.edited"), value: String(tc.edited), sub: t("kpi.daysSub", { count: tc.edited }), change: has ? change(tc.edited, tp.edited, "relative") : null, unit: "%", testId: "kpi-edited" },
   ];
   const hoursRows = cur
     .filter((r) => r.planned_minutes || r.worked_minutes)
@@ -164,7 +171,13 @@ async function StaffSection(p: SectionProps) {
   return (
     <div className="space-y-4" data-testid="section-staff">
       <KpiGrid t={t} items={kpis} />
-      <ChartCard t={t} testId="chart-hours" title={t("charts.hours")} insight={renderInsight(t, hoursInsight(cur), ph)} note={t("notes.staff")}>
+      <ChartCard
+        t={t}
+        testId="chart-hours"
+        title={t("charts.hours")}
+        insight={renderInsight(t, hoursInsight(cur), ph)}
+        note={prevRange ? `${t("notes.staff")} ${t("period.compare", { range: rangeLabel(prevRange) })}.` : t("notes.staff")}
+      >
         {hoursRows.length ? (
           <HPairBars label={t("charts.hours")} rows={hoursRows} names={{ a: t("series.planned"), b: t("series.worked") }} />
         ) : (
@@ -185,17 +198,20 @@ function shortName(full: string) {
 // ───────────────────────────── 3. Finance ─────────────────────────────
 async function FinanceSection(p: SectionProps) {
   const { t } = p;
-  const [cur, prev] = await Promise.all([loadFinance(p.supabase, p.kgId, p.cur), loadFinance(p.supabase, p.kgId, p.prev)]);
+  // while the period runs, the previous one is read «as of» the same day (payments accepted up to then, D-025 FIFO)
+  const paidUntil = paidUntilPrev(p.period, p.prev, p.today);
+  const [cur, prev] = await Promise.all([loadFinance(p.supabase, p.kgId, p.cur), loadFinance(p.supabase, p.kgId, p.prev, paidUntil)]);
   const tc = financeTotals(cur.months);
   const tp = financeTotals(prev.months);
   if (!tc.invoices && !cur.debtors.length) return <SectionEmpty title={t("empty.title")} hint={t("empty.finance")} />;
   const ph = phrases(p);
+  const pp = t("delta.pp");
   const [months, debtors] = buildTables("finance", cur, { t, range: p.cur });
   const kpis: KpiProps[] = [
     { label: t("kpi.charged"), value: formatMoney(tc.charged), change: change(tc.charged, tp.charged, "relative"), unit: "%", testId: "kpi-charged" },
     { label: t("kpi.paid"), value: formatMoney(tc.paid), change: change(tc.paid, tp.paid, "relative"), unit: "%", testId: "kpi-paid" },
     { label: t("kpi.debt"), value: formatMoney(tc.debt), change: change(tc.debt, tp.debt, "relative"), unit: "%", danger: tc.debt > 0, testId: "kpi-debt" },
-    { label: t("kpi.collection"), value: pctText(tc.collection), change: change(tc.collection, tp.collection, "points"), unit: "%", testId: "kpi-collection" },
+    { label: t("kpi.collection"), value: pctText(tc.collection), change: change(tc.collection, tp.collection, "points"), unit: pp, testId: "kpi-collection" },
     {
       label: t("kpi.payDays"),
       value: tc.avgDays == null ? "—" : String(Math.round(tc.avgDays)),
@@ -214,7 +230,13 @@ async function FinanceSection(p: SectionProps) {
   return (
     <div className="space-y-4" data-testid="section-finance">
       <KpiGrid t={t} items={kpis} />
-      <ChartCard t={t} testId="chart-finance" title={t("charts.finance")} insight={renderInsight(t, rateInsight("collection", tc.collection, tp.collection), ph)} note={t("notes.finance")}>
+      <ChartCard
+        t={t}
+        testId="chart-finance"
+        title={t("charts.finance")}
+        insight={renderInsight(t, rateInsight("collection", tc.collection, tp.collection), ph)}
+        note={paidUntil ? `${t("notes.finance")} ${t("notes.financeAsOf", { date: formatDate(paidUntil) })}` : t("notes.finance")}
+      >
         {tc.charged ? <MoneyStack label={t("charts.finance")} rows={bars} names={{ paid: t("series.paid"), debt: t("series.debt") }} /> : <ChartEmpty text={t("empty.chart")} />}
       </ChartCard>
       <ChartCard t={t} testId="table-months-card" title={months.title} insight={renderInsight(t, payDaysInsight(tc.avgDays, tp.avgDays), ph)} table={months} exportUrl={exportHref("finance", "months", p.period)} />
@@ -234,7 +256,7 @@ async function FunnelSection(p: SectionProps) {
   const [funnel, churn, active] = buildTables("funnel", cur, { t, range: p.cur });
   const kpis: KpiProps[] = [
     { label: t("kpi.applications"), value: String(cur.applications), change: change(cur.applications, prev.applications, "relative"), unit: "%", testId: "kpi-applications" },
-    { label: t("kpi.conversion"), value: pctText(tc.conversion), change: change(tc.conversion, tp.conversion, "points"), unit: "%", testId: "kpi-conversion" },
+    { label: t("kpi.conversion"), value: pctText(tc.conversion), change: change(tc.conversion, tp.conversion, "points"), unit: t("delta.pp"), testId: "kpi-conversion" },
     { label: t("kpi.joined"), value: String(cur.joined), change: change(cur.joined, prev.joined, "relative"), unit: "%", testId: "kpi-joined" },
     { label: t("kpi.left"), value: String(cur.left), change: change(cur.left, prev.left, "relative"), unit: "%", testId: "kpi-left" },
     { label: t("kpi.active"), value: tc.activeEnd == null ? "—" : String(tc.activeEnd), change: change(tc.activeEnd, tp.activeEnd, "relative"), unit: "%", testId: "kpi-active" },

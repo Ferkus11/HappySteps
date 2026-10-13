@@ -1,8 +1,7 @@
 {
   "title": "Талдау",
   "subtitle": "Бала бақшадағы жағдай және өткен кезеңмен салыстырғандағы өзгерістер",
-  "tabs": { "attendance": "Қатысу", "staff": "Қызметкерлер", "finance": "Қаржы", "funnel": "Қабылдау және кету" },
-  "tabsShort": { "attendance": "Балалар", "staff": "Қызметкер", "finance": "Қаржы", "funnel": "Қабылдау" },
+  "tabs": { "attendance": "Қатысу", "staff": "Қызметкерлер", "finance": "Қаржы", "funnel": "Қабылдау" },
   "period": {
     "kinds": { "week": "Апта", "month": "Ай", "quarter": "Тоқсан", "year": "Жыл", "custom": "Кезең" },
     "prev": "Алдыңғы кезең",
@@ -11,7 +10,11 @@
     "to": "Соңы",
     "apply": "Көрсету",
     "compare": "Салыстыру: {range}",
-    "running": "Кезең әлі жүріп жатыр — {date} дейінгі деректер, сонша күнмен салыстырылады"
+    "running": "Кезең әлі жүріп жатыр — {date} дейінгі деректер, сонша күнмен салыстырылады",
+    "problems": {
+      "invalidRange": "Кезең күндерін оқу мүмкін болмады — ағымдағы ай көрсетілді. Екі күнді де көрсетіңіз.",
+      "tooLong": "Кезең {max} күннен ұзақ — ағымдағы ай көрсетілді. Қысқарақ кезең таңдаңыз."
+    }
   },
   "label": {
     "week": "{from} – {to}",
@@ -31,25 +34,26 @@
     "down": "өткен кезеңнен {value}{unit} аз",
     "same": "өткен кезеңдегідей",
     "none": "өткен кезең бойынша дерек жоқ",
-    "days": " күн"
+    "days": " күн",
+    "pp": " п.т."
   },
   "kpi": {
     "attendance": "Қатысу",
     "fill": "Толымдылық",
     "sickness": "Аурушаңдық",
     "absences": "Келмеу",
-    "absencesSub": "бала-күн",
+    "absencesSub": "{count, plural, other {бала-күн}}",
     "late": "Кешігу",
     "missed": "Келмеу",
     "missedSub": "болмау және белгісіз",
     "hours": "Кестедегі сағаттан",
     "autoClosed": "Автоматты жабылды",
     "edited": "Қолмен түзету",
-    "daysSub": "күн",
+    "daysSub": "{count, plural, other {күн}}",
     "charged": "Есептелді",
     "paid": "Төленді",
     "debt": "Қарыз",
-    "collection": "Жиналым",
+    "collection": "Жинау деңгейі",
     "payDays": "Төлеу мерзімі",
     "payDaysSub": "ай басынан бастап күн",
     "applications": "Өтінімдер",
@@ -116,7 +120,7 @@
     "paid": "Төленді",
     "debt": "Қарыз",
     "overdue": "Мерзімі өткен",
-    "collection": "Жиналым, %",
+    "collection": "Жинау деңгейі, %",
     "avgDays": "Орт. төлеу мерзімі, күн",
     "invoices": "Шоттар",
     "child": "Бала",
@@ -145,9 +149,10 @@
   "stages": { "applications": "Өтінімдер", "contacted": "Хабарластық", "accepted": "Қабылданды", "declined": "Бас тартты" },
   "churnRows": { "joined": "Келді", "left": "Кетті" },
   "archived": "мұрағатта",
+  "notDue": "мерзімі келген жоқ",
   "insights": {
-    "attendance": "Қатысу {when} — {rate}%{dir, select, up {, {than} {diff}% жоғары} down {, {than} {diff}% төмен} same {, {than} өзгерген жоқ} other {}}",
-    "sickness": "Келмеудің {rate}%-ы — ауру себебінен{dir, select, up {, {than} {diff}% көп} down {, {than} {diff}% аз} same {, {than} өзгерген жоқ} other {}}",
+    "attendance": "Қатысу {when} — {rate}%{dir, select, up {, {than} {diff} пайыздық тармаққа жоғары} down {, {than} {diff} пайыздық тармаққа төмен} same {, {than} өзгерген жоқ} other {}}",
+    "sickness": "Келмеудің {rate}%-ы — ауру себебінен{dir, select, up {, {than} {diff} пайыздық тармаққа көп} down {, {than} {diff} пайыздық тармаққа аз} same {, {than} өзгерген жоқ} other {}}",
     "groups": "Ең жақсы қатысу — «{best}» тобында ({bestRate}%), ең төмені — «{worst}» тобында ({worstRate}%)",
     "groupsEven": "Барлық топта қатысу — {rate}%",
     "fill": "Бала бақша {fill}% толы: {free, plural, =0 {бос орын жоқ} other {# бос орын бар}}",
@@ -158,7 +163,7 @@
     "staffClean": "Кешігу де, келмеу де болған жоқ",
     "hours": "Кестедегі сағаттың {rate}%-ы орындалды: {planned} сағаттың {worked} сағаты",
     "hoursNoPlan": "Кестеден тыс {worked} сағат жұмыс істелді",
-    "collection": "Есептелгеннің {rate}%-ы жиналды{dir, select, up {, {than} {diff}% көп} down {, {than} {diff}% аз} same {, {than} өзгерген жоқ} other {}}",
+    "collection": "Есептелгеннің {rate}%-ы жиналды{dir, select, up {, {than} {diff} пайыздық тармаққа көп} down {, {than} {diff} пайыздық тармаққа аз} same {, {than} өзгерген жоқ} other {}}",
     "debtors": "{count, plural, other {# борышкер}}, жалпы {sum}; ең ұзағы — {name}, {days, plural, =0 {мерзімі әлі өткен жоқ} other {# күн кешіктірілді}}",
     "debtorsNone": "Борышкерлер жоқ — барлық шот төленген",
     "payDays": "Орта есеппен ай басталғаннан кейін {days, plural, other {# күнде}} төлейді{dir, select, up {, {than} {diff} күн кешірек} down {, {than} {diff} күн ертерек} same {, {than} өзгерген жоқ} other {}}",
@@ -170,7 +175,8 @@
   "notes": {
     "staff": "Аяқталған күндер ғана есептеледі — кешегі күнге дейін.",
     "finance": "Кезең айларының шоттары; төлем ең ескі қарызды өтейді. Борышкерлер — бүгінгі күнге.",
-    "fill": "{date} күнгі жағдай"
+    "fill": "{date} күнгі жағдай",
+    "financeAsOf": "Өткен кезең — қазіргідей, {date} дейінгі төлемдермен."
   },
   "empty": {
     "title": "Бұл кезеңде дерек жоқ",

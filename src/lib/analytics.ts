@@ -90,20 +90,29 @@ export interface PeriodParams {
   to?: string;
 }
 
+/** Why a custom range from the URL was not used: a date is missing/invalid, or the range is longer than allowed. */
+export type PeriodProblem = "invalidRange" | "tooLong";
+
 /**
  * Period from the URL: `p` = kind (default month), `d` = any date inside the calendar unit (default today),
  * custom: `from`/`to` (≤ 366 days, from ≤ to; swapped if reversed). Anything invalid falls back to the current month.
  */
 export function parsePeriod(sp: PeriodParams, today: string): Period {
+  return parsePeriodChecked(sp, today).period;
+}
+
+/** parsePeriod + the reason a custom range fell back to the current month (the picker shows it as a hint). */
+export function parsePeriodChecked(sp: PeriodParams, today: string): { period: Period; problem: PeriodProblem | null } {
   const kind: PeriodKind = (PERIOD_KINDS as readonly string[]).includes(sp.p ?? "") ? (sp.p as PeriodKind) : "month";
   if (kind === "custom") {
     if (isIsoDate(sp.from) && isIsoDate(sp.to)) {
       const [from, to] = sp.from <= sp.to ? [sp.from, sp.to] : [sp.to, sp.from];
-      if (daysIn(from, to) <= MAX_CUSTOM_DAYS) return { kind, from, to };
+      if (daysIn(from, to) <= MAX_CUSTOM_DAYS) return { period: { kind, from, to }, problem: null };
+      return { period: calendarPeriod("month", today), problem: "tooLong" };
     }
-    return calendarPeriod("month", today);
+    return { period: calendarPeriod("month", today), problem: "invalidRange" };
   }
-  return calendarPeriod(kind, isIsoDate(sp.d) ? sp.d : today);
+  return { period: calendarPeriod(kind, isIsoDate(sp.d) ? sp.d : today), problem: null };
 }
 
 /** Previous/next period: the neighbouring calendar unit, or a custom range of the same length right before/after. */
@@ -130,6 +139,29 @@ export function comparison(p: Period, today: string): { cur: Range; prev: Range;
 }
 
 const minDate = (a: string, b: string) => (a < b ? a : b);
+
+/**
+ * Staff numbers count closed days only (up to yesterday, see analytics_staff). The previous range is cut to the same
+ * number of closed days while the period is not over yet (1–12 October ↔ 1–12 September on the 13th), and is null
+ * when the current period has no closed day yet (nothing to compare).
+ */
+export function closedDaysPrev(period: Range, prev: Range, today: string): Range | null {
+  const yesterday = addDays(today, -1);
+  if (period.to <= yesterday) return prev;
+  if (yesterday < period.from) return null;
+  const closed = daysIn(period.from, yesterday);
+  return { from: prev.from, to: minDate(prev.to, addDays(prev.from, closed - 1)) };
+}
+
+/**
+ * Finance: invoices are per month and money keeps arriving, so while the period is not over (today inside it, the
+ * last day included) the previous one is read «as of» the same day — payments accepted up to prev.from + elapsed
+ * days, i.e. the end of the (already cut) previous range (analytics_finance p_paid_until). Null once the period is
+ * over: both are compared as they stand today.
+ */
+export function paidUntilPrev(period: Range, prev: Range, today: string): string | null {
+  return today >= period.from && today <= period.to ? prev.to : null;
+}
 
 export function isFuture(p: Range, today: string): boolean {
   return p.from > today;
@@ -186,20 +218,20 @@ export function granularity(days: number): Granularity {
   return "month";
 }
 
-export function bucketKey(d: string, g: Granularity): string {
-  if (g === "day") return d;
-  if (g === "week") return addDays(d, 1 - weekday(d));
-  return `${d.slice(0, 7)}-01`;
+/** First date of the bucket `d` belongs to, never before `from` (a period starting on a Wednesday labels its first week with that Wednesday). */
+export function bucketKey(d: string, g: Granularity, from?: string): string {
+  const k = g === "day" ? d : g === "week" ? addDays(d, 1 - weekday(d)) : `${d.slice(0, 7)}-01`;
+  return from && k < from ? from : k;
 }
 
 /**
- * Groups daily points into buckets (first date of the bucket as `d`). Numeric fields are summed (`sum`) or the
- * bucket's last value is kept (`last`, e.g. the number of active children).
+ * Groups daily points into buckets (first date of the bucket as `d`, clamped to `from`). Numeric fields are summed
+ * (`sum`) or the bucket's last value is kept (`last`, e.g. the number of active children).
  */
-export function bucketize<T extends { d: string }>(points: T[], g: Granularity, mode: "sum" | "last" = "sum"): (T & { days: number })[] {
+export function bucketize<T extends { d: string }>(points: T[], g: Granularity, mode: "sum" | "last" = "sum", from?: string): (T & { days: number })[] {
   const out = new Map<string, T & { days: number }>();
   for (const p of points) {
-    const k = bucketKey(p.d, g);
+    const k = bucketKey(p.d, g, from);
     const cur = out.get(k);
     if (!cur) {
       out.set(k, { ...p, d: k, days: 1 });
@@ -337,6 +369,11 @@ export function financeTotals(months: FinanceMonth[]) {
 /** Days a debt is overdue (0 while within the due date). */
 export function overdueDays(since: string, today: string): number {
   return Math.max(0, daysIn(since, today) - 1);
+}
+
+/** Whether a debt is past its due date (overdue from the day after `since`). */
+export function isOverdue(since: string, today: string): boolean {
+  return today > since;
 }
 
 export interface FunnelData {

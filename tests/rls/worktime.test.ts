@@ -19,6 +19,11 @@ async function addSession(c: PoolClient, user: string, start: string, end: strin
   return r.rows[0].id as string;
 }
 
+/** The fixtures joined the garden today; tests about 2025 days need the staff to have joined before DAY (D-017). */
+async function joinedLongAgo(c: PoolClient) {
+  await c.query("update memberships set created_at = '2025-01-01T00:00:00+05:00' where kindergarten_id = $1 and role <> 'parent'", [F.A]);
+}
+
 async function errorOf(c: PoolClient, sql: string, params: unknown[] = []): Promise<string | null> {
   await c.query("savepoint e");
   try {
@@ -59,6 +64,7 @@ describe("work_sessions visibility", () => {
 
   it("worktime_range: everyone for owner/head/accountant, self for staff, nothing for parents and other gardens", async () => {
     await inTx(async (c, become) => {
+      await joinedLongAgo(c);
       const people = async () => new Set((await c.query("select user_id from worktime_range($1, $2, $2)", [F.A, DAY])).rows.map((r) => r.user_id)).size;
       await become(F.users.head);
       expect(await people()).toBeGreaterThanOrEqual(7);
@@ -173,6 +179,7 @@ describe("day statuses (worktime_range)", () => {
   it("late / on time / absent / unmarked / outside schedule / holiday", async () => {
     await inTx(async (c, become) => {
       const SAT = "2025-03-08"; // Saturday (and Women's day)
+      await joinedLongAgo(c);
       await c.query("delete from work_sessions where work_date in ($1, $2)", [DAY, SAT]);
       await addSession(c, F.users.teacher, at("08:25"), at("17:00")); // late 25 > 10
       await addSession(c, F.users.cook, at("08:05"), at("12:00")); // within threshold
@@ -207,6 +214,28 @@ describe("day statuses (worktime_range)", () => {
       const h = await q("2025-03-04");
       expect(h[F.users.teacherParent].status).toBe("off");
       expect(h[F.users.teacherParent].is_holiday).toBe(true);
+    });
+  });
+
+  it("nobody is expected before joining the garden; an earlier first mark counts as joined (D-017)", async () => {
+    await inTx(async (c, become) => {
+      // the cook joined on Wednesday 05.03.2025, the teacher joined later but has a mark on Tuesday 04.03
+      await c.query("update memberships set created_at = $3 where kindergarten_id = $1 and user_id = $2", [F.A, F.users.cook, "2025-03-05T09:00:00+05:00"]);
+      await c.query("update memberships set created_at = $3 where kindergarten_id = $1 and user_id = $2", [F.A, F.users.teacher, "2025-06-01T09:00:00+05:00"]);
+      await addSession(c, F.users.teacher, at("08:00", "2025-03-04"), at("17:00", "2025-03-04"), F.A, "2025-03-04");
+      await become(F.users.accountant);
+      const days = async (u: string) =>
+        (await c.query("select work_date::text as d, status from worktime_range($1, '2025-03-03', '2025-03-07') where user_id = $2", [F.A, u])).rows.map((r) => `${r.d}:${r.status}`);
+      expect(await days(F.users.cook)).toEqual(["2025-03-05:unmarked", "2025-03-06:unmarked", "2025-03-07:unmarked"]);
+      expect(await days(F.users.teacher)).toEqual(["2025-03-04:done", "2025-03-05:unmarked", "2025-03-06:unmarked", "2025-03-07:unmarked"]);
+      // the joining day is the local date in the garden's time zone (23:30 UTC on the 4th = 05.03 in Almaty)
+      await c.query("reset role");
+      await c.query("update memberships set created_at = '2025-03-04T23:30:00Z' where kindergarten_id = $1 and user_id = $2", [F.A, F.users.cook]);
+      await become(F.users.accountant);
+      expect((await days(F.users.cook))[0]).toBe("2025-03-05:unmarked");
+      // the staff's own view follows the same rule
+      await become(F.users.cook);
+      expect(await days(F.users.cook)).toHaveLength(3);
     });
   });
 

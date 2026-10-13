@@ -11,6 +11,12 @@ export async function snap(page: Page, stage: string, name: string) {
   mkdirSync(dir, { recursive: true });
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
+    // Wait until the page has re-laid out for the new width (charts re-measure via ResizeObserver): a full-page shot
+    // taken too early keeps the previous width (a «390» file came out 576px wide). Real overflow still shows up.
+    await page
+      .waitForFunction((w) => window.innerWidth === w && document.documentElement.scrollWidth <= w, vp.width, { timeout: 3000 })
+      .catch(() => undefined);
+    await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
     await page.waitForTimeout(150);
     await page.screenshot({ path: `${dir}/${name}-${vp.name}.png`, fullPage: true });
   }
