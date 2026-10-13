@@ -12,6 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const ctx = await requireAnyContext();
   if (ctx.kind === "kindergarten" && !ctx.membership.consent_at) redirect("/consent");
   const tr = await getTranslations("roles");
+  const tc = await getTranslations("common");
   const role = ctx.kind === "kindergarten" ? ctx.role : "superadmin";
 
   const contexts = ctx.memberships.map((m) => ({
@@ -19,7 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     kindergartenName: m.kindergartens?.name ?? "",
     roleLabel: tr(m.role),
   }));
-  if (ctx.isSuperadmin) contexts.unshift({ value: "superadmin", kindergartenName: "Happy Steps Platform", roleLabel: tr("superadmin") });
+  if (ctx.isSuperadmin) contexts.unshift({ value: "superadmin", kindergartenName: tc("platformName"), roleLabel: tr("superadmin") });
 
   const logoUrl = ctx.kind === "kindergarten" ? await signedUrl("kindergarten-assets", ctx.kg.logo_path, 3600) : null;
   const counters = ctx.kind === "kindergarten" ? await getShellCounters(ctx) : { chats: 0, notifications: 0 };

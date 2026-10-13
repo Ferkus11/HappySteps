@@ -19,11 +19,11 @@ export function LanguageSwitcher() {
     <Dropdown>
       <DropdownTrigger
         className="flex h-11 cursor-pointer items-center gap-1.5 rounded-full px-3 text-sm font-bold text-muted uppercase hover:bg-surface-muted"
-        aria-label={t("language")}
         data-testid="language-switcher"
         disabled={pending}
       >
         <Languages className="size-[18px]" aria-hidden />
+        <span className="sr-only">{t("language")}: </span>
         {locale}
       </DropdownTrigger>
       <DropdownContent>
@@ -43,6 +43,7 @@ export function LanguageSwitcher() {
               });
             }}
             className={l === locale ? "font-bold text-brand" : undefined}
+            lang={l}
           >
             {t(`languages.${l}`)}
           </DropdownItem>

@@ -24,7 +24,7 @@ function Parents({ row, rights }: { row: RosterRow; rights: RosterRights }) {
       {row.parents.map((p) => (
         <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl bg-surface-muted px-3 py-2" data-testid="roster-parent">
           <div className="min-w-0 flex-1 text-sm">
-            <div className="truncate font-semibold">{p.name}</div>
+            <div data-user-content className="truncate font-semibold">{p.name}</div>
             <a href={`tel:${p.phone}`} className="inline-flex min-h-11 items-center gap-1.5 text-[13px] text-sky-strong" data-testid="parent-phone" data-phone={p.phone}>
               <Phone className="size-3.5" aria-hidden />
               {formatPhone(p.phone)}
@@ -47,13 +47,18 @@ async function Row({ row, club, stats, rights, tz }: { row: RosterRow; club: Clu
         <Avatar name={row.child_name} size={40} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="font-bold">{row.child_name}</span>
+            <span data-user-content className="font-bold">{row.child_name}</span>
             {row.status !== "active" ? <EnrollmentBadge status={row.status} position={row.queue_position} /> : null}
             {row.status === "queued" && outcome === "active" ? <Badge tone="success">{t("queueReady")}</Badge> : null}
           </div>
           <div className="text-[13px] text-muted">
             {t("childAge", { count: age })}
-            {row.group_name ? ` · ${row.group_name}` : ""}
+            {row.group_name ? (
+  <>
+    {" · "}
+    <span data-user-content>{row.group_name}</span>
+  </>
+) : null}
             {" · "}
             {row.status === "active" && row.started_on ? t("since", { date: formatDate(row.started_on, tz) }) : t("requestedAt", { date: formatDate(row.requested_at, tz) })}
           </div>

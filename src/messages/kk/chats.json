@@ -10,7 +10,7 @@
   "noMessages": "Хабарлама жоқ",
   "deletedShort": "Хабарлама жойылды",
   "photo": "Сурет",
-  "file": "Құжат",
+  "file": "Файл",
   "unread": "{count, plural, one {# оқылмаған} other {# оқылмаған}}",
   "unreadCaption": "{count, plural, one {оқылмаған} other {оқылмаған}}",
   "newChat": "Жаңа чат",

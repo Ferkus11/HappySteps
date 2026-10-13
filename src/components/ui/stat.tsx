@@ -48,7 +48,7 @@ export function StatusTile({
       <div className="text-[28px] leading-none font-extrabold" data-testid={testId}>
         {value}
       </div>
-      <div className="mt-2 text-[13px] font-semibold opacity-90">{label}</div>
+      <div className="mt-2 text-[13px] font-semibold">{label}</div>
     </>
   );
   const cls = cn("block rounded-2xl p-4 transition-transform", tileTones[tone], href && "hover:-translate-y-0.5");

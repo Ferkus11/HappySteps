@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Plus, Search, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { withUserValues } from "@/components/ui/user-text";
 import { Avatar } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -125,14 +126,24 @@ export function NewChatDialog() {
                 >
                   <Avatar name={c.full_name} size={40} />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[15px] font-semibold text-text">
+                    <span data-user-content className="block truncate text-[15px] font-semibold text-text">
                       {c.full_name}
                     </span>
                     <span className="block truncate text-[13px] text-muted">
                       {tr(c.role)}
-                      {c.hint
-                        ? ` · ${c.role === "parent" ? t("parentOf", { names: c.hint }) : c.hint}`
-                        : ""}
+                      {c.hint ? (
+                        c.role === "parent" ? (
+                          <>
+                            {" · "}
+                            {withUserValues((v) => t("parentOf", v), { names: c.hint })}
+                          </>
+                        ) : (
+                          <>
+                            {" · "}
+                            <span data-user-content>{c.hint}</span>
+                          </>
+                        )
+                      ) : null}
                     </span>
                   </span>
                 </button>

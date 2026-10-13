@@ -2,6 +2,8 @@
  * Analytics presentation shared by the page and the .xlsx export: period names, insight sentences and the
  * tables of each section (one definition → the table on screen and the exported sheet are the same).
  */
+import type { ReactNode } from "react";
+import { withUserValues } from "@/components/ui/user-text";
 import {
   attendanceTotals,
   bucketize,
@@ -60,12 +62,27 @@ export function periodThan(t: T, kind: PeriodKind, prev: Range): string {
   return t(`than.${kind}`, { q: f.quarter, year: f.year });
 }
 
-export function renderInsight(t: T, i: Insight | null, phrases: { when: string; than: string }): string | null {
+/** Insight values that are user content (group and people names): shown untranslated, marked as such. */
+const USER_VALUES = ["best", "worst", "group", "name"];
+
+export function insightText(t: T, i: Insight | null, phrases: { when: string; than: string }): string | null {
   if (!i) return null;
+  return t(`insights.${i.key}`, insightValues(t, i, phrases));
+}
+
+function insightValues(t: T, i: Insight, phrases: { when: string; than: string }) {
   const v: Record<string, string | number> = { ...i.values, when: phrases.when, than: phrases.than };
   if (typeof v.sum === "number") v.sum = formatMoney(v.sum);
   if (i.key === "churnReason") v.reason = t(`leaveReasons.${String(v.reason)}`);
-  return t(`insights.${i.key}`, v);
+  return v;
+}
+
+/** The insight sentence with names wrapped as user content (see `withUserValues`). */
+export function renderInsight(t: T, i: Insight | null, phrases: { when: string; than: string }): ReactNode {
+  if (!i) return null;
+  const v = insightValues(t, i, phrases);
+  const user = Object.fromEntries(USER_VALUES.filter((k) => typeof v[k] === "string").map((k) => [k, String(v[k])]));
+  return withUserValues((marks) => t(`insights.${i.key}`, { ...v, ...marks }), user);
 }
 
 // ───────────────────────────── Tables ─────────────────────────────

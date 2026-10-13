@@ -62,7 +62,7 @@ export function TeacherGroups({ userId, groups, selected }: { userId: string; gr
         {groups.map((g) => (
           <label key={g.id} className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-xl border border-border px-3 text-sm">
             <Checkbox checked={ids.includes(g.id)} onCheckedChange={(v) => setIds((s) => (v ? [...s, g.id] : s.filter((x) => x !== g.id)))} />
-            {g.name}
+            <span data-user-content>{g.name}</span>
           </label>
         ))}
       </div>

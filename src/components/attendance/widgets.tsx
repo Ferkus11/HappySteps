@@ -97,7 +97,7 @@ async function TeacherToday({ ctx }: { ctx: KgContext }) {
               title={
                 <span className="inline-flex items-center gap-2">
                   <span className="size-2.5 rounded-full" style={{ background: g.color }} aria-hidden />
-                  {t("myGroupToday")} · {g.name}
+                  {t("myGroupToday")} · <span data-user-content>{g.name}</span>
                 </span>
               }
             />
@@ -124,7 +124,7 @@ async function TeacherToday({ ctx }: { ctx: KgContext }) {
                         <span className="text-tile-absent-fg">
                           <ReasonIcon reason={reason} />
                         </span>
-                        <span className="min-w-0 truncate font-semibold">{c.name}</span>
+                        <span data-user-content className="min-w-0 truncate font-semibold">{c.name}</span>
                         <span className="shrink-0 text-muted">{reason ? t(`reasons.${reason}`) : t("absent")}</span>
                       </li>
                     );

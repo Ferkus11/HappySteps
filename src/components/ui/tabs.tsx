@@ -20,7 +20,7 @@ export function TabsTrigger({ className, ...props }: T.TabsTriggerProps) {
   return (
     <T.Trigger
       className={cn(
-        "h-10 shrink-0 cursor-pointer rounded-xl px-4 text-sm font-semibold text-muted data-[state=active]:bg-surface data-[state=active]:text-text data-[state=active]:shadow-sm",
+        "h-10 pointer-coarse:h-11 shrink-0 cursor-pointer rounded-xl px-4 text-sm font-semibold text-muted data-[state=active]:bg-surface data-[state=active]:text-text data-[state=active]:shadow-sm",
         className,
       )}
       {...props}

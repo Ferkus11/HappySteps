@@ -98,7 +98,7 @@ export default async function TimesheetPage({ searchParams }: { searchParams: Pr
                   {days.map((d) => {
                     const wd = isoWeekday(d);
                     return (
-                      <th key={d} className={cn("min-w-8 border-b border-border px-0.5 py-2 text-center font-semibold", wd > 5 && "text-brand/70", d === today && "text-brand")}>
+                      <th key={d} className={cn("min-w-8 border-b border-border px-0.5 py-2 text-center font-semibold", wd > 5 && "text-brand", d === today && "text-brand")}>
                         <div className="text-text">{Number(d.slice(8))}</div>
                         <div className="text-[10px] font-medium">{t(`weekdays.${wd}`)}</div>
                       </th>
@@ -115,13 +115,15 @@ export default async function TimesheetPage({ searchParams }: { searchParams: Pr
                   <tr key={p.userId} data-testid={`ts-row-${p.userId}`}>
                     <th scope="row" className="sticky left-0 z-10 border-b border-border bg-surface px-3 py-1.5 text-left font-semibold">
                       <div className="flex items-center gap-1">
-                        <Link href={`/worktime/people/${p.userId}?month=${month}`} className="max-w-36 truncate hover:text-brand md:max-w-48" title={p.fullName}>
-                          {p.fullName}
+                        <Link href={`/worktime/people/${p.userId}?month=${month}`} className="max-w-36 truncate hover:text-brand md:max-w-48 pointer-coarse:flex pointer-coarse:min-h-11 pointer-coarse:items-center" title={p.fullName}>
+                          <span className="truncate" data-user-content>
+                            {p.fullName}
+                          </span>
                         </Link>
                         {canEdit ? (
                           <Link
                             href={`/worktime/people/${p.userId}?month=${month}`}
-                            className="grid size-8 shrink-0 place-items-center rounded-full text-faint hover:bg-surface-muted hover:text-brand"
+                            className="grid size-8 pointer-coarse:size-11 shrink-0 place-items-center rounded-full text-faint hover:bg-surface-muted hover:text-brand"
                             aria-label={t("editPerson")}
                             data-testid="ts-edit"
                           >

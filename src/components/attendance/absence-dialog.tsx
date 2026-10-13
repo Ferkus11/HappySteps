@@ -102,7 +102,7 @@ export function ReportAbsenceButton({
               <Field label={t("child")} htmlFor="ab-child">
                 <Select id="ab-child" name="child" defaultValue={childId ?? kids[0]?.id}>
                   {kids.map((k) => (
-                    <option key={k.id} value={k.id}>
+                    <option data-user-content key={k.id} value={k.id}>
                       {k.name}
                     </option>
                   ))}

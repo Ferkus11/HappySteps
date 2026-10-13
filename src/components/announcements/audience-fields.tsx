@@ -75,7 +75,7 @@ export function AudienceFields({
                   data-group-id={g.id}
                 />
                 <span className="size-2.5 shrink-0 rounded-full" style={{ background: g.color }} aria-hidden />
-                <span className="truncate">{g.name}</span>
+                <span data-user-content className="truncate">{g.name}</span>
               </label>
             ))}
           </div>

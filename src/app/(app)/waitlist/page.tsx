@@ -88,7 +88,7 @@ export default async function WaitlistPage({ searchParams }: { searchParams: Pro
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="truncate font-bold">{r.child_name}</span>
+                      <span data-user-content className="truncate font-bold">{r.child_name}</span>
                     </div>
                     <div className="truncate text-sm text-muted">
                       {tch("age", { count: ageOn(r.child_birth_date, today) })}

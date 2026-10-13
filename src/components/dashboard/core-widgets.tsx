@@ -268,12 +268,17 @@ async function ParentChildCard({ ctx }: { ctx: KgContext }) {
             size={56}
           />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[17px] font-extrabold">
+            <span data-user-content className="block truncate text-[17px] font-extrabold">
               {k.full_name}
             </span>
             <span className="block truncate text-sm text-muted">
               {tc("age", { count: ageOn(k.birth_date, today) })}
-              {k.groups ? ` · ${k.groups.name}` : ""}
+              {k.groups ? (
+  <>
+    {" · "}
+    <span data-user-content>{k.groups.name}</span>
+  </>
+) : null}
             </span>
           </span>
           <ChevronRight className="size-5 shrink-0 text-faint" aria-hidden />
@@ -298,7 +303,7 @@ async function ParentChildCard({ ctx }: { ctx: KgContext }) {
               )}
             </span>
             <div className="min-w-0">
-              <div className="text-[11px] font-semibold tracking-wide uppercase opacity-80">
+              <div className="text-[11px] font-semibold tracking-wide uppercase">
                 {ta("todayInKg")}
               </div>
               <div
@@ -315,7 +320,7 @@ async function ParentChildCard({ ctx }: { ctx: KgContext }) {
                       : ta("notMarkedYet")}
               </div>
               {e.status === "absent" && e.reason ? (
-                <div className="text-[13px] font-semibold opacity-80">
+                <div className="text-[13px] font-semibold">
                   {ta(`reasons.${e.reason}`)}
                 </div>
               ) : null}

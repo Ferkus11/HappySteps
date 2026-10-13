@@ -37,7 +37,7 @@ async function ParentClubsWidget({ ctx }: { ctx: KgContext }) {
                       <li key={e.id}>
                         <Link href={`/clubs/${c.id}?child=${kid.id}`} className="-mx-2 flex min-h-12 items-center gap-3 rounded-xl px-2 py-1 hover:bg-surface-muted" data-testid="parent-club" data-club={c.name}>
                           <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-semibold">{c.name}</div>
+                            <div data-user-content className="truncate text-sm font-semibold">{c.name}</div>
                             <ScheduleText schedule={c.schedule} className="truncate text-xs text-faint" />
                           </div>
                           <EnrollmentBadge status={e.status} position={e.position} />
@@ -85,7 +85,7 @@ async function TeacherClubsWidget({ ctx }: { ctx: KgContext }) {
           return (
             <li key={c.id}>
               <Link href={`/clubs/${c.id}`} className="-mx-2 flex min-h-11 items-center justify-between gap-3 rounded-xl px-2 hover:bg-surface-muted">
-                <span className="truncate text-sm font-semibold">{c.name}</span>
+                <span data-user-content className="truncate text-sm font-semibold">{c.name}</span>
                 <span className="shrink-0 text-[13px] text-muted">{t("places.attending", { active: s.active, capacity: s.capacity })}</span>
               </Link>
             </li>

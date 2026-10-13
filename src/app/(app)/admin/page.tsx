@@ -48,7 +48,7 @@ export default async function AdminPage() {
             <Card key={k.id} className="flex flex-col gap-4 md:flex-row md:items-center" data-testid={`kg-row-${k.slug}`}>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[16px] font-bold">{k.name}</span>
+                  <span data-user-content className="text-[16px] font-bold">{k.name}</span>
                   <Badge tone={k.status === "active" ? "success" : "danger"}>
                     {k.status === "active" ? t("statusActive") : t("statusBlocked")}
                   </Badge>

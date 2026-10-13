@@ -245,7 +245,7 @@ function CopyDialog({ date, dateLabel, recent, overwrite }: { date: string; date
                   type="button"
                   onClick={() => setFrom(r.date)}
                   className={cn(
-                    "h-10 cursor-pointer rounded-xl border px-3 text-sm font-semibold",
+                    "h-10 pointer-coarse:h-11 cursor-pointer rounded-xl border px-3 text-sm font-semibold",
                     from === r.date ? "border-brand bg-brand-soft text-brand" : "border-border text-text hover:bg-surface-muted",
                   )}
                 >

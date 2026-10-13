@@ -50,7 +50,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
                 {children.data.map((c) => (
                   <li key={c.id}>
                     <Link href={`/children/${c.id}`} className="flex min-h-11 items-center gap-3 rounded-xl px-2 hover:bg-surface-muted">
-                      <Avatar name={c.full_name} size={32} /> {c.full_name}
+                      <Avatar name={c.full_name} size={32} /> <span data-user-content>{c.full_name}</span>
                     </Link>
                   </li>
                 ))}
@@ -65,7 +65,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
                   <li key={s.user_id}>
                     <Link href={`/staff/${s.user_id}`} className="flex min-h-11 items-center gap-3 rounded-xl px-2 hover:bg-surface-muted">
                       <Avatar name={s.profiles.full_name} size={32} />
-                      <span className="flex-1">{s.profiles.full_name}</span>
+                      <span data-user-content className="flex-1">{s.profiles.full_name}</span>
                       <span className="text-sm text-muted">{formatPhone(s.profiles.phone)}</span>
                     </Link>
                   </li>

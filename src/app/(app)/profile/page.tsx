@@ -22,7 +22,7 @@ export default async function ProfilePage() {
           <div className="flex items-center gap-4">
             <Avatar name={ctx.profile.full_name} size={64} />
             <div>
-              <div className="text-lg font-extrabold">{ctx.profile.full_name}</div>
+              <div data-user-content className="text-lg font-extrabold">{ctx.profile.full_name}</div>
               <div className="text-muted">{formatPhone(ctx.profile.phone)}</div>
             </div>
           </div>

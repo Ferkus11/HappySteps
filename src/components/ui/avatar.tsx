@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 const palette = ["#FCE4EC", "#E3F2FD", "#E8F5E9", "#FFF3E0", "#EDE7F6", "#E0F7FA"];
-const fg = ["#AD1457", "#1565C0", "#2E7D32", "#B45309", "#5E35B1", "#00838F"];
+const fg = ["#AD1457", "#1565C0", "#2E7D32", "#B45309", "#5E35B1", "#00727C"];
 
 export function initials(name: string) {
   return name

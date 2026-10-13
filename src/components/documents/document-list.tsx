@@ -55,9 +55,15 @@ export function DocumentList({ kind, items, today, timezone }: { kind: "child" |
                 <Icon className="size-5" aria-hidden />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-semibold text-text">{d.title}</span>
+                <span data-user-content className="block truncate font-semibold text-text">{d.title}</span>
                 <span className="block truncate text-[13px] text-muted">
-                  {[d.label, formatDate(d.createdAt, timezone), sizeLabel(d.size), d.meta].filter(Boolean).join(" · ")}
+                  {[d.label, formatDate(d.createdAt, timezone), sizeLabel(d.size)].filter(Boolean).join(" · ")}
+                  {d.meta ? (
+                    <>
+                      {" · "}
+                      <span data-user-content>{d.meta}</span>
+                    </>
+                  ) : null}
                 </span>
                 {d.expiresOn ? (
                   <span className="mt-1 block">

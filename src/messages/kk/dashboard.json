@@ -8,18 +8,18 @@
   "fillLabel": "Топтардың толымдылығы",
   "myChildren": "Менің балаларым",
   "noChildren": "Аккаунтыңызға әзірге балалар байланыстырылмаған",
-  "noChildrenHint": "Бақша әкімшілігіне хабарласыңыз.",
+  "noChildrenHint": "Балабақша әкімшілігіне хабарласыңыз.",
   "attention": {
     "title": "Назар аударыңыз",
     "allGood": "Бәрі ретте",
     "allGoodHint": "Жаңа істер жоқ — шай ішуге болады.",
     "items": {
       "unmarkedGroups": "{count, plural, one {топ белгіленбеген} other {топ белгіленбеген}}",
-      "receipts": "{count, plural, one {чек тексеруде} other {чек тексеруде}}",
+      "receipts": "{count, plural, one {түбіртек тексеруде} other {түбіртек тексеруде}}",
       "clubRequests": "{count, plural, one {үйірмеге өтінім} other {үйірмеге өтінім}}",
       "clubQueue": "{count, plural, one {үйірмеде кезекке бос орын} other {үйірмелерде кезекке бос орын}}",
       "documents": "{count, plural, one {қызметкер құжатының мерзімі бітеді} other {қызметкерлер құжатының мерзімі бітеді}}",
-      "waitlist": "{count, plural, one {күту парағына жаңа өтінім} other {күту парағына жаңа өтінім}}"
+      "waitlist": "{count, plural, one {күту тізіміне жаңа өтінім} other {күту тізіміне жаңа өтінім}}"
     },
     "hints": {
       "unmarkedGroups": "Бүгінгі қатысу",

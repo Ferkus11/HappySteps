@@ -9,6 +9,9 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
+/** First-column values that are user content (names) — not translated. */
+const USER_COLUMNS = ["group", "employee", "child"];
+
 export function analyticsHref(tab: Section, p: Period): string {
   return `/analytics?${new URLSearchParams({ tab, ...periodQuery(p) }).toString()}`;
 }
@@ -193,7 +196,7 @@ export function ChartCard({
   className,
 }: {
   title: string;
-  insight: string | null;
+  insight: React.ReactNode;
   note?: string;
   children?: React.ReactNode;
   table?: DataTable;
@@ -253,7 +256,7 @@ export function TableView({ table }: { table: DataTable }) {
   // a table with phone columns fits the phone width; the others scroll sideways inside the card
   const fits = table.columns.some((c) => c.phone);
   return (
-    <div className="-mx-4 overflow-x-auto px-4 md:-mx-5 md:px-5" data-testid={`table-${table.id}`}>
+    <div className="-mx-4 overflow-x-auto px-4 md:-mx-5 md:px-5" data-testid={`table-${table.id}`} tabIndex={0} role="region" aria-label={table.title}>
       <table className={cn("w-full border-collapse text-sm", fits ? "sm:min-w-max" : "min-w-max")}>
         <caption className="sr-only">{table.title}</caption>
         <thead>
@@ -289,9 +292,17 @@ export function TableView({ table }: { table: DataTable }) {
                   >
                     {i === 0 ? (
                       <>
-                        <span className="block truncate">{formatCell(r[c.key] ?? null, c.kind)}</span>
-                        {subline ? <span className="block truncate text-xs font-normal text-muted sm:hidden">{subline}</span> : null}
+                        <span className="block truncate" data-user-content={USER_COLUMNS.includes(c.key) ? "" : undefined}>
+                          {formatCell(r[c.key] ?? null, c.kind)}
+                        </span>
+                        {subline ? (
+                          <span className="block truncate text-xs font-normal text-muted sm:hidden" data-user-content={subs.some((c) => USER_COLUMNS.includes(c.key)) ? "" : undefined}>
+                            {subline}
+                          </span>
+                        ) : null}
                       </>
+                    ) : USER_COLUMNS.includes(c.key) ? (
+                      <span data-user-content>{formatCell(r[c.key] ?? null, c.kind)}</span>
                     ) : (
                       formatCell(r[c.key] ?? null, c.kind)
                     )}

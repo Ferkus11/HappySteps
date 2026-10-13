@@ -74,26 +74,26 @@ export default async function ChildrenPage({ searchParams }: { searchParams: Pro
           />
         </form>
         <div className="scrollbar-none flex gap-1.5 overflow-x-auto">
-          <Link href={qs({ group: undefined })} className={cn("flex h-10 shrink-0 items-center rounded-full px-4 text-sm font-semibold", !sp.group ? "bg-text text-white" : "bg-surface text-muted border border-border")}>
+          <Link href={qs({ group: undefined })} className={cn("flex h-10 pointer-coarse:h-11 shrink-0 items-center rounded-full px-4 text-sm font-semibold", !sp.group ? "bg-text text-white" : "bg-surface text-muted border border-border")}>
             {t("allGroups")}
           </Link>
           {visibleGroups.map((g) => (
             <Link
               key={g.id}
               href={qs({ group: g.id })}
-              className={cn("flex h-10 shrink-0 items-center gap-2 rounded-full px-4 text-sm font-semibold", sp.group === g.id ? "bg-text text-white" : "border border-border bg-surface text-muted")}
+              className={cn("flex h-10 pointer-coarse:h-11 shrink-0 items-center gap-2 rounded-full px-4 text-sm font-semibold", sp.group === g.id ? "bg-text text-white" : "border border-border bg-surface text-muted")}
             >
               <span className="size-2.5 rounded-full" style={{ background: g.color }} aria-hidden />
-              {g.name}
+              <span data-user-content>{g.name}</span>
             </Link>
           ))}
         </div>
         {ctx.role !== "teacher" ? (
           <div className="flex gap-1 md:ml-auto">
-            <Link href={qs({ status: undefined })} className={cn("flex h-10 items-center rounded-xl px-3 text-sm font-semibold", status === "active" ? "bg-surface shadow-sm" : "text-muted")}>
+            <Link href={qs({ status: undefined })} className={cn("flex h-10 pointer-coarse:h-11 items-center rounded-xl px-3 text-sm font-semibold", status === "active" ? "bg-surface shadow-sm" : "text-muted")}>
               {t("statusActive")}
             </Link>
-            <Link href={qs({ status: "archived" })} className={cn("flex h-10 items-center rounded-xl px-3 text-sm font-semibold", status === "archived" ? "bg-surface shadow-sm" : "text-muted")}>
+            <Link href={qs({ status: "archived" })} className={cn("flex h-10 pointer-coarse:h-11 items-center rounded-xl px-3 text-sm font-semibold", status === "archived" ? "bg-surface shadow-sm" : "text-muted")}>
               {t("statusArchived")}
             </Link>
           </div>
@@ -113,10 +113,15 @@ export default async function ChildrenPage({ searchParams }: { searchParams: Pro
                   <Link href={`/children/${c.id}`} className="flex min-h-16 items-center gap-3 px-4 py-3 hover:bg-surface-muted md:px-5" data-testid="child-row">
                     <Avatar name={c.full_name} src={c.photo_path ? photos[c.photo_path] : null} />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-bold">{c.full_name}</div>
+                      <div data-user-content className="truncate font-bold">{c.full_name}</div>
                       <div className="truncate text-sm text-muted">
                         {t("age", { count: ageOn(c.birth_date, today) })}
-                        {g ? ` · ${g.name}` : ""}
+                        {g ? (
+  <>
+    {" · "}
+    <span data-user-content>{g.name}</span>
+  </>
+) : null}
                       </div>
                     </div>
                     {c.allergies ? <Badge tone="warning" className="hidden sm:inline-flex">{t("allergies")}</Badge> : null}

@@ -46,8 +46,9 @@ export function AccountMenu({
     <Dropdown>
       <DropdownTrigger className="ml-1 flex cursor-pointer items-center gap-2.5 rounded-full p-1 pr-1 hover:bg-surface-muted md:pr-3" data-testid="account-menu">
         <Avatar name={user.fullName} size={36} />
+        <span className="sr-only md:hidden">{t("account")}</span>
         <span className="hidden text-left md:block">
-          <span className="block max-w-40 truncate text-[13px] font-bold text-text">{user.fullName}</span>
+          <span data-user-content className="block max-w-40 truncate text-[13px] font-bold text-text">{user.fullName}</span>
           <span className="block text-xs text-muted">{roleLabel}</span>
         </span>
       </DropdownTrigger>
@@ -81,7 +82,7 @@ export function AccountMenu({
                 }}
               >
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-semibold">{c.kindergartenName}</span>
+                  <span data-user-content className="block truncate font-semibold">{c.kindergartenName}</span>
                   <span className="block text-xs text-muted">{c.roleLabel}</span>
                 </span>
                 {c.value === current ? <Check className="!text-brand" /> : null}

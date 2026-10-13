@@ -1,6 +1,6 @@
 {
   "title": "Талдау",
-  "subtitle": "Бала бақшадағы жағдай және өткен кезеңмен салыстырғандағы өзгерістер",
+  "subtitle": "Балабақшадағы жағдай және өткен кезеңмен салыстырғандағы өзгерістер",
   "tabs": { "attendance": "Қатысу", "staff": "Қызметкерлер", "finance": "Қаржы", "funnel": "Қабылдау" },
   "period": {
     "kinds": { "week": "Апта", "month": "Ай", "quarter": "Тоқсан", "year": "Жыл", "custom": "Кезең" },
@@ -145,7 +145,7 @@
     "active": "Белсенді балалар"
   },
   "absenceReasons": { "sick": "Ауырып тұр", "vacation": "Демалыс", "family": "Отбасылық жағдай", "other": "Басқа", "none": "Себепсіз" },
-  "leaveReasons": { "moved": "Көшіп кетті", "school": "Мектепке барды", "other_kindergarten": "Басқа бақшаға ауысты", "family": "Отбасылық жағдай", "health": "Денсаулығына байланысты", "other": "Басқа" },
+  "leaveReasons": { "moved": "Көшіп кетті", "school": "Мектепке барды", "other_kindergarten": "Басқа балабақшаға ауысты", "family": "Отбасылық жағдай", "health": "Денсаулығына байланысты", "other": "Басқа" },
   "stages": { "applications": "Өтінімдер", "contacted": "Хабарластық", "accepted": "Қабылданды", "declined": "Бас тартты" },
   "churnRows": { "joined": "Келді", "left": "Кетті" },
   "archived": "мұрағатта",
@@ -155,8 +155,8 @@
     "sickness": "Келмеудің {rate}%-ы — ауру себебінен{dir, select, up {, {than} {diff} пайыздық тармаққа көп} down {, {than} {diff} пайыздық тармаққа аз} same {, {than} өзгерген жоқ} other {}}",
     "groups": "Ең жақсы қатысу — «{best}» тобында ({bestRate}%), ең төмені — «{worst}» тобында ({worstRate}%)",
     "groupsEven": "Барлық топта қатысу — {rate}%",
-    "fill": "Бала бақша {fill}% толы: {free, plural, =0 {бос орын жоқ} other {# бос орын бар}}",
-    "fillOver": "Бала бақша {fill}% толы; {count, plural, other {# топта}} орын саны асып кетті, мысалы «{group}»",
+    "fill": "Балабақша {fill}% толы: {free, plural, =0 {бос орын жоқ} other {# бос орын бар}}",
+    "fillOver": "Балабақша {fill}% толы; {count, plural, other {# топта}} орын саны асып кетті, мысалы «{group}»",
     "topAbsences": "Ең көп келмеу — «{group}» тобында: {count, plural, other {# бала-күн}}",
     "staffLate": "{late, plural, other {# кешігу}} және {missed, plural, other {# келмеу}}; жиі кешігетін — {name} ({days, plural, other {# рет}})",
     "staffMissed": "Кешігу болған жоқ, {missed, plural, other {# келмеу}}",

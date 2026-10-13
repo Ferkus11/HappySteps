@@ -58,5 +58,8 @@
     "receipt.revert": "Отменено решение по чеку",
     "waitlist.delete": "Удалена заявка из листа ожидания",
     "club.delete": "Удалён кружок"
-  }
+  },
+  "sections": {"kindergarten":"Сад","account":"Аккаунты","group":"Группы","child":"Дети","guardian":"Родители","worktime":"Рабочее время","attendance":"Посещаемость","holidays":"Выходные и праздники","announcement":"Объявления","event":"События","invoice":"Счета","receipt":"Чеки","chat":"Чаты","club":"Кружки","waitlist":"Лист ожидания","document":"Документы"},
+  "fromDate": "Дата с",
+  "toDate": "Дата по"
 }

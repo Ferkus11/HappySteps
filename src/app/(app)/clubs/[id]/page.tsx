@@ -45,12 +45,12 @@ async function Info({ club, stats, photo }: { club: Club; stats: ClubStats; phot
       <div className="md:flex">
         <ClubPhoto name={club.name} src={photo} className="h-40 w-full md:h-auto md:min-h-56 md:w-80 md:shrink-0" />
         <div className="space-y-4 p-5">
-          {club.description ? <p className="text-[15px] whitespace-pre-line text-text">{club.description}</p> : null}
+          {club.description ? <p data-user-content className="text-[15px] whitespace-pre-line text-text">{club.description}</p> : null}
           <div className="grid gap-3 sm:grid-cols-2">
             {row(Users, t("ageLabel"), <AgeRange from={club.age_from} to={club.age_to} />)}
             {row(CalendarDays, t("scheduleLabel"), <ScheduleText schedule={club.schedule} />)}
-            {club.place ? row(MapPin, t("placeLabel"), club.place) : null}
-            {club.teacher_name ? row(UserRound, t("teacherLabel"), club.teacher_name) : null}
+            {club.place ? row(MapPin, t("placeLabel"), <span data-user-content>{club.place}</span>) : null}
+            {club.teacher_name ? row(UserRound, t("teacherLabel"), <span data-user-content>{club.teacher_name}</span>) : null}
           </div>
           <div className="text-sm">
             <PlacesText stats={stats} />
@@ -126,7 +126,7 @@ export default async function ClubPage({ params, searchParams }: { params: Promi
         <ArrowLeft className="size-4" aria-hidden /> {t("back")}
       </Link>
       <PageHeader
-        title={club.name}
+        title={<span data-user-content>{club.name}</span>}
         actions={
           admin ? (
             <>

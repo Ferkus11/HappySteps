@@ -114,10 +114,10 @@ async function PersonDay({ row, tz, href, canEdit }: { row: DayRow; tz: string; 
   const shift = row.shift_start && row.shift_end ? `${row.shift_start}–${row.shift_end}` : null;
   return (
     <li>
-      <Link href={href} className="flex min-h-16 items-center gap-3 px-4 py-3 hover:bg-surface-muted md:px-5" data-testid={`wt-row-${row.user_id}`} aria-label={canEdit ? t("openPerson") : undefined}>
+      <Link href={href} className="flex min-h-16 items-center gap-3 px-4 py-3 hover:bg-surface-muted md:px-5" data-testid={`wt-row-${row.user_id}`} title={canEdit ? t("openPerson") : undefined}>
         <Avatar name={row.full_name} />
         <div className="min-w-0 flex-1">
-          <div className="truncate font-bold">{row.full_name}</div>
+          <div data-user-content className="truncate font-bold">{row.full_name}</div>
           <div className="mt-0.5 text-sm text-muted">
             {shift ? t("shiftShort", { time: shift }) : t("noShift")}
             {row.sessions.length ? <span className="text-text"> · {sessionsText(row, tz)}</span> : null}

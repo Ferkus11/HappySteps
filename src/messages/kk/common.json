@@ -35,7 +35,7 @@
   "account": "Аккаунт",
   "profile": "Профиль",
   "logout": "Шығу",
-  "switchContext": "Бақша және рөл",
+  "switchContext": "Балабақша және рөл",
   "status": "Мәртебе",
   "actions": "Әрекеттер",
   "comment": "Түсініктеме",
@@ -61,5 +61,12 @@
   "hours": "{count, plural, one {# сағат} other {# сағат}}",
   "days": "{count, plural, one {# күн} other {# күн}}",
   "styleguide": "Дизайн жүйесі",
-  "notificationsUnread": "{count, plural, one {Хабарландырулар: # оқылмаған} other {Хабарландырулар: # оқылмаған}}"
+  "notificationsUnread": "{count, plural, one {Хабарландырулар: # оқылмаған} other {Хабарландырулар: # оқылмаған}}",
+  "platformName": "Happy Steps платформасы",
+  "notFoundTitle": "Бет табылмады",
+  "notFoundText": "Сілтеменің мерзімі өткен болуы мүмкін немесе бұл бетке қолжетімділігіңіз жоқ.",
+  "toHome": "Басты бетке",
+  "errorTitle": "Бетті ашу мүмкін болмады",
+  "retry": "Қайталау",
+  "toasts": "Қалқымалы хабарламалар"
 }

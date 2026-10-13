@@ -599,7 +599,7 @@ export function Conversation(p: ConversationProps) {
           size={40}
         />
         <div className="min-w-0 flex-1">
-          <h1
+          <h1 data-user-content
             className="truncate text-[16px] font-extrabold text-text"
             data-testid="chat-heading"
           >
@@ -931,7 +931,7 @@ function Bubble({
                       aria-hidden
                     />
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold">
+                      <span data-user-content className="block truncate text-sm font-semibold">
                         {f.name}
                       </span>
                       <span className="block text-xs text-faint">
@@ -944,11 +944,11 @@ function Bubble({
               {local?.localFile && !m.files.length ? (
                 <div className="mb-1.5 flex min-h-12 items-center gap-2.5 rounded-xl bg-surface/70 px-3 py-2 text-sm text-muted">
                   <FileText className="size-5 shrink-0" aria-hidden />
-                  <span className="truncate">{local.localFile.name}</span>
+                  <span data-user-content className="truncate">{local.localFile.name}</span>
                 </div>
               ) : null}
               {m.body ? (
-                <p
+                <p data-user-content
                   className="break-words whitespace-pre-wrap"
                   data-testid="message-text"
                 >

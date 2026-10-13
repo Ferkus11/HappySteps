@@ -25,7 +25,9 @@ export async function MealList({ menu, meals, compact }: { menu: DayMenu; meals:
         {groups.map((g) => (
           <li key={g.meal} className="flex gap-3 py-2.5 text-sm first:pt-0 last:pb-0">
             <span className="w-28 shrink-0 text-muted">{t(`meals.${g.meal}`)}</span>
-            <span className="min-w-0 flex-1 font-semibold break-words">{g.dishes.map((d) => d.dish).join(", ")}</span>
+            <span className="min-w-0 flex-1 font-semibold break-words" data-user-content>
+              {g.dishes.map((d) => d.dish).join(", ")}
+            </span>
           </li>
         ))}
       </ul>
@@ -39,8 +41,8 @@ export async function MealList({ menu, meals, compact }: { menu: DayMenu; meals:
           <ul className="space-y-1.5">
             {g.dishes.map((d, i) => (
               <li key={i} className="rounded-xl bg-surface-muted px-3 py-2">
-                <div className="text-[15px] font-semibold break-words">{d.dish}</div>
-                {d.composition ? <div className="mt-0.5 text-[13px] break-words text-muted">{d.composition}</div> : null}
+                <div data-user-content className="text-[15px] font-semibold break-words">{d.dish}</div>
+                {d.composition ? <div data-user-content className="mt-0.5 text-[13px] break-words text-muted">{d.composition}</div> : null}
               </li>
             ))}
           </ul>

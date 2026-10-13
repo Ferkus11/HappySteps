@@ -185,6 +185,8 @@ export function AnnouncementDialog({
               accept={PHOTO_TYPES.join(",")}
               multiple
               className="sr-only"
+              aria-label={t("addPhotos")}
+              tabIndex={-1}
               data-testid="announcement-photos"
               onChange={(e) => {
                 addFiles(e.target.files, "photo");
@@ -197,6 +199,8 @@ export function AnnouncementDialog({
               accept="application/pdf"
               multiple
               className="sr-only"
+              aria-label={t("addPdf")}
+              tabIndex={-1}
               data-testid="announcement-pdfs"
               onChange={(e) => {
                 addFiles(e.target.files, "pdf");

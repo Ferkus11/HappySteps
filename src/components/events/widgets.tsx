@@ -32,9 +32,15 @@ async function UpcomingEvents({ ctx }: { ctx: KgContext }) {
                   <span className="text-[11px] text-muted">{e.date.slice(5, 7)}</span>
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-bold">{e.title}</span>
+                  <span data-user-content className="block truncate text-sm font-bold">{e.title}</span>
                   <span className="block truncate text-[13px] text-muted">
-                    {[e.date === today ? tc("today") : e.date === tomorrow ? tc("tomorrow") : formatDate(e.date), timeRange(e), e.place].filter(Boolean).join(" · ")}
+                    {[e.date === today ? tc("today") : e.date === tomorrow ? tc("tomorrow") : formatDate(e.date), timeRange(e)].filter(Boolean).join(" · ")}
+                    {e.place ? (
+                      <>
+                        {" · "}
+                        <span data-user-content>{e.place}</span>
+                      </>
+                    ) : null}
                   </span>
                 </span>
                 <span className={cn("hidden shrink-0 rounded-lg px-2 py-1 text-[11px] font-bold @md:inline", KIND_STYLE[e.kind])}>{t(`kinds.${e.kind}`)}</span>
@@ -67,10 +73,15 @@ async function BirthdaysWeek({ ctx }: { ctx: KgContext }) {
               <Cake className="size-4" aria-hidden />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate font-semibold">{b.full_name}</span>
+              <span data-user-content className="block truncate font-semibold">{b.full_name}</span>
               <span className="block truncate text-[13px] text-muted">
                 {b.kind === "child" ? t("turnsChild", { age: b.age ?? 0 }) : t("staffBirthday")}
-                {b.group_name ? ` · ${b.group_name}` : ""}
+                {b.group_name ? (
+  <>
+    {" · "}
+    <span data-user-content>{b.group_name}</span>
+  </>
+) : null}
               </span>
             </span>
             <span className="shrink-0 text-[13px] font-semibold text-muted">{b.day === today ? tc("today") : formatDate(b.day).slice(0, 5)}</span>

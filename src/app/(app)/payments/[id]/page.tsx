@@ -65,7 +65,13 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         title={<span data-testid="invoice-title">{t("invoiceTitle", { month: monthPhrase(t, inv.period) })}</span>}
         description={
           <span className="inline-flex flex-wrap items-center gap-2">
-            {isParent ? child.full_name : <Link href={`/children/${child.id}`} className="font-semibold text-text hover:text-brand">{child.full_name}</Link>}
+            {isParent ? (
+              <span data-user-content>{child.full_name}</span>
+            ) : (
+              <Link href={`/children/${child.id}`} className="inline-flex min-h-11 items-center font-semibold text-text hover:text-brand">
+                <span data-user-content>{child.full_name}</span>
+              </Link>
+            )}
             {child.status === "archived" ? <Badge>{t("archived")}</Badge> : null}
           </span>
         }

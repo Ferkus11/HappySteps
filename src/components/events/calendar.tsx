@@ -125,7 +125,7 @@ export function EventsCalendar({
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-7 gap-1 lg:gap-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-border" role="grid" data-testid="calendar-grid">
+        <div className="grid grid-cols-7 gap-1 lg:gap-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-border" data-testid="calendar-grid">
           {weeks.flat().map((d, i) => {
             const info = byDay.get(d);
             const inMonth = d.slice(0, 7) === month;
@@ -139,16 +139,13 @@ export function EventsCalendar({
               <button
                 key={d}
                 type="button"
-                role="gridcell"
-                aria-selected={isSel}
-                aria-label={`${formatDate(d)}${items ? ` · ${t("itemsCount", { count: items })}` : ""}${info?.off ? ` · ${info.off.name}` : ""}`}
+                aria-pressed={isSel}
                 onClick={() => setDay(d)}
                 data-testid={`day-${d}`}
                 className={cn(
                   "relative flex min-h-12 cursor-pointer flex-col items-center rounded-xl p-1 text-left transition-colors lg:min-h-28 lg:items-stretch lg:rounded-none lg:border-r lg:border-b lg:border-border lg:p-1.5",
                   i % 7 === 6 && "lg:border-r-0",
                   i >= weeks.length * 7 - 7 && "lg:border-b-0",
-                  !inMonth && "opacity-40",
                   info?.off ? "bg-tile-unmarked/60" : "lg:bg-surface",
                   isSel ? "ring-2 ring-text ring-inset lg:ring-2" : "hover:bg-surface-muted",
                 )}
@@ -156,10 +153,22 @@ export function EventsCalendar({
                 <span
                   className={cn(
                     "grid size-7 shrink-0 place-items-center rounded-full text-sm font-bold",
-                    isToday ? "bg-text text-white" : weekend || info?.off ? "text-tile-unmarked-fg" : "text-text",
+                    isToday ? "bg-text text-white" : !inMonth ? "font-medium text-faint" : weekend || info?.off ? "text-tile-unmarked-fg" : "text-text",
                   )}
+                  aria-hidden
                 >
                   {dayNum}
+                </span>
+                {/* The button's name: the full date, how many entries, the day off (the chips below add the titles). */}
+                <span className="sr-only">
+                  {formatDate(d)}
+                  {items ? ` · ${t("itemsCount", { count: items })}` : ""}
+                  {info?.off ? (
+                    <>
+                      {" · "}
+                      <span data-user-content>{info.off.name}</span>
+                    </>
+                  ) : null}
                 </span>
                 {/* phone: dots */}
                 <span className="mt-0.5 flex h-1.5 gap-0.5 lg:hidden" aria-hidden>
@@ -168,11 +177,11 @@ export function EventsCalendar({
                 </span>
                 {/* desktop: chips */}
                 <span className="mt-1 hidden min-w-0 flex-col gap-0.5 lg:flex">
-                  {info?.off ? <span className="truncate text-[11px] font-semibold text-tile-unmarked-fg">{info.off.name}</span> : null}
+                  {info?.off ? <span data-user-content className="truncate text-[11px] font-semibold text-tile-unmarked-fg">{info.off.name}</span> : null}
                   {info?.events.slice(0, 2).map((e) => (
                     <span key={e.id} className={cn("truncate rounded-md px-1.5 py-0.5 text-[11px] font-semibold", KIND_STYLE[e.kind])} data-testid="calendar-event">
                       {e.start_time ? `${e.start_time} ` : ""}
-                      {e.title}
+                      <span data-user-content>{e.title}</span>
                     </span>
                   ))}
                   {info?.birthdays.slice(0, 2).map((b) => (
@@ -259,7 +268,7 @@ function DayList({ info, onOpen }: { info: { events: CalEvent[]; birthdays: CalB
     <ul className="space-y-2" data-testid="day-items">
       {info.off ? (
         <li className="flex min-h-11 items-center gap-2 rounded-xl bg-tile-unmarked px-3 text-sm font-semibold text-tile-unmarked-fg">
-          <CalendarDays className="size-4" aria-hidden /> {t("dayOff")}: {info.off.name}
+          <CalendarDays className="size-4" aria-hidden /> {t("dayOff")}: <span data-user-content>{info.off.name}</span>
         </li>
       ) : null}
       {info.events.map((e) => (
@@ -271,10 +280,15 @@ function DayList({ info, onOpen }: { info: { events: CalEvent[]; birthdays: CalB
         <li key={`${b.kind}-${b.person_id}`} className="flex min-h-11 items-center gap-3 rounded-xl bg-brand-soft px-3 py-2 text-sm" data-testid="birthday-item">
           <Cake className="size-4 shrink-0 text-brand" aria-hidden />
           <span className="min-w-0 flex-1">
-            <span className="block truncate font-semibold">{b.full_name}</span>
+            <span data-user-content className="block truncate font-semibold">{b.full_name}</span>
             <span className="block text-[13px] text-muted">
               {b.kind === "child" ? t("turnsChild", { age: b.age ?? 0 }) : t("staffBirthday")}
-              {b.group_name ? ` · ${b.group_name}` : ""}
+              {b.group_name ? (
+  <>
+    {" · "}
+    <span data-user-content>{b.group_name}</span>
+  </>
+) : null}
             </span>
           </span>
         </li>
@@ -296,9 +310,17 @@ export function EventRow({ e, onOpen, showDate, today }: { e: CalEvent; onOpen: 
     >
       <span className={cn("w-1 shrink-0 rounded-full", KIND_DOT[e.kind])} aria-hidden />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-bold">{e.title}</span>
+        <span data-user-content className="block truncate text-sm font-bold">{e.title}</span>
         {when || e.start_time ? <span className="block truncate text-[13px] text-muted">{[when, timeRange(e)].filter(Boolean).join(" · ")}</span> : null}
-        <span className="block truncate text-[13px] text-faint">{[t(`kinds.${e.kind}`), e.place].filter(Boolean).join(" · ")}</span>
+        <span className="block truncate text-[13px] text-faint">
+          {t(`kinds.${e.kind}`)}
+          {e.place ? (
+            <>
+              {" · "}
+              <span data-user-content>{e.place}</span>
+            </>
+          ) : null}
+        </span>
       </span>
     </button>
   );
@@ -324,14 +346,14 @@ function EventDetails({ event, onClose, targets }: { event: CalEvent | null; onC
             ) : null}
             {e.place ? (
               <p className="flex items-center gap-2">
-                <MapPin className="size-4 text-faint" aria-hidden /> {e.place}
+                <MapPin className="size-4 text-faint" aria-hidden /> <span data-user-content>{e.place}</span>
               </p>
             ) : null}
             <p className="flex items-center gap-2">
               <UsersRound className="size-4 text-faint" aria-hidden />
-              {e.audience === "groups" ? e.groups.map((g) => g.name).join(", ") : ta(`audiences.${e.audience}`)}
+              {e.audience === "groups" ? <span data-user-content>{e.groups.map((g) => g.name).join(", ")}</span> : ta(`audiences.${e.audience}`)}
             </p>
-            {e.description ? <p className="whitespace-pre-wrap text-text">{e.description}</p> : null}
+            {e.description ? <p data-user-content className="whitespace-pre-wrap text-text">{e.description}</p> : null}
             {e.kind === "day_off" ? <Badge tone="lavender">{t("kinds.day_off")}</Badge> : null}
           </div>
           {e.manageable && targets ? (

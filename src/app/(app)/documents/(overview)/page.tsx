@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { todayIn } from "@/lib/format";
 import { canUploadStaffDocs, listChildDocuments, listStaffDocuments } from "@/lib/documents";
-import { ChildFolder, FolderLink, StaffFolder } from "@/components/documents/folders";
+import { ChildFolder, FolderLink, StaffFolder, withGroup } from "@/components/documents/folders";
 import { ExpiryBadge } from "@/components/documents/expiry-badge";
 
 export async function generateMetadata() {
@@ -120,7 +120,7 @@ async function GroupChildren({ ctx }: { ctx: KgContext }) {
               <FolderLink
                 href={`/documents/child/${k.id}`}
                 title={k.full_name}
-                subtitle={[gName.get(k.group_id), t("count", { count: docs.filter((d) => d.childId === k.id).length })].filter(Boolean).join(" · ")}
+                subtitle={withGroup(gName.get(k.group_id), t("count", { count: docs.filter((d) => d.childId === k.id).length }))}
                 testId={`child-row-${k.id}`}
               />
             </li>
@@ -139,7 +139,7 @@ function TabLink({ href, active, children, testId }: { href: string; active: boo
       href={href}
       data-testid={testId}
       aria-current={active ? "page" : undefined}
-      className={cn("flex h-10 items-center rounded-xl px-4 text-sm font-semibold", active ? "bg-surface text-text shadow-sm" : "text-muted")}
+      className={cn("flex h-10 pointer-coarse:h-11 items-center rounded-xl px-4 text-sm font-semibold", active ? "bg-surface text-text shadow-sm" : "text-muted")}
     >
       {children}
     </Link>
@@ -174,12 +174,12 @@ async function ChildrenOverview({ ctx, q }: { ctx: KgContext; q?: string }) {
   const count = (id: string) => docs.filter((d) => d.childId === id).length;
   return (
     <Card className="p-0">
-      <form action="/documents" className="flex gap-2 p-4 md:p-5" role="search">
+      <form action="/documents" className="flex gap-2 p-4 md:p-5" role="search" aria-label={t("search")}>
         <label htmlFor="doc-search" className="sr-only">
           {t("search")}
         </label>
         <Input id="doc-search" name="q" defaultValue={query} placeholder={t("searchPlaceholder")} data-testid="doc-search" />
-        <Button type="submit" variant="outline" size="icon" aria-label={t("search")}>
+        <Button type="submit" variant="outline" size="icon" className="shrink-0" aria-label={t("search")}>
           <Search />
         </Button>
       </form>
@@ -192,7 +192,7 @@ async function ChildrenOverview({ ctx, q }: { ctx: KgContext; q?: string }) {
                 <FolderLink
                   href={`/documents/child/${k.id}`}
                   title={k.full_name}
-                  subtitle={groups.find((g) => g.id === k.group_id)?.name ?? t("noGroup")}
+                  subtitle={withGroup(groups.find((g) => g.id === k.group_id)?.name, t("noGroup"), true)}
                   right={<Badge tone={n ? "sky" : "neutral"}>{t("count", { count: n })}</Badge>}
                   testId={`child-row-${k.id}`}
                 />
@@ -242,7 +242,7 @@ async function StaffOverview({ ctx, filter, base }: { ctx: KgContext; filter?: s
                 <FolderLink
                   href={`/documents/staff/${d.userId}`}
                   title={d.personName}
-                  subtitle={d.title}
+                  subtitle={<span data-user-content>{d.title}</span>}
                   right={<ExpiryBadge expiresOn={d.expiresOn} today={today} />}
                   testId={`expiring-row-${d.id}`}
                 />

@@ -41,7 +41,7 @@ async function WaitlistWidget({ ctx }: { ctx: KgContext }) {
               <li key={a.id}>
                 <Link href={`/waitlist/${a.id}`} className="flex min-h-11 items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-surface-muted" data-testid="waitlist-widget-row">
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold">{a.child_name}</span>
+                    <span data-user-content className="block truncate text-sm font-semibold">{a.child_name}</span>
                     <span className="block text-xs text-faint">{formatDate(a.created_at, ctx.settings.timezone)}</span>
                   </span>
                   <WaitlistStatusBadge status={a.status} />

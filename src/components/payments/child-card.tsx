@@ -32,7 +32,7 @@ export async function ChildPaymentCard({ ctx, childId }: { ctx: KgContext; child
         <InvoiceStatusBadge status={status} className="shrink-0" />
       </div>
       <p className="mt-3 text-sm text-muted">
-        <Link href={href} className="hover:text-brand">
+        <Link href={href} className="-my-2.5 inline-flex min-h-11 items-center hover:text-brand">
           {monthLabel(t, inv.period)} · {t("payUntil", { date: formatDate(inv.due_date) })}
         </Link>
       </p>

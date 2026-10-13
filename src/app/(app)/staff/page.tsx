@@ -37,10 +37,10 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
         actions={canAdd ? <AddStaffButton roles={allowedRoles} groups={groups.map((g) => ({ id: g.id, name: g.name }))} /> : null}
       />
       <div className="mb-4 inline-flex gap-1 rounded-2xl bg-surface-muted p-1">
-        <Link href="/staff" className={`flex h-10 items-center rounded-xl px-4 text-sm font-semibold ${!archive ? "bg-surface shadow-sm" : "text-muted"}`}>
+        <Link href="/staff" className={`flex h-10 pointer-coarse:h-11 items-center rounded-xl px-4 text-sm font-semibold ${!archive ? "bg-surface shadow-sm" : "text-muted"}`}>
           {t("active")}
         </Link>
-        <Link href="/staff?tab=archive" className={`flex h-10 items-center rounded-xl px-4 text-sm font-semibold ${archive ? "bg-surface shadow-sm" : "text-muted"}`}>
+        <Link href="/staff?tab=archive" className={`flex h-10 pointer-coarse:h-11 items-center rounded-xl px-4 text-sm font-semibold ${archive ? "bg-surface shadow-sm" : "text-muted"}`}>
           {t("archive")}
         </Link>
       </div>
@@ -56,10 +56,15 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
                 <Link href={`/staff/${p.userId}`} className="flex min-h-16 items-center gap-3 px-4 py-3 hover:bg-surface-muted md:px-5" data-testid={`staff-${p.phone}`}>
                   <Avatar name={p.fullName} />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-bold">{p.fullName}</div>
+                    <div data-user-content className="truncate font-bold">{p.fullName}</div>
                     <div className="truncate text-sm text-muted">
                       {formatPhone(p.phone)}
-                      {p.groups.length ? ` · ${p.groups.map((g) => g.name).join(", ")}` : ""}
+                      {p.groups.length ? (
+                        <>
+                          {" · "}
+                          <span data-user-content>{p.groups.map((g) => g.name).join(", ")}</span>
+                        </>
+                      ) : null}
                     </div>
                   </div>
                   <div className="hidden flex-wrap justify-end gap-1.5 sm:flex">

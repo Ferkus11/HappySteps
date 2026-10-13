@@ -33,7 +33,8 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   if (sp.to) q = q.lte("created_at", `${sp.to}T23:59:59+05:00`);
   const [{ data: rows }, staff] = await Promise.all([q, listStaff(supabase, ctx.kg.id)]);
   const names = new Map(staff.map((p) => [p.userId, p.fullName]));
-  const prefixes = ["account", "child", "guardian", "group", "worktime", "attendance", "receipt", "invoice", "chat", "kindergarten"];
+  const sections = t.raw("sections") as Record<string, string>;
+  const prefixes = Object.keys(sections);
   // Keys contain dots ("worktime.edit"), which next-intl would read as a path — look them up in the raw map.
   const labels = t.raw("actions") as Record<string, string>;
   const actionLabel = (a: string) => labels[a] ?? a;
@@ -48,20 +49,20 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
             <option value="">{t("allActions")}</option>
             {prefixes.map((p) => (
               <option key={p} value={p}>
-                {p}
+                {sections[p]}
               </option>
             ))}
           </Select>
           <Select name="actor" defaultValue={sp.actor ?? ""} aria-label={t("actor")}>
             <option value="">{t("allActors")}</option>
             {staff.map((p) => (
-              <option key={p.userId} value={p.userId}>
+              <option data-user-content key={p.userId} value={p.userId}>
                 {p.fullName}
               </option>
             ))}
           </Select>
-          <Input type="date" name="from" defaultValue={sp.from} aria-label="from" />
-          <Input type="date" name="to" defaultValue={sp.to} aria-label="to" />
+          <Input type="date" name="from" defaultValue={sp.from} aria-label={t("fromDate")} />
+          <Input type="date" name="to" defaultValue={sp.to} aria-label={t("toDate")} />
           <Button type="submit" variant="secondary">
             {t("filter")}
           </Button>
@@ -80,10 +81,10 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                 <span className="min-w-0">
                   <span className="font-semibold">{actionLabel(r.action)}</span>
                   {r.details && Object.keys(r.details).length ? (
-                    <span className="block truncate text-xs text-faint">{summarize(r.details as Record<string, unknown>, names)}</span>
+                    <span className="block truncate text-xs text-faint" data-user-content>{summarize(r.details as Record<string, unknown>, names)}</span>
                   ) : null}
                 </span>
-                <span className="truncate text-sm">{r.actor_id ? (names.get(r.actor_id) ?? "—") : t("system")}</span>
+                <span className="truncate text-sm" data-user-content={r.actor_id ? "" : undefined}>{r.actor_id ? (names.get(r.actor_id) ?? "—") : t("system")}</span>
               </li>
             ))}
           </ul>

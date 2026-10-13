@@ -37,10 +37,10 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
         title={
           <span className="flex items-center gap-2.5">
             <span className="size-3.5 rounded-full" style={{ background: g.color }} aria-hidden />
-            {g.name}
+            <span data-user-content>{g.name}</span>
           </span>
         }
-        description={g.age_category ?? undefined}
+        description={g.age_category ? <span data-user-content>{g.age_category}</span> : undefined}
         actions={
           isAdmin ? (
             <>
@@ -62,7 +62,7 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
                 <li key={c.id}>
                   <Link href={`/children/${c.id}`} className="flex min-h-14 items-center gap-3 px-5 py-2.5 hover:bg-surface-muted">
                     <Avatar name={c.full_name} size={36} />
-                    <span className="min-w-0 flex-1 truncate font-semibold">{c.full_name}</span>
+                    <span data-user-content className="min-w-0 flex-1 truncate font-semibold">{c.full_name}</span>
                     <span className="text-sm text-muted">{tch("age", { count: ageOn(c.birth_date, today) })}</span>
                   </Link>
                 </li>
@@ -89,7 +89,7 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
               <ul className="space-y-2">
                 {g.teachers.map((x) => (
                   <li key={x.id} className="flex items-center gap-2.5 text-sm font-semibold">
-                    <Avatar name={x.name} size={32} /> {x.name}
+                    <Avatar name={x.name} size={32} /> <span data-user-content>{x.name}</span>
                   </li>
                 ))}
               </ul>
