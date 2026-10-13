@@ -1,0 +1,35 @@
+name: Demo seed (cloud)
+
+# Loads the demo garden «Happy Steps» into a hosted Supabase project (README → «Демо-данные в облаке»).
+# Manual only. Repository secrets: SUPABASE_SERVICE_ROLE_KEY, DEMO_PASSWORD (min 8 chars; GitHub masks it in logs).
+# The run deletes and recreates the demo garden (slug happy-steps) and the demo phones +7 707 0…; real data is untouched.
+on:
+  workflow_dispatch:
+    inputs:
+      supabase_url:
+        description: Supabase project URL
+        required: true
+        default: https://felxihtrajbaaqrmgrgk.supabase.co
+      confirm:
+        description: Type DEMO to confirm
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  seed:
+    if: ${{ inputs.confirm == 'DEMO' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:seed
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ inputs.supabase_url }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
