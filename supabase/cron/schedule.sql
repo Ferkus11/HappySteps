@@ -1,13 +1,20 @@
--- Happy Steps: расписание фоновых задач через pg_cron + pg_net (вместо Vercel Cron).
+-- Happy Steps: расписание фоновых задач через pg_cron + pg_net + Vault — ИСТОЧНИК ИСТИНЫ для расписания
+-- (DECISIONS.md D-036). docker/cron/crontab (свой сервер) повторяет его; совпадение проверяет
+-- tests/unit/deploy-config.test.ts.
 --
 -- ЭТО НЕ МИГРАЦИЯ. Файл лежит вне supabase/migrations и не применяется `supabase db push`.
--- Запустите его ОДИН раз в Supabase Dashboard → SQL Editor (или `psql "$SUPABASE_DB_URL" -f ...`),
--- предварительно заменив две строки-заглушки ниже. Повторный запуск безопасен: секреты обновятся,
--- задания перезапишутся (pg_cron обновляет задание с тем же именем).
+-- Запустите его в Supabase Dashboard → SQL Editor (или `psql "$SUPABASE_DB_URL" -f ...`),
+-- предварительно заменив две строки-заглушки ниже.
 --
--- Когда нужен: Vercel Hobby разрешает только ежедневные cron-задачи (DECISIONS.md D-021), а нашим
--- задачам нужен запуск каждые 5–15 минут. На Vercel Pro достаточно vercel.json — этот файл не нужен
--- (если запустить оба, задачи просто выполнятся дважды: они идемпотентны, но лучше выбрать одно).
+-- ФАЙЛ МОЖНО ЗАПУСКАТЬ ПОВТОРНО (например, после смены адреса приложения или CRON_SECRET, или когда в
+-- репозитории изменилось расписание): расширения и схема создаются через `if not exists`, секреты в Vault
+-- обновляются, функция пересоздаётся (`create or replace`), а задания с теми же именами перезаписываются
+-- (cron.schedule с существующим именем обновляет задание, дублей не будет).
+--
+-- Это планировщик по умолчанию для Vercel (на тарифе Hobby разрешены только ежедневные cron-задачи Vercel,
+-- а нашим задачам нужен запуск каждые 5–15 минут, D-021). На Vercel Pro можно вместо этого файла добавить
+-- блок `crons` в vercel.json — но НИКОГДА не оба сразу (задачи идемпотентны, но выполнялись бы дважды).
+-- Перешли на vercel.json — отключите задания этого файла (см. «Отключить всё» ниже).
 --
 -- Где хранится секрет: в Supabase Vault (шифруется на диске, читается только ролью postgres).
 -- В тексте заданий cron секрета нет — он подставляется в момент вызова из vault.decrypted_secrets.
@@ -63,7 +70,7 @@ as $$
 $$;
 revoke all on function hs_cron.call(text) from public;
 
--- 3) Расписание — то же, что в vercel.json (время UTC).
+-- 3) Расписание (время UTC). Новый маршрут /api/cron/* — добавьте строку здесь и в docker/cron/crontab.
 select cron.schedule('hs-attendance-reminders', '*/15 * * * *', $$select hs_cron.call('/api/cron/attendance-reminders')$$);
 select cron.schedule('hs-event-reminders',      '5 * * * *',    $$select hs_cron.call('/api/cron/event-reminders')$$);
 select cron.schedule('hs-worktime-autoclose',   '*/15 * * * *', $$select hs_cron.call('/api/cron/worktime-autoclose')$$);

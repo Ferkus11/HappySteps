@@ -10,7 +10,8 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { useAction } from "@/hooks/use-action";
 import type { ScheduleItem } from "@/lib/clubs";
-import { removeClubPhotoAction, saveClubAction, uploadClubPhotoAction } from "@/app/(app)/clubs/actions";
+import { commitClubPhotoAction, prepareClubPhotoAction, removeClubPhotoAction, saveClubAction } from "@/app/(app)/clubs/actions";
+import { directUpload } from "@/lib/upload-client";
 
 export interface ClubFormValue {
   id: string;
@@ -62,9 +63,16 @@ export function ClubDialog({ teachers, club }: { teachers: { id: string; name: s
       if (!r?.ok) return;
       const id = r.data.id;
       if (file) {
-        const fd = new FormData();
-        fd.set("file", file);
-        const up = await uploadClubPhotoAction(id, fd);
+        // The photo goes straight to storage (D-035).
+        const up = await directUpload(
+          file,
+          (f) => prepareClubPhotoAction(id, f),
+          (ticket) => commitClubPhotoAction(id, ticket),
+          { tooLarge: "photoTooLarge" },
+        ).catch((e) => {
+          console.error(e);
+          return { ok: false as const, error: "generic" };
+        });
         if (!up.ok) toast.error(te.has(up.error) ? te(up.error) : te("generic"));
       }
       toast.success(t("saved"));

@@ -52,6 +52,7 @@ import {
   messagesByIdAction,
   olderMessagesAction,
   participantsAction,
+  prepareChatFileAction,
   sendMessageAction,
   setParentsCanWriteAction,
 } from "@/app/(app)/chats/actions";
@@ -59,6 +60,7 @@ import { ChatAvatar, useChatsFrame } from "./chats-frame";
 import { Composer, type Draft } from "./composer";
 import { subscribeAuthed, uniqueTopic } from "./realtime";
 import { useOfflineGuard } from "@/lib/pwa/offline-guard";
+import { directUpload } from "@/lib/upload-client";
 
 export interface ConversationProps {
   chat: {
@@ -429,14 +431,18 @@ export function Conversation(p: ConversationProps) {
       },
     }));
     setReplyTo(null);
-    const fd = new FormData();
-    fd.set("chatId", chatId);
-    fd.set("id", id);
-    fd.set("body", d.body);
-    if (d.replyTo) fd.set("replyTo", d.replyTo.id);
-    if (d.file) fd.set("file", d.file);
+    // A file goes straight from the browser to storage (D-035); the message is sent with its upload ticket.
+    const input = { chatId, id, body: d.body, replyTo: d.replyTo?.id ?? null };
     let networkFailed = false;
-    const r = await sendMessageAction(fd).catch((e) => {
+    const r = await (
+      d.file
+        ? directUpload(
+            d.file,
+            (f) => prepareChatFileAction(chatId, f),
+            (ticket) => sendMessageAction({ ...input, ticket }),
+          )
+        : sendMessageAction({ ...input, ticket: null })
+    ).catch((e) => {
       networkFailed = offline.failed(e);
       return null;
     });

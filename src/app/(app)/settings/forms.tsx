@@ -7,7 +7,8 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { useAction } from "@/hooks/use-action";
-import { saveDailySettingsAction, saveOwnerSettingsAction, uploadLogoAction } from "./actions";
+import { commitLogoAction, prepareLogoAction, saveDailySettingsAction, saveOwnerSettingsAction } from "./actions";
+import { directUpload } from "@/lib/upload-client";
 
 const ACCENTS = ["#C02A62", "#D6336C", "#1F6FAE", "#2E9E7A", "#7C6CD6", "#C2571A"];
 
@@ -87,6 +88,9 @@ export function DailySettings({
   );
 }
 
+/** Logo bytes go straight to storage (D-035); the actions check the owner role and the stored file. */
+const uploadLogo = (file: File) => directUpload(file, prepareLogoAction, commitLogoAction);
+
 export function OwnerSettings({
   value,
   logoUrl,
@@ -106,7 +110,7 @@ export function OwnerSettings({
   const [accent, setAccent] = React.useState(value.accentColor);
   const fileRef = React.useRef<HTMLInputElement>(null);
   const { run, pending, fieldError } = useAction(saveOwnerSettingsAction, { success: t("saved") });
-  const logo = useAction(uploadLogoAction, { success: t("saved") });
+  const logo = useAction(uploadLogo, { success: t("saved") });
   return (
     <Card>
       <CardHeader title={t("general")} />
@@ -154,9 +158,7 @@ export function OwnerSettings({
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (!file) return;
-              const fd = new FormData();
-              fd.set("file", file);
-              logo.run(fd);
+              logo.run(file);
               e.target.value = "";
             }}
           />

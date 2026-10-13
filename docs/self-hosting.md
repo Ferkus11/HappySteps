@@ -168,7 +168,7 @@ docker compose ps        # app — healthy, caddy и cron — running
   Если перед Caddy поставить ещё прокси (например, Cloudflare), в Caddy нужно указать его адреса как
   `trusted_proxies` и выставить `TRUSTED_PROXY_HOPS=2`.
 - **cron** — `alpine` + встроенный busybox `crond`, без установки пакетов. Расписание — `docker/cron/crontab`
-  (то же, что в `vercel.json`, время UTC), вызов — `docker/cron/call.sh`. Каждая попытка пишет строку в лог:
+  (то же, что в `supabase/cron/schedule.sql`, время UTC), вызов — `docker/cron/call.sh`. Каждая попытка пишет строку в лог:
   `docker compose logs -f cron` → `… ok /api/cron/push-deferred {"ok":true,…}` или `FAIL … 401`.
 
 Проверить cron вручную, не дожидаясь расписания:

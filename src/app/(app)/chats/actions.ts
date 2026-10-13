@@ -1,15 +1,17 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { kgAction, parse, check } from "@/lib/actions/safe";
 import { ActionError } from "@/lib/actions/result";
 import { audit } from "@/lib/audit";
 import { notify } from "@/lib/notify";
 import { createServiceClient } from "@/lib/supabase/service";
 import { zUuid } from "@/lib/validation";
-import { sniffMime } from "@/lib/documents-logic";
-import { CHAT_FILE_MAX, CHAT_FILE_TYPES, CHAT_TEXT_MAX, type ChatMessage, type ChatPerson, type ChatSummary } from "@/lib/chats-logic";
+import type { KgContext } from "@/lib/auth/context";
+import { commitUpload, prepareUpload, type PreparedUpload } from "@/lib/uploads";
+import type { DeclaredFile } from "@/lib/uploads-core";
+import { CHAT_TEXT_MAX, type ChatMessage, type ChatPerson, type ChatSummary } from "@/lib/chats-logic";
 import { MESSAGE_COLUMNS, loadChatList, loadMessages, loadParticipants, loadQuotes, toMessage, unreadTotal } from "@/lib/chats";
 
 const BUCKET = "chat-files";
@@ -19,55 +21,57 @@ const sendSchema = z.object({
   id: zUuid,
   body: z.string().max(CHAT_TEXT_MAX, "tooLong"),
   replyTo: zUuid.nullable(),
+  /** Upload ticket from prepareChatFileAction when the message carries a file (D-035). */
+  ticket: z.string().max(4096).nullable().default(null),
 });
+
+export type SendMessageInput = z.input<typeof sendSchema>;
 
 const preview = (s: string) => (s.length > 120 ? `${s.slice(0, 117)}…` : s);
 
+/** The chat must be in the current garden and writable by the user (can_write_chat: membership, lock, role). */
+async function writableChat(ctx: KgContext, supabase: SupabaseClient, chatId: string) {
+  const { data: chat } = await supabase.from("chats").select("id, kind, kindergarten_id, groups(name)").eq("id", chatId).eq("kindergarten_id", ctx.kg.id).maybeSingle();
+  if (!chat) throw new ActionError("forbidden");
+  const { data: canWrite } = await supabase.rpc("can_write_chat", { p_chat: chatId });
+  if (canWrite !== true) throw new ActionError("forbidden");
+  return chat;
+}
+
+const chatPrefix = (ctx: KgContext, chatId: string) => `${ctx.kg.id}/${chatId}/`;
+
+/** Step A of attaching a photo/PDF: permission + limits, then a signed upload URL for a server-chosen path. */
+export async function prepareChatFileAction(chatId: string, file: DeclaredFile) {
+  return kgAction(null, async (ctx, supabase): Promise<PreparedUpload> => {
+    zUuid.parse(chatId);
+    await writableChat(ctx, supabase, chatId);
+    const prefix = chatPrefix(ctx, chatId);
+    return prepareUpload("chat", ctx, { target: chatId, prefix, file, path: (ext, id) => `${prefix}${id}.${ext}` });
+  });
+}
+
 /**
- * Sends a message (text and/or one photo/PDF). The message row is inserted as the user (RLS decides
- * whether they may write here); the file goes to private storage and its row is written by the server.
+ * Sends a message (text and/or one photo/PDF already uploaded to storage with prepareChatFileAction). The
+ * message row is inserted as the user (RLS decides whether they may write here); the file is verified in
+ * storage and its row is written by the server.
  */
-export async function sendMessageAction(form: FormData) {
+export async function sendMessageAction(input: SendMessageInput) {
   return kgAction(null, async (ctx, supabase) => {
-    const replyRaw = String(form.get("replyTo") ?? "");
-    const v = parse(sendSchema, {
-      chatId: String(form.get("chatId") ?? ""),
-      id: String(form.get("id") ?? ""),
-      body: String(form.get("body") ?? ""),
-      replyTo: replyRaw || null,
-    });
+    const v = parse(sendSchema, input);
     const body = v.body.trim();
-    const file = form.get("file");
-    const hasFile = file instanceof File && file.size > 0;
-    if (!body && !hasFile) throw new ActionError("invalid");
-    let ext: string | undefined;
-    let mime: string | null = null;
-    if (hasFile) {
-      if (file.size > CHAT_FILE_MAX) throw new ActionError("fileTooLarge");
-      // Trust the bytes, not the browser's `file.type` (HEIC is converted to JPEG in the browser).
-      mime = sniffMime(new Uint8Array(await file.slice(0, 16).arrayBuffer()));
-      ext = mime ? CHAT_FILE_TYPES[mime] : undefined;
-      if (!mime || !ext) throw new ActionError("fileType");
-    }
-    const { data: chat } = await supabase.from("chats").select("id, kind, kindergarten_id, groups(name)").eq("id", v.chatId).eq("kindergarten_id", ctx.kg.id).maybeSingle();
-    if (!chat) throw new ActionError("forbidden");
-    const { data: canWrite } = await supabase.rpc("can_write_chat", { p_chat: v.chatId });
-    if (canWrite !== true) throw new ActionError("forbidden");
+    if (!body && !v.ticket) throw new ActionError("invalid");
+    const chat = await writableChat(ctx, supabase, v.chatId);
 
     const service = createServiceClient();
-    let path: string | null = null;
-    if (hasFile) {
-      path = `${ctx.kg.id}/${v.chatId}/${randomUUID()}.${ext}`;
-      const up = await service.storage.from(BUCKET).upload(path, file, { contentType: mime ?? undefined });
-      if (up.error) throw new ActionError("generic");
-    }
+    // Verifies the ticket and the stored object (size, real type); a bad object is removed.
+    const file = v.ticket ? await commitUpload("chat", ctx, v.ticket, { target: v.chatId, prefix: chatPrefix(ctx, v.chatId) }) : null;
     const ins = await supabase
       .from("messages")
       .insert({ id: v.id, kindergarten_id: ctx.kg.id, chat_id: v.chatId, author_id: ctx.userId, body, reply_to: v.replyTo })
       .select("id")
       .single();
     if (ins.error) {
-      if (path) await service.storage.from(BUCKET).remove([path]);
+      if (file) await service.storage.from(BUCKET).remove([file.path]);
       if (ins.error.code === "23505") {
         // A retry of a message that already went through (same client id): return it, notify nobody again.
         const { data: same } = await supabase.from("messages").select(MESSAGE_COLUMNS).eq("id", v.id).eq("author_id", ctx.userId).maybeSingle();
@@ -75,21 +79,21 @@ export async function sendMessageAction(form: FormData) {
       }
       check(ins);
     }
-    if (hasFile && path) {
+    if (file) {
       // Permission checked above (can_write_chat + RLS insert of the message); rows are written by the server only.
       const f = await service.from("message_files").insert({
         kindergarten_id: ctx.kg.id,
         chat_id: v.chatId,
         message_id: v.id,
-        kind: ext === "pdf" ? "pdf" : "photo",
-        path,
-        name: (file.name || `file.${ext}`).slice(0, 200),
-        mime,
+        kind: file.ext === "pdf" ? "pdf" : "photo",
+        path: file.path,
+        name: file.name,
+        mime: file.mime,
         size: file.size,
       });
       if (f.error) {
         console.error("message_files", f.error.message);
-        await service.storage.from(BUCKET).remove([path]);
+        if (f.error.code !== "23505") await service.storage.from(BUCKET).remove([file.path]);
       }
     }
 
@@ -111,7 +115,7 @@ export async function sendMessageAction(form: FormData) {
         type: "message.new",
         params: {
           from: groupName ? `${ctx.profile.full_name} · ${groupName}` : ctx.profile.full_name,
-          text: preview(body || (hasFile ? (file as File).name : "")),
+          text: preview(body || (file?.name ?? "")),
           // delete_chat_message() strips the text of this row when the message is removed
           message_id: v.id,
         },

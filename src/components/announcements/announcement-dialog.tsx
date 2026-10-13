@@ -14,13 +14,16 @@ import {
   createAnnouncementAction,
   removeAnnouncementFileAction,
   updateAnnouncementAction,
-  uploadAnnouncementFileAction,
+  commitAnnouncementFileAction,
+  prepareAnnouncementFileAction,
 } from "@/app/(app)/announcements/actions";
 import { AudienceFields, readAudience, type Audience, type TargetGroup } from "./audience-fields";
 import { useOfflineGuard } from "@/lib/pwa/offline-guard";
+import { directUpload } from "@/lib/upload-client";
+import { ANNOUNCEMENT_FILE_MAX, PHOTO_TYPES as PHOTO_MIME } from "@/lib/upload-limits";
 
-const MAX_FILE = 15 * 1024 * 1024;
-const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_FILE = ANNOUNCEMENT_FILE_MAX;
+const PHOTO_TYPES = Object.keys(PHOTO_MIME);
 const MAX_PER_KIND = 10;
 
 export interface AnnouncementFormValue {
@@ -106,10 +109,15 @@ export function AnnouncementDialog({
       if (failed(res) || !res.ok) return;
       const id = res.data.id;
       for (const fileId of removed) failed(await removeAnnouncementFileAction(fileId));
+      // Each file goes straight to storage (D-035), then its row is committed.
       for (const file of files) {
-        const fd = new FormData();
-        fd.set("file", file);
-        failed(await uploadAnnouncementFileAction(id, fd));
+        failed(
+          await directUpload(
+            file,
+            (f) => prepareAnnouncementFileAction(id, f),
+            (ticket) => commitAnnouncementFileAction(id, ticket),
+          ),
+        );
       }
       toast.success(announcement ? t("saved") : t("published"));
       setOpen(false);

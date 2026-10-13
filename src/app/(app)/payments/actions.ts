@@ -1,15 +1,17 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { KgContext } from "@/lib/auth/context";
+import { commitUpload, prepareUpload, type PreparedUpload } from "@/lib/uploads";
+import type { DeclaredFile } from "@/lib/uploads-core";
 import { kgAction, parse, check } from "@/lib/actions/safe";
 import { ActionError } from "@/lib/actions/result";
 import { memberIds, notify } from "@/lib/notify";
 import { createServiceClient } from "@/lib/supabase/service";
 import { signedUrl } from "@/lib/kg-assets";
 import { formatMoney } from "@/lib/format";
-import { RECEIPT_MAX_BYTES, RECEIPT_TYPES, periodOf, toPay } from "@/lib/payments";
-import { sniffMime } from "@/lib/documents-logic";
+import { periodOf, toPay } from "@/lib/payments";
 import { zMoney, zUuid } from "@/lib/validation";
 
 const BUCKET = "receipts";
@@ -46,43 +48,53 @@ export async function adjustInvoiceAction(id: string, input: z.input<typeof adju
   });
 }
 
-/** Parent uploads a receipt (photo/screenshot/PDF; HEIC is converted to JPEG in the browser). The type is taken
- * from the file's first bytes, never from the browser-provided `file.type`. */
-export async function uploadReceiptAction(invoiceId: string, form: FormData) {
+/** The invoice, visible to this parent (RLS: own children only) with an active guardian link (is_guardian). */
+async function parentInvoice(ctx: KgContext, supabase: SupabaseClient, invoiceId: string) {
+  const { data: inv } = await supabase
+    .from("invoices")
+    .select("id, child_id, period, carried, balance, children(full_name)")
+    .eq("id", invoiceId)
+    .eq("kindergarten_id", ctx.kg.id)
+    .maybeSingle();
+  if (!inv) throw new ActionError("notFound");
+  const { data: guardian } = await supabase.rpc("is_guardian", { c: inv.child_id });
+  if (guardian !== true) throw new ActionError("forbidden");
+  return inv;
+}
+
+/**
+ * Step A of a receipt upload (photo/screenshot/PDF; HEIC is converted to JPEG in the browser), D-035:
+ * permission, limits, signed upload URL for a server-chosen path in the child's folder.
+ */
+export async function prepareReceiptAction(invoiceId: string, file: DeclaredFile) {
+  return kgAction(["parent"], async (ctx, supabase): Promise<PreparedUpload> => {
+    zUuid.parse(invoiceId);
+    const inv = await parentInvoice(ctx, supabase, invoiceId);
+    const prefix = `${ctx.kg.id}/${inv.child_id}/`;
+    return prepareUpload("receipt", ctx, { target: invoiceId, prefix, file, path: (ext, id) => `${prefix}${id}.${ext}` });
+  });
+}
+
+/** Step C: re-checks the parent, verifies the stored file — the type is taken from its first bytes, never from
+ * the browser — writes the receipt row and tells the accountant (or the owner). */
+export async function commitReceiptAction(invoiceId: string, ticket: string) {
   return kgAction(["parent"], async (ctx, supabase) => {
     zUuid.parse(invoiceId);
-    const file = form.get("file");
-    if (!(file instanceof File) || file.size === 0) throw new ActionError("invalid");
-    if (file.size > RECEIPT_MAX_BYTES) throw new ActionError("fileTooLarge");
-    const mime = sniffMime(new Uint8Array(await file.slice(0, 16).arrayBuffer()));
-    const ext = mime ? RECEIPT_TYPES[mime] : undefined;
-    if (!mime || !ext) throw new ActionError("fileType");
-    // RLS shows a parent only invoices of own children; is_guardian double-checks the active parent link.
-    const { data: inv } = await supabase
-      .from("invoices")
-      .select("id, child_id, period, carried, balance, children(full_name)")
-      .eq("id", invoiceId)
-      .eq("kindergarten_id", ctx.kg.id)
-      .maybeSingle();
-    if (!inv) throw new ActionError("notFound");
-    const { data: guardian } = await supabase.rpc("is_guardian", { c: inv.child_id });
-    if (guardian !== true) throw new ActionError("forbidden");
-    const path = `${ctx.kg.id}/${inv.child_id}/${randomUUID()}.${ext}`;
+    const inv = await parentInvoice(ctx, supabase, invoiceId);
+    const file = await commitUpload("receipt", ctx, ticket, { target: invoiceId, prefix: `${ctx.kg.id}/${inv.child_id}/` });
     const service = createServiceClient();
-    const up = await service.storage.from(BUCKET).upload(path, file, { contentType: mime });
-    if (up.error) throw new ActionError("generic");
     // Permission checked above; receipt rows are written by the server only.
     const ins = await service.from("payment_receipts").insert({
       kindergarten_id: ctx.kg.id,
       invoice_id: inv.id,
       child_id: inv.child_id,
       uploaded_by: ctx.userId,
-      file_path: path,
-      mime,
+      file_path: file.path,
+      mime: file.mime,
       size: file.size,
     });
     if (ins.error) {
-      await service.storage.from(BUCKET).remove([path]);
+      if (ins.error.code !== "23505") await service.storage.from(BUCKET).remove([file.path]);
       check(ins);
     }
     let staff = await memberIds(ctx.kg.id, ["accountant"]);

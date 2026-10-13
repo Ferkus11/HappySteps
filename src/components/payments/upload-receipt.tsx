@@ -6,7 +6,8 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { Loader2, Upload } from "lucide-react";
 import { Button, type ButtonProps } from "@/components/ui/button";
-import { uploadReceiptAction } from "@/app/(app)/payments/actions";
+import { commitReceiptAction, prepareReceiptAction } from "@/app/(app)/payments/actions";
+import { directUpload } from "@/lib/upload-client";
 import { RECEIPT_MAX_BYTES } from "@/lib/payments";
 import { prepareDocumentFile } from "@/lib/heic";
 import { cn } from "@/lib/utils";
@@ -47,9 +48,12 @@ export function UploadReceiptButton({
       // iPhone photos are HEIC: converted to JPEG here; the server checks the real type from the file's bytes.
       const file = await prepareDocumentFile(raw);
       if (file.size > RECEIPT_MAX_BYTES) throw new Error("fileTooLarge");
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await uploadReceiptAction(invoiceId, fd);
+      // The bytes go straight to storage (D-035); the server checks the stored file before writing the receipt.
+      const res = await directUpload(
+        file,
+        (f) => prepareReceiptAction(invoiceId, f),
+        (ticket) => commitReceiptAction(invoiceId, ticket),
+      );
       if (!res.ok) throw new Error(res.error);
       toast.success(t("uploaded"));
       router.refresh();

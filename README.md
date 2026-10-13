@@ -208,14 +208,16 @@ npx web-push generate-vapid-keys     # → Public Key = NEXT_PUBLIC_VAPID_PUBLIC
 4. **Settings → Functions → Function Region** — тот же регион, что у Supabase (Frankfurt = `fra1`): страницы откроются быстрее.
 5. **Deploy**. Проверка: `https://<проект>.vercel.app/api/health` → `{"ok":true}`, `/login` — экран входа.
 
-Ограничение Vercel: тело запроса к функции — не больше 4,5 МБ, поэтому файлы крупнее (документы до 15 МБ)
-на Vercel не загрузятся; на своём сервере этого ограничения нет.
+Файлы (документы, чеки, вложения чатов и объявлений до 15 МБ, фото, логотип) браузер загружает напрямую в
+Supabase Storage по подписанной ссылке на один файл, а не через функцию Vercel, поэтому ограничение Vercel на тело
+запроса (4,5 МБ) их не касается (DECISIONS.md D-035). Сервер проверяет права до загрузки и сам файл — после.
 
 ### 6. Фоновые задачи
 
 Напоминания о посещаемости, отложенные push, автозакрытие смен, начисление счетов и т. д. —
-см. [Фоновые задачи (cron)](#фоновые-задачи-cron). Коротко: **Vercel Pro** — ничего делать не надо;
-**Vercel Hobby** — уберите блок `crons` из `vercel.json` и выполните `supabase/cron/schedule.sql`.
+см. [Фоновые задачи (cron)](#фоновые-задачи-cron). Коротко: один раз выполните
+[`supabase/cron/schedule.sql`](supabase/cron/schedule.sql) в SQL Editor Supabase (pg_cron) — это работает на любом
+тарифе Vercel, включая Hobby.
 
 ### 7. Первый суперадмин и первый сад
 
@@ -265,16 +267,21 @@ npm run superadmin:create -- --phone "+7 701 000 00 00" --name "Имя Фами�
 | `/api/cron/invoices-accrue` | 01:00 | Счета за текущий месяц (начисление 1-го числа, в часовом поясе сада) |
 | `/api/cron/push-deferred` | каждые 5 мин | Отправка push, отложенных тихими часами |
 
-Источник расписания — [`vercel.json`](vercel.json); копии в `supabase/cron/schedule.sql` и `docker/cron/crontab`
-сверяет unit-тест `tests/unit/deploy-config.test.ts`. Где запускать:
+Источник расписания — [`supabase/cron/schedule.sql`](supabase/cron/schedule.sql) (pg_cron + pg_net + Vault,
+DECISIONS.md D-036); копию в `docker/cron/crontab` и то, что у каждого маршрута `/api/cron/*` есть задание, проверяет
+unit-тест `tests/unit/deploy-config.test.ts`. В `vercel.json` блока `crons` нет: Vercel Hobby разрешает только
+ежедневные задачи, и деплой с задачами каждые 5–15 минут не прошёл бы. Где запускать:
 
-- **Vercel Pro** — `vercel.json` работает как есть: Vercel сам добавляет `CRON_SECRET` в заголовок.
-- **Vercel Hobby** разрешает только ежедневные задачи, и деплой с частыми задачами не пройдёт (DECISIONS.md D-021).
-  1. Удалите блок `"crons": [...]` из `vercel.json` (закоммитьте — Vercel пересоберёт).
-  2. Supabase Dashboard → **SQL Editor** → вставьте [`supabase/cron/schedule.sql`](supabase/cron/schedule.sql),
-     замените в начале `https://app.example.kz` на адрес приложения и `REPLACE_WITH_CRON_SECRET` на `CRON_SECRET` → **Run**.
-     Расширения `pg_cron` и `pg_net` включаются самим скриптом. Секреты хранятся в **Supabase Vault**
-     (зашифрованы, в тексте заданий их нет). Проверка и отключение — в комментариях файла.
+- **Vercel + Supabase Cloud (по умолчанию, любой тариф Vercel)** — Supabase Dashboard → **SQL Editor** → вставьте
+  [`supabase/cron/schedule.sql`](supabase/cron/schedule.sql), замените в начале `https://app.example.kz` на адрес
+  приложения и `REPLACE_WITH_CRON_SECRET` на `CRON_SECRET` → **Run**. Расширения `pg_cron` и `pg_net` включаются самим
+  скриптом. Секреты хранятся в **Supabase Vault** (зашифрованы, в тексте заданий их нет). Файл можно запускать
+  повторно — например, после смены адреса или `CRON_SECRET`, или когда в репозитории изменилось расписание.
+  Проверка и отключение — в комментариях файла.
+- **Vercel Pro (по желанию)** — вместо pg_cron можно добавить в `vercel.json` блок `"crons"` с теми же маршрутами и
+  расписанием (Vercel сам передаёт `CRON_SECRET` в заголовке). **Никогда не включайте оба способа сразу**: перед
+  этим отключите задания pg_cron (`select cron.unschedule(jobname) from cron.job where jobname like 'hs-%';`).
+  Тест `deploy-config` сверит блок `crons` с `schedule.sql`.
 - **Свой сервер** — контейнер `cron` в `docker-compose.yml` (busybox crond + wget), см. [docs/self-hosting.md](docs/self-hosting.md).
 
 Проверить вручную: `curl -H "Authorization: Bearer <CRON_SECRET>" https://<адрес>/api/cron/push-deferred` → `{"ok":true,...}`.

@@ -1,7 +1,10 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { KgContext } from "@/lib/auth/context";
+import { commitUpload, prepareUpload, type PreparedUpload } from "@/lib/uploads";
+import type { DeclaredFile } from "@/lib/uploads-core";
 import { getTranslations } from "next-intl/server";
 import { kgAction, parse, check } from "@/lib/actions/safe";
 import { ActionError } from "@/lib/actions/result";
@@ -9,16 +12,7 @@ import { audit } from "@/lib/audit";
 import { createServiceClient } from "@/lib/supabase/service";
 import { zOptionalDate, zUuid } from "@/lib/validation";
 import { canUploadChildDocs, canUploadStaffDocs } from "@/lib/documents";
-import {
-  CHILD_BUCKET,
-  CHILD_CATEGORIES,
-  DOCUMENT_TYPES,
-  MAX_DOCUMENT_SIZE,
-  STAFF_BUCKET,
-  STAFF_DOC_TYPES,
-  sniffMime,
-  titleFromFileName,
-} from "@/lib/documents-logic";
+import { CHILD_BUCKET, CHILD_CATEGORIES, STAFF_BUCKET, STAFF_DOC_TYPES, titleFromFileName } from "@/lib/documents-logic";
 
 const zTitle = z
   .string()
@@ -26,72 +20,75 @@ const zTitle = z
   .optional()
   .transform((v) => (v && v.trim() ? v.trim() : null));
 
-const childSchema = z.object({ childId: zUuid, category: z.enum(CHILD_CATEGORIES), title: zTitle });
-const staffSchema = z.object({ userId: zUuid, type: z.enum(STAFF_DOC_TYPES), title: zTitle, expiresOn: zOptionalDate });
+const childSchema = z.object({ childId: zUuid, category: z.enum(CHILD_CATEGORIES), title: zTitle, ticket: z.string().max(4096) });
+const staffSchema = z.object({ userId: zUuid, type: z.enum(STAFF_DOC_TYPES), title: zTitle, expiresOn: zOptionalDate, ticket: z.string().max(4096) });
 
-/** Validates the uploaded file: size and the real type from its first bytes (HEIC is converted in the browser). */
-async function readFile(form: FormData): Promise<{ file: File; mime: string; ext: string }> {
-  const file = form.get("file");
-  if (!(file instanceof File) || file.size === 0) throw new ActionError("invalid");
-  if (file.size > MAX_DOCUMENT_SIZE) throw new ActionError("fileTooLarge");
-  const mime = sniffMime(new Uint8Array(await file.slice(0, 16).arrayBuffer()));
-  const ext = mime ? DOCUMENT_TYPES[mime] : undefined;
-  if (!mime || !ext) throw new ActionError("fileType");
-  return { file, mime, ext };
+export type ChildDocumentInput = z.input<typeof childSchema>;
+export type StaffDocumentInput = z.input<typeof staffSchema>;
+
+/** Allowed: the child's parents and owner/head (checked with the user's own client — `child_docs_can_upload`). */
+async function assertChildUpload(ctx: KgContext, supabase: SupabaseClient, childId: string) {
+  const { data: child } = await supabase.from("children").select("id").eq("id", childId).eq("kindergarten_id", ctx.kg.id).maybeSingle();
+  if (!child || !(await canUploadChildDocs(supabase, childId))) throw new ActionError("forbidden");
 }
 
-const str = (form: FormData, k: string) => {
-  const v = form.get(k);
-  return typeof v === "string" ? v : undefined;
-};
+/** Step A of a child document upload (D-035): permission, limits, signed upload URL in the child's folder. */
+export async function prepareChildDocumentAction(childId: string, file: DeclaredFile) {
+  return kgAction(["owner", "head", "parent"], async (ctx, supabase): Promise<PreparedUpload> => {
+    zUuid.parse(childId);
+    await assertChildUpload(ctx, supabase, childId);
+    const prefix = `${ctx.kg.id}/${childId}/`;
+    return prepareUpload("childDocument", ctx, { target: childId, prefix, file, path: (ext, id) => `${prefix}${id}.${ext}` });
+  });
+}
 
 /**
- * Uploads one file into a child's folder. Allowed: the child's parents and owner/head (checked here with the
- * user's own client — `child_docs_can_upload` — before the service role writes the object and the row).
+ * Step C: re-checks permission, verifies the stored file (size and the real type from its first bytes; HEIC is
+ * converted in the browser) and writes the row (server only).
  */
-export async function uploadChildDocumentAction(form: FormData) {
+export async function commitChildDocumentAction(input: ChildDocumentInput) {
   return kgAction(["owner", "head", "parent"], async (ctx, supabase) => {
-    const v = parse(childSchema, { childId: str(form, "childId"), category: str(form, "category"), title: str(form, "title") });
-    const { data: child } = await supabase.from("children").select("id").eq("id", v.childId).eq("kindergarten_id", ctx.kg.id).maybeSingle();
-    if (!child || !(await canUploadChildDocs(supabase, v.childId))) throw new ActionError("forbidden");
-    const { file, mime, ext } = await readFile(form);
+    const v = parse(childSchema, input);
+    await assertChildUpload(ctx, supabase, v.childId);
+    const file = await commitUpload("childDocument", ctx, v.ticket, { target: v.childId, prefix: `${ctx.kg.id}/${v.childId}/` });
     const t = await getTranslations("documents");
     const title = v.title ?? (titleFromFileName(file.name) || t(`categories.${v.category}`));
-    const path = `${ctx.kg.id}/${v.childId}/${randomUUID()}.${ext}`;
     const service = createServiceClient();
-    const up = await service.storage.from(CHILD_BUCKET).upload(path, file, { contentType: mime });
-    if (up.error) throw new ActionError("generic");
     // Permission checked above; rows are written by the server only.
     const ins = await service
       .from("child_documents")
-      .insert({ kindergarten_id: ctx.kg.id, child_id: v.childId, category: v.category, title, path, mime, size: file.size, uploaded_by: ctx.userId })
+      .insert({ kindergarten_id: ctx.kg.id, child_id: v.childId, category: v.category, title, path: file.path, mime: file.mime, size: file.size, uploaded_by: ctx.userId })
       .select("id")
       .single();
     if (ins.error) {
-      await service.storage.from(CHILD_BUCKET).remove([path]);
+      if (ins.error.code !== "23505") await service.storage.from(CHILD_BUCKET).remove([file.path]);
       check(ins);
     }
     return { id: ins.data!.id as string };
   });
 }
 
-/** Uploads one staff document: the employee themself or owner/head (`staff_docs_can_upload`). */
-export async function uploadStaffDocumentAction(form: FormData) {
-  return kgAction(["owner", "head", "accountant", "teacher", "club_teacher", "cook"], async (ctx, supabase) => {
-    const v = parse(staffSchema, {
-      userId: str(form, "userId"),
-      type: str(form, "type"),
-      title: str(form, "title"),
-      expiresOn: str(form, "expiresOn"),
-    });
+const STAFF_ROLES = ["owner", "head", "accountant", "teacher", "club_teacher", "cook"] as const;
+
+/** Step A of a staff document upload: the employee themself or owner/head (`staff_docs_can_upload`). */
+export async function prepareStaffDocumentAction(userId: string, file: DeclaredFile) {
+  return kgAction([...STAFF_ROLES], async (ctx, supabase): Promise<PreparedUpload> => {
+    zUuid.parse(userId);
+    if (!(await canUploadStaffDocs(supabase, ctx.kg.id, userId))) throw new ActionError("forbidden");
+    const prefix = `${ctx.kg.id}/${userId}/`;
+    return prepareUpload("staffDocument", ctx, { target: userId, prefix, file, path: (ext, id) => `${prefix}${id}.${ext}` });
+  });
+}
+
+/** Step C of a staff document upload: re-check, verify the stored file, write the row. */
+export async function commitStaffDocumentAction(input: StaffDocumentInput) {
+  return kgAction([...STAFF_ROLES], async (ctx, supabase) => {
+    const v = parse(staffSchema, input);
     if (!(await canUploadStaffDocs(supabase, ctx.kg.id, v.userId))) throw new ActionError("forbidden");
-    const { file, mime, ext } = await readFile(form);
+    const file = await commitUpload("staffDocument", ctx, v.ticket, { target: v.userId, prefix: `${ctx.kg.id}/${v.userId}/` });
     const t = await getTranslations("documents");
     const title = v.title ?? t(`types.${v.type}`);
-    const path = `${ctx.kg.id}/${v.userId}/${randomUUID()}.${ext}`;
     const service = createServiceClient();
-    const up = await service.storage.from(STAFF_BUCKET).upload(path, file, { contentType: mime });
-    if (up.error) throw new ActionError("generic");
     const ins = await service
       .from("staff_documents")
       .insert({
@@ -100,15 +97,15 @@ export async function uploadStaffDocumentAction(form: FormData) {
         type: v.type,
         title,
         expires_on: v.expiresOn,
-        path,
-        mime,
+        path: file.path,
+        mime: file.mime,
         size: file.size,
         uploaded_by: ctx.userId,
       })
       .select("id")
       .single();
     if (ins.error) {
-      await service.storage.from(STAFF_BUCKET).remove([path]);
+      if (ins.error.code !== "23505") await service.storage.from(STAFF_BUCKET).remove([file.path]);
       check(ins);
     }
     return { id: ins.data!.id as string };
