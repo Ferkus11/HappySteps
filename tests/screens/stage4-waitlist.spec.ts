@@ -33,7 +33,7 @@ test("waitlist · public form (ru, thank you, kk, not found)", async ({ page }) 
   await snap(page, S, "waitlist-public-form");
 
   await page.getByTestId("apply-submit").click();
-  await page.getByRole("alert").first().waitFor();
+  await page.getByTestId("apply-error").waitFor();
   await snap(page, S, "waitlist-public-errors");
 
   await page.goto("/apply/e2e-a");

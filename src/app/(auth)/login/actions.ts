@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import { clientIp } from "@/lib/client-ip";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { serverEnv } from "@/lib/env";
@@ -24,7 +25,8 @@ export async function loginAction(_prev: LoginState, form: FormData): Promise<Lo
   if (password.length < 8) return { error: "invalidCredentials", phone: rawPhone };
 
   const h = await headers();
-  const ip = (h.get("x-forwarded-for") ?? "").split(",")[0]?.trim() || "local";
+  // Unknown IP (no trusted proxy header) → one shared bucket; the per-phone limit still applies.
+  const ip = clientIp(h) ?? "unknown";
   const service = createServiceClient();
 
   // Rate limit: max 5 failed attempts per phone (or per IP x5) in 15 minutes.

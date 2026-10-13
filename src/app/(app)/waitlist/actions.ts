@@ -4,15 +4,17 @@ import { z } from "zod";
 import { kgAction, parse, check } from "@/lib/actions/safe";
 import { ActionError } from "@/lib/actions/result";
 import { audit } from "@/lib/audit";
-import { groupOverCapacity, insertChild, linkParent, type ParentInviteResult } from "@/lib/children";
-import { applicationSchema, MANUAL_STATUSES, birthDateOk } from "@/lib/waitlist";
+import { groupOverCapacity, type ParentInviteResult } from "@/lib/children";
+import { createInvite, findOrCreateUser, type InviteLink } from "@/lib/people";
+import { createServiceClient } from "@/lib/supabase/service";
+import { applicationSchema, MANUAL_STATUSES, birthDateOk, type ApplicationInput } from "@/lib/waitlist";
 import { zDate, zMoney, zName, zPhone, zUuid } from "@/lib/validation";
 import { todayIn } from "@/lib/format";
 
 /** «Добавить заявку» — the administration adds an application by hand (RLS: owner/head). */
-export async function createApplicationAction(input: z.input<typeof applicationSchema>) {
+export async function createApplicationAction(input: ApplicationInput) {
   return kgAction(["owner", "head"], async (ctx, supabase) => {
-    const v = parse(applicationSchema, input);
+    const v = parse(applicationSchema(todayIn(ctx.settings.timezone)), input);
     const row = check(
       await supabase
         .from("waitlist_applications")
@@ -86,8 +88,12 @@ export type AcceptResult =
 
 /**
  * «Принять»: creates the child card in the chosen group and the parent's account with an invite, links them
- * and marks the application «Принята» — one click, safe against double clicks and two admins at once
- * (waitlist_begin_accept claims the application first).
+ * and marks the application «Принята» — one click, safe against double clicks and two admins at once.
+ *
+ * waitlist_begin_accept claims the application (token); only the parent's auth account is created outside the
+ * database (service role). Membership, child, guardian link, status and audit happen in one transaction inside
+ * waitlist_accept (which checks the caller, the claim and the group). On failure the claim is released and an
+ * auth account created by this very call is deleted again — nothing else can be left half-done.
  */
 export async function acceptApplicationAction(id: string, input: z.input<typeof acceptSchema>) {
   return kgAction<AcceptResult>(["owner", "head"], async (ctx, supabase) => {
@@ -106,33 +112,68 @@ export async function acceptApplicationAction(id: string, input: z.input<typeof 
       const over = await groupOverCapacity(supabase, v.groupId);
       if (over) return { needsConfirm: over };
     }
+    const { data: mayAddParent } = await supabase.rpc("can_manage_role", { kg: ctx.kg.id, target: "parent" });
+    if (!mayAddParent) throw new ActionError("forbidden");
 
-    const claim = check(await supabase.rpc("waitlist_begin_accept", { p_app: id })) as "ok" | "accepted" | "busy";
-    if (claim === "accepted") {
-      const { data: done } = await supabase.from("waitlist_applications").select("child_id").eq("id", id).single();
-      return { childId: done?.child_id ?? null, invites: [], already: true };
-    }
-    if (claim === "busy") throw new ActionError("waitlistBusy");
+    const claim = check(await supabase.rpc("waitlist_begin_accept", { p_app: id })) as
+      | { state: "ok"; token: string }
+      | { state: "accepted"; child_id: string | null }
+      | { state: "busy" };
+    if (claim.state === "accepted") return { childId: claim.child_id, invites: [], already: true };
+    if (claim.state === "busy") throw new ActionError("waitlistBusy");
 
-    let childId: string | null = null;
+    let createdUserId: string | null = null;
     try {
-      childId = await insertChild(supabase, ctx.kg.id, {
-        fullName: v.childName,
-        birthDate: v.childBirthDate,
-        groupId: v.groupId,
-        enrolledOn: v.enrolledOn,
-        monthlyFee: v.monthlyFee,
-        allergies: null,
-        medicalNotes: null,
-      });
-      const parent = await linkParent(supabase, ctx.userId, ctx.kg.id, childId, { fullName: v.parentName, phone: v.parentPhone, relation: null });
-      check(await supabase.rpc("waitlist_finish_accept", { p_app: id, p_child: childId, p_parent: parent.userId }));
-      return { childId, invites: [{ name: parent.name, existed: parent.existed, invite: parent.invite }], already: false };
+      const parent = await findOrCreateUser(v.parentName, v.parentPhone);
+      if (!parent.existed) createdUserId = parent.userId;
+      const childId = check(
+        await supabase.rpc("waitlist_accept", {
+          p_app: id,
+          p_token: claim.token,
+          p_child_name: v.childName,
+          p_birth: v.childBirthDate,
+          p_group: v.groupId,
+          p_enrolled: v.enrolledOn,
+          p_fee: v.monthlyFee,
+          p_parent: parent.userId,
+          p_parent_new: !parent.existed,
+        }),
+      ) as string;
+      createdUserId = null; // linked now — it stays
+      // The invite is created only after everything is committed; if it fails, the parent can be re-invited later.
+      let invite: InviteLink | null = null;
+      if (!parent.activated) {
+        try {
+          invite = await createInvite({ userId: parent.userId, kgId: ctx.kg.id, kind: "invite", createdBy: ctx.userId });
+        } catch (e) {
+          console.error("waitlist accept: invite", e);
+        }
+      }
+      return {
+        childId,
+        invites: [{ name: v.parentName, existed: parent.existed && parent.activated, invite }],
+        already: false,
+      };
     } catch (e) {
-      // Roll back the half-done accept so the application can be accepted again.
-      if (childId) await supabase.from("children").delete().eq("id", childId);
-      await supabase.rpc("waitlist_abort_accept", { p_app: id });
+      await supabase.rpc("waitlist_abort_accept", { p_app: id, p_token: claim.token });
+      if (createdUserId) await deleteUnusedUser(createdUserId);
       throw e;
     }
   });
+}
+
+/**
+ * Rollback of an auth account created by a failed «Принять» (service role). Deleted only while nothing uses it yet —
+ * a parallel action may have linked the same new phone in the meantime.
+ */
+async function deleteUnusedUser(userId: string) {
+  const service = createServiceClient();
+  const [{ count: memberships }, { count: guardians }] = await Promise.all([
+    service.from("memberships").select("id", { count: "exact", head: true }).eq("user_id", userId),
+    service.from("child_guardians").select("child_id", { count: "exact", head: true }).eq("user_id", userId),
+  ]);
+  if (memberships === 0 && guardians === 0) {
+    const { error } = await service.auth.admin.deleteUser(userId);
+    if (error) console.error("waitlist accept: rollback user", error.message);
+  }
 }

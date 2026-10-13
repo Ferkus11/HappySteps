@@ -2,30 +2,32 @@
 
 import { createHash } from "node:crypto";
 import { headers } from "next/headers";
+import { clientIp } from "@/lib/client-ip";
 import { parse, ValidationError } from "@/lib/actions/safe";
 import { dbErrorCode, fail, type ActionResult } from "@/lib/actions/result";
 import { createServiceClient } from "@/lib/supabase/service";
 import { memberIds, notify } from "@/lib/notify";
 import { publicGarden } from "@/lib/waitlist-data";
 import { publicApplicationSchema } from "@/lib/waitlist";
+import { todayIn } from "@/lib/format";
 
 const hash = (kind: string, value: string) => createHash("sha256").update(`hs-waitlist:${kind}:${value}`).digest("hex");
 
 /**
  * Public application form (no login). Anonymous visitors get no table access: the server validates,
- * drops honeypot hits, and the service role calls waitlist_public_submit(), which rate-limits by IP and phone.
+ * drops honeypot hits, and the service role calls waitlist_public_submit(), which rate-limits per garden by IP, in total and by phone.
  */
 export async function submitApplicationAction(slug: string, input: unknown): Promise<ActionResult> {
   try {
     // Honeypot: bots fill every field. Answer as if all went well and store nothing.
     const honeypot = (input as { website?: unknown } | null)?.website;
     if (typeof honeypot === "string" && honeypot.trim()) return { ok: true };
-    const v = parse(publicApplicationSchema, input);
     const kg = await publicGarden(String(slug));
     if (!kg) return fail("notFound");
+    const v = parse(publicApplicationSchema(todayIn(kg.timezone)), input);
 
     const h = await headers();
-    const ip = (h.get("x-forwarded-for") ?? "").split(",")[0]?.trim() || h.get("x-real-ip") || "local";
+    const ip = clientIp(h);
     const service = createServiceClient();
     const { data, error } = await service.rpc("waitlist_public_submit", {
       p_kg: kg.id,
@@ -35,7 +37,7 @@ export async function submitApplicationAction(slug: string, input: unknown): Pro
       p_phone: v.parentPhone,
       p_desired: v.desiredDate,
       p_comment: v.comment,
-      p_ip_hash: hash("ip", ip),
+      p_ip_hash: ip ? hash("ip", ip) : null,
       p_phone_hash: hash("phone", v.parentPhone),
     });
     if (error) return fail(dbErrorCode(error));

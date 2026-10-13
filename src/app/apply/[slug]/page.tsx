@@ -58,7 +58,7 @@ export default async function ApplyPage({ params }: Props) {
             <p className="mt-2 max-w-sm text-sm text-muted">{t("subtitle")}</p>
           </header>
           <Card className="p-5 md:p-7">
-            <ApplyForm slug={kg.slug} today={todayIn("Asia/Almaty")} />
+            <ApplyForm slug={kg.slug} today={todayIn(kg.timezone)} />
           </Card>
           <footer className="mt-6 space-y-2 text-center text-xs text-faint">
             {kg.phone ? (

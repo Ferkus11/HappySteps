@@ -1,7 +1,7 @@
 import type { PoolClient } from "pg";
 import { randomUUID } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
-import { asUser, inTx, rejects } from "./db";
+import { admin, asUser, inTx, rejects } from "./db";
 import { fx, type Who } from "./fixtures";
 
 let F: Awaited<ReturnType<typeof fx>>;
@@ -162,46 +162,133 @@ describe("waitlist · writes", () => {
   });
 });
 
-describe("waitlist · «Принять»", () => {
-  it("claim → link the child → «Принята» (final, audited); double claim is «busy», then «accepted»", async () => {
+/** The error message of a statement (null = it succeeded), inside a savepoint so the transaction goes on. */
+async function errorOf(c: PoolClient, sql: string, params: unknown[] = []): Promise<string | null> {
+  await c.query("savepoint e");
+  try {
+    await c.query(sql, params);
+    await c.query("release savepoint e");
+    return null;
+  } catch (e) {
+    await c.query("rollback to savepoint e");
+    return (e as Error).message;
+  }
+}
+
+const ACCEPT = "select waitlist_accept($1, $2, $3, '2022-03-01', $4, '2026-09-01', 50000, $5, false) r";
+
+describe("waitlist · «Принять» (one transaction, claim token)", () => {
+  it("begin → accept: membership, child, guardian, «Принята» and audit in one go, with the caller's checks", async () => {
     await inTx(async (c, become) => {
       const id = await application(c, F.A, "contacted");
-      const childB = F.children["Саша"];
+      const groupB = (await c.query("select id from groups where kindergarten_id = $1 limit 1", [F.B])).rows[0].id;
+      const parent = F.users.parentB; // a person not yet in garden A
+      const name = "Принятов Тимур";
       await become(F.users.accountant);
       expect(await rejects(c, "select waitlist_begin_accept($1)", [id])).toBe(true);
       await become(F.users.ownerB);
       expect(await rejects(c, "select waitlist_begin_accept($1)", [id])).toBe(true);
+
       await become(F.users.head);
-      expect((await c.query("select waitlist_begin_accept($1) r", [id])).rows[0].r).toBe("ok");
-      expect((await c.query("select waitlist_begin_accept($1) r", [id])).rows[0].r).toBe("busy");
-      // the child must belong to the same garden, and the parent must be its guardian
-      expect(await rejects(c, "select waitlist_finish_accept($1, $2, null)", [id, childB])).toBe(true);
-      expect(await rejects(c, "select waitlist_finish_accept($1, $2, $3)", [id, F.children["Айлин"], F.users.parent])).toBe(true);
-      await c.query("select waitlist_finish_accept($1, $2, $3)", [id, F.children["Алихан"], F.users.parent]);
-      const row = (await c.query("select status, child_id, parent_user_id, accepted_by, accepting_since from waitlist_applications where id = $1", [id])).rows[0];
-      expect(row).toEqual({ status: "accepted", child_id: F.children["Алихан"], parent_user_id: F.users.parent, accepted_by: F.users.head, accepting_since: null });
-      expect((await c.query("select waitlist_begin_accept($1) r", [id])).rows[0].r).toBe("accepted");
-      expect(await rejects(c, "select waitlist_finish_accept($1, $2, null)", [id, F.children["Айлин"]])).toBe(true);
+      const claim = (await c.query("select waitlist_begin_accept($1) r", [id])).rows[0].r;
+      expect(claim).toEqual({ state: "ok", token: expect.any(String) });
+      expect((await c.query("select waitlist_begin_accept($1) r", [id])).rows[0].r).toEqual({ state: "busy" });
+
+      // without the claim token, with a group of another garden, or failing half-way: nothing is left behind
+      expect(await errorOf(c, ACCEPT, [id, randomUUID(), name, F.gA1, parent])).toMatch(/hs:waitlistBusy/);
+      expect(await errorOf(c, ACCEPT, [id, null, name, F.gA1, parent])).toMatch(/hs:waitlistBusy/);
+      expect(await errorOf(c, ACCEPT, [id, claim.token, name, groupB, parent])).toMatch(/kindergarten mismatch/);
+      expect(await errorOf(c, ACCEPT, [id, claim.token, "Я", F.gA1, parent])).not.toBeNull(); // child check fails after the membership insert
+      await become(F.users.teacher);
+      expect(await errorOf(c, ACCEPT, [id, claim.token, name, F.gA1, parent])).toMatch(/hs:notFound/);
+      await c.query("reset role");
+      expect((await c.query("select 1 from memberships where user_id = $1 and kindergarten_id = $2", [parent, F.A])).rowCount).toBe(0);
+      expect((await c.query("select 1 from children where full_name = $1", [name])).rowCount).toBe(0);
+      expect((await c.query("select 1 from audit_log where action in ('account.create', 'child.create') and details->>'name' = $1", [name])).rowCount).toBe(0);
+
+      await become(F.users.head);
+      const child = (await c.query(ACCEPT, [id, claim.token, name, F.gA1, parent])).rows[0].r;
+      await c.query("reset role");
+      const kid = (await c.query("select kindergarten_id, group_id, monthly_fee::int as fee from children where id = $1", [child])).rows[0];
+      expect(kid).toEqual({ kindergarten_id: F.A, group_id: F.gA1, fee: 50000 });
+      expect((await c.query("select 1 from child_guardians where child_id = $1 and user_id = $2", [child, parent])).rowCount).toBe(1);
+      const m = (await c.query("select status, created_by from memberships where user_id = $1 and kindergarten_id = $2 and role = 'parent'", [parent, F.A])).rows;
+      expect(m).toEqual([{ status: "active", created_by: F.users.head }]);
+      const row = (await c.query("select status, child_id, parent_user_id, accepted_by, accepting_since, accepting_token from waitlist_applications where id = $1", [id])).rows[0];
+      expect(row).toEqual({ status: "accepted", child_id: child, parent_user_id: parent, accepted_by: F.users.head, accepting_since: null, accepting_token: null });
+      const audit = await c.query(
+        "select action from audit_log where actor_id = $1 and (entity_id = $2 or entity_id = $3 or (action = 'account.create' and entity_id = $4)) order by action",
+        [F.users.head, id, child, parent],
+      );
+      expect(audit.rows.map((r) => r.action)).toEqual(["account.create", "child.create", "guardian.link", "waitlist.accept"]);
+
+      await become(F.users.head);
+      expect((await c.query("select waitlist_begin_accept($1) r", [id])).rows[0].r).toEqual({ state: "accepted", child_id: child });
+      expect(await errorOf(c, ACCEPT, [id, claim.token, name, F.gA1, parent])).toMatch(/hs:waitlistAccepted/);
       expect(await rejects(c, "update waitlist_applications set status = 'declined' where id = $1", [id])).toBe(true);
-      const audit = await c.query("select actor_id from audit_log where action = 'waitlist.accept' and entity_id = $1", [id]);
-      expect(audit.rows).toEqual([{ actor_id: F.users.head }]);
+      expect(await rejects(c, "update waitlist_applications set accepting_token = null where id = $1", [id])).toBe(true);
     });
   });
 
-  it("abort releases the claim", async () => {
+  it("an existing parent membership is reused, an archived one re-activated", async () => {
     await inTx(async (c, become) => {
       const id = await application(c, F.A);
+      await c.query("update memberships set status = 'archived', archived_at = now() where user_id = $1 and kindergarten_id = $2 and role = 'parent'", [F.users.parent, F.A]);
       await become(F.users.owner);
-      expect((await c.query("select waitlist_begin_accept($1) r", [id])).rows[0].r).toBe("ok");
-      await c.query("select waitlist_abort_accept($1)", [id]);
-      expect((await c.query("select waitlist_begin_accept($1) r", [id])).rows[0].r).toBe("ok");
+      const { token } = (await c.query("select waitlist_begin_accept($1) r", [id])).rows[0].r;
+      await c.query(ACCEPT, [id, token, "Второй Ребёнок", F.gA1, F.users.parent]);
+      await c.query("reset role");
+      const m = await c.query("select status from memberships where user_id = $1 and kindergarten_id = $2 and role = 'parent'", [F.users.parent, F.A]);
+      expect(m.rows).toEqual([{ status: "active" }]);
+    });
+  });
+
+  it("an expired claim taken over: the old attempt can neither finish nor release the new claim", async () => {
+    await inTx(async (c, become) => {
+      const id = await application(c, F.A);
+      await become(F.users.head);
+      const first = (await c.query("select waitlist_begin_accept($1) r", [id])).rows[0].r.token;
+      await c.query("reset role");
+      await c.query("update waitlist_applications set accepting_since = now() - interval '3 minutes' where id = $1", [id]);
+      await become(F.users.owner);
+      const second = (await c.query("select waitlist_begin_accept($1) r", [id])).rows[0].r.token;
+      expect(second).not.toBe(first);
+      await become(F.users.head);
+      await c.query("select waitlist_abort_accept($1, $2)", [id, first]);
+      expect((await c.query("select waitlist_begin_accept($1) r", [id])).rows[0].r).toEqual({ state: "busy" });
+      expect(await errorOf(c, ACCEPT, [id, first, "Старый Клик", F.gA1, null])).toMatch(/hs:waitlistBusy/);
+      await become(F.users.owner);
+      await c.query("select waitlist_abort_accept($1, $2)", [id, second]);
+      expect((await c.query("select waitlist_begin_accept($1) r", [id])).rows[0].r.state).toBe("ok");
+    });
+  });
+});
+
+describe("waitlist · date bounds (DB)", () => {
+  it("birth date not in the future, desired date within 3 years", async () => {
+    await asUser(F.users.head, async (c) => {
+      const ins = "insert into waitlist_applications (kindergarten_id, child_name, child_birth_date, parent_name, parent_phone, desired_date) values ($1, 'Даты Тест', $2, 'Родитель Тест', '+77059990002', $3)";
+      expect(await errorOf(c, ins, [F.A, "2099-01-01", null])).toMatch(/hs:dateInvalid/);
+      expect(await errorOf(c, ins, [F.A, "2022-01-01", "2099-01-01"])).toMatch(/hs:dateInvalid/);
+      expect(await errorOf(c, ins, [F.A, "2022-01-01", "1999-01-01"])).not.toBeNull();
+      expect(await errorOf(c, ins, [F.A, "2022-01-01", null])).toBeNull();
     });
   });
 });
 
 describe("waitlist · public form (service role only)", () => {
-  const submit = (phone = "+77059990003", ip = "ip-1", phoneHash = `ph-${phone}`, child = "Публичный Ребёнок") =>
-    [`select waitlist_public_submit($1, $2, '2022-05-05', 'Публичный Родитель', $3, null, null, $4, $5) r`, [F.A, child, phone, ip, phoneHash]] as const;
+  type Opt = { phone?: string; ip?: string | null; child?: string; ipMax?: number; kgMax?: number; phoneMax?: number; kg?: string };
+  const submit = (o: Opt = {}) => {
+    const phone = o.phone ?? "+77059990003";
+    return [
+      `select waitlist_public_submit($1, $2, '2022-05-05', 'Публичный Родитель', $3, null, null, $4, $5, $6, $7, $8) r`,
+      [o.kg ?? F.A, o.child ?? "Публичный Ребёнок", phone, o.ip === undefined ? "ip-1" : o.ip, `ph-${phone}`, o.ipMax ?? 10, o.kgMax ?? 60, o.phoneMax ?? 3],
+    ] as const;
+  };
+  const run = async (c: PoolClient, o: Opt = {}) => {
+    const [sql, params] = submit(o);
+    return errorOf(c, sql, [...params]);
+  };
 
   it("anonymous and signed-in users cannot call it", async () => {
     for (const who of [null, F.users.owner, F.users.parent]) {
@@ -212,7 +299,12 @@ describe("waitlist · public form (service role only)", () => {
     }
   });
 
-  it("inserts a public application, does not duplicate it, and rate-limits by phone and by IP", async () => {
+  it("defaults: 10 per IP per garden per hour, 60 per garden per hour, 3 per phone per day", async () => {
+    const { rows } = await admin((c) => c.query("select pg_get_function_arguments('public.waitlist_public_submit'::regproc) a"));
+    expect(rows[0].a).toMatch(/p_ip_max integer DEFAULT 10, p_kg_max integer DEFAULT 60, p_phone_max integer DEFAULT 3/);
+  });
+
+  it("inserts a public application, does not duplicate it, and limits by phone", async () => {
     await inTx(async (c) => {
       await c.query("delete from waitlist_rate_limits");
       const [sql, params] = submit();
@@ -222,26 +314,38 @@ describe("waitlist · public form (service role only)", () => {
       expect(row).toEqual({ source: "public", status: "new", created_by: null });
       const again = (await c.query(sql, [...params])).rows[0].r;
       expect(again).toEqual({ id: first.id, created: false });
-      // third submission of this phone in 24h is still allowed, the fourth is not
-      await c.query(sql, [...params]);
-      expect(await rejects(c, sql, [...params])).toBe(true);
-      // the same IP with other phones: 5 accepted submissions per hour in total (3 used above)
-      for (const n of [1, 2]) {
-        const [s, p] = submit(`+7705999001${n}`, "ip-1", `ph-other-${n}`, "Другой Ребёнок");
-        expect((await c.query(s, [...p])).rows[0].r.created).toBe(true);
-      }
-      const [s2, p2] = submit("+77059990013", "ip-1", "ph-other-3", "Другой Ребёнок");
-      expect(await rejects(c, s2, [...p2])).toBe(true);
-      const [s3, p3] = submit("+77059990013", "ip-2", "ph-other-3", "Другой Ребёнок");
-      expect((await c.query(s3, [...p3])).rows[0].r.created).toBe(true);
+      // third submission of this phone in 24h is still allowed, the fourth is not — from any IP
+      expect(await run(c)).toBeNull();
+      expect(await run(c, { ip: "ip-other" })).toMatch(/hs:tooManyApplications/);
+      expect(await run(c, { ip: null })).toMatch(/hs:tooManyApplications/);
+    });
+  });
+
+  it("the IP limit is per garden; an unknown IP skips it but the garden cap still applies", async () => {
+    await inTx(async (c) => {
+      await c.query("delete from waitlist_rate_limits");
+      const phone = (n: number) => `+770599901${String(n).padStart(2, "0")}`;
+      // one IP: 3 (test maximum) to garden A, then refused there — but garden B still accepts it
+      for (const n of [1, 2, 3]) expect(await run(c, { phone: phone(n), ipMax: 3 })).toBeNull();
+      expect(await run(c, { phone: phone(4), ipMax: 3 })).toMatch(/hs:tooManyApplications/);
+      expect(await run(c, { phone: phone(4), ipMax: 3, kg: F.B })).toBeNull();
+      // other IPs and unknown IPs are not in that bucket
+      expect(await run(c, { phone: phone(5), ipMax: 3, ip: "ip-2" })).toBeNull();
+      expect(await run(c, { phone: phone(6), ipMax: 3, ip: null })).toBeNull();
+      expect(await run(c, { phone: phone(7), ipMax: 3, ip: null })).toBeNull();
+      // garden A has 6 submissions this hour: a garden cap of 6 stops everybody, unknown IPs included
+      expect(await run(c, { phone: phone(8), ip: "ip-9", kgMax: 6 })).toMatch(/hs:tooManyApplications/);
+      expect(await run(c, { phone: phone(8), ip: null, kgMax: 6 })).toMatch(/hs:tooManyApplications/);
+      expect(await run(c, { phone: phone(8), ip: "ip-9", kgMax: 7 })).toBeNull();
+      const nulls = await c.query("select count(*)::int as n from waitlist_rate_limits where kindergarten_id = $1 and ip_hash is null", [F.A]);
+      expect(nulls.rows[0].n).toBe(2);
     });
   });
 
   it("a blocked garden does not accept applications", async () => {
     await inTx(async (c) => {
       await c.query("update kindergartens set status = 'blocked' where id = $1", [F.A]);
-      const [sql, params] = submit("+77059990005", "ip-3");
-      expect(await rejects(c, sql, [...params])).toBe(true);
+      expect(await run(c, { phone: "+77059990005", ip: "ip-3" })).toMatch(/hs:notFound/);
     });
   });
 });
