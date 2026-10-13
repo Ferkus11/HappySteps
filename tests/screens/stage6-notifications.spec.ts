@@ -77,8 +77,8 @@ async function pushApis(ctx: BrowserContext, state: "off" | "on" | "blocked" | "
     Object.defineProperty(window, "Notification", { value: N, configurable: true });
     Object.defineProperty(window, "PushManager", { value: function PushManager() {}, configurable: true });
     const sub = { endpoint: "https://fcm.googleapis.com/fcm/send/screens", toJSON: () => ({}), unsubscribe: async () => true };
-    const reg = { active: {}, pushManager: { getSubscription: async () => (s === "on" ? sub : null), subscribe: async () => sub } };
-    Object.defineProperty(navigator, "serviceWorker", { value: { getRegistration: async () => reg, register: async () => reg, ready: Promise.resolve(reg) }, configurable: true });
+    const reg = { active: {}, addEventListener() {}, pushManager: { getSubscription: async () => (s === "on" ? sub : null), subscribe: async () => sub } };
+    Object.defineProperty(navigator, "serviceWorker", { value: { getRegistration: async () => reg, register: async () => reg, ready: Promise.resolve(reg), controller: null, addEventListener() {}, removeEventListener() {} }, configurable: true });
   }, state);
 }
 

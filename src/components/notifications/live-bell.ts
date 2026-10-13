@@ -1,5 +1,6 @@
 "use client";
 
+import { isOnline } from "@/lib/pwa/connectivity";
 import * as React from "react";
 import { unreadNotificationsAction } from "@/app/(app)/notifications/actions";
 import { subscribeAuthed, uniqueTopic } from "@/components/chats/realtime";
@@ -20,6 +21,7 @@ export function useLiveUnreadNotifications(initial: number | undefined): number 
     const reload = (delay = 500) => {
       clearTimeout(timer);
       timer = setTimeout(async () => {
+        if (!isOnline()) return; // background refresh: skip while offline
         const r = await unreadNotificationsAction().catch(() => null);
         if (r?.ok) setState((s) => ({ ...s, n: r.data }));
       }, delay);

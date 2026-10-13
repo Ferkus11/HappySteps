@@ -1,5 +1,6 @@
 "use client";
 
+import { isOnline } from "@/lib/pwa/connectivity";
 import * as React from "react";
 import { unreadTotalAction } from "@/app/(app)/chats/actions";
 import { subscribeAuthed, uniqueTopic } from "./realtime";
@@ -18,6 +19,7 @@ export function useLiveUnreadChats(initial: number | undefined, enabled: boolean
     const reload = () => {
       clearTimeout(timer);
       timer = setTimeout(async () => {
+        if (!isOnline()) return; // background refresh: skip while offline
         const r = await unreadTotalAction().catch(() => null);
         if (r?.ok) setState((s) => ({ ...s, n: r.data }));
       }, 800);

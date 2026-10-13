@@ -1,5 +1,6 @@
 "use client";
 
+import { isOnline } from "@/lib/pwa/connectivity";
 import * as React from "react";
 import { savePushSubscriptionAction } from "@/app/(app)/notifications/actions";
 import { currentSubscription, pushSupported, toInput } from "./push-client";
@@ -21,7 +22,7 @@ export function PushSync() {
     const timer = setTimeout(async () => {
       try {
         const sub = await currentSubscription();
-        if (!sub) return;
+        if (!sub || !isOnline()) return;
         const r = await savePushSubscriptionAction(toInput(sub));
         if (r.ok) sessionStorage.setItem(KEY, "1");
       } catch {

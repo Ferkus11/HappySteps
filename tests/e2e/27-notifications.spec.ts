@@ -157,8 +157,12 @@ test("profile: only the parent's types, a switch is saved, the push card subscri
       Object.defineProperty(window, "PushManager", { value: function PushManager() {}, configurable: true });
       let current: unknown = null;
       const sub = { endpoint: ep, toJSON: () => ({ endpoint: ep, keys: { p256dh, auth } }), unsubscribe: async () => ((current = null), true) };
-      const reg = { active: {}, pushManager: { getSubscription: async () => current, subscribe: async () => (current = sub) } };
-      Object.defineProperty(navigator, "serviceWorker", { value: { getRegistration: async () => reg, register: async () => reg, ready: Promise.resolve(reg) }, configurable: true });
+      const reg = { active: {}, addEventListener() {}, pushManager: { getSubscription: async () => current, subscribe: async () => (current = sub) } };
+      Object.defineProperty(navigator, "serviceWorker", {
+        // (the PWA root also listens for worker updates — give it an inert event target)
+        value: { getRegistration: async () => reg, register: async () => reg, ready: Promise.resolve(reg), controller: null, addEventListener() {}, removeEventListener() {} },
+        configurable: true,
+      });
     },
     { ep: `${endpoint}-ui`, p256dh: ecdh.getPublicKey("base64url"), auth: authSecret.toString("base64url") },
   );
