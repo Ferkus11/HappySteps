@@ -29,7 +29,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="antialiased">
         <NextIntlClientProvider>
           {children}
-          <Toaster position="top-center" richColors closeButton toastOptions={{ className: "!rounded-2xl !font-sans" }} />
+          {/* Phones: the 16px page gutter on the sides, below the notch/status bar on top. */}
+          <Toaster
+            position="top-center"
+            richColors
+            closeButton
+            mobileOffset={{ top: "max(16px, env(safe-area-inset-top))", left: 16, right: 16, bottom: "max(16px, env(safe-area-inset-bottom))" }}
+            toastOptions={{ className: "!rounded-2xl !font-sans" }}
+          />
         </NextIntlClientProvider>
       </body>
     </html>

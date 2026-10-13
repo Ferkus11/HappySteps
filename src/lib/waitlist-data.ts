@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase/service";
 import { signedUrl } from "@/lib/kg-assets";
 import { serverEnv } from "@/lib/env";
-import type { WaitlistStatus } from "@/lib/waitlist";
+import { WAITLIST_STATUSES, type WaitlistStatus } from "@/lib/waitlist";
 
 export interface WaitlistRow {
   id: string;
@@ -36,6 +36,8 @@ export interface PublicGarden {
   logoUrl: string | null;
   defaultLocale: "ru" | "kk";
   phone: string | null;
+  /** IANA time zone of the garden — date limits of the form are «today» there. */
+  timezone: string;
 }
 
 /**
@@ -47,13 +49,13 @@ export async function publicGarden(slug: string): Promise<PublicGarden | null> {
   const service = createServiceClient();
   const { data } = await service
     .from("kindergartens")
-    .select("id, name, slug, accent_color, logo_path, kindergarten_settings(default_locale, phone)")
+    .select("id, name, slug, accent_color, logo_path, kindergarten_settings(default_locale, phone, timezone)")
     .eq("slug", slug)
     .maybeSingle();
   if (!data) return null;
   const { data: open } = await service.rpc("kg_is_open", { kg: data.id });
   if (open !== true) return null;
-  const settings = data.kindergarten_settings as unknown as { default_locale: "ru" | "kk"; phone: string | null } | null;
+  const settings = data.kindergarten_settings as unknown as { default_locale: "ru" | "kk"; phone: string | null; timezone: string | null } | null;
   return {
     id: data.id,
     name: data.name,
@@ -62,13 +64,21 @@ export async function publicGarden(slug: string): Promise<PublicGarden | null> {
     logoUrl: await signedUrl("kindergarten-assets", data.logo_path, 3600),
     defaultLocale: settings?.default_locale ?? "ru",
     phone: settings?.phone ?? null,
+    timezone: settings?.timezone || "Asia/Almaty",
   };
 }
 
-/** Number of applications per status (RLS: owner/head/accountant). */
+/** Number of applications per status (RLS: owner/head/accountant) — head-only counts, no rows are downloaded. */
 export async function waitlistCounts(supabase: SupabaseClient, kgId: string): Promise<Record<WaitlistStatus, number>> {
-  const { data } = await supabase.from("waitlist_applications").select("status").eq("kindergarten_id", kgId);
-  const out: Record<WaitlistStatus, number> = { new: 0, contacted: 0, accepted: 0, declined: 0 };
-  for (const r of data ?? []) out[r.status as WaitlistStatus]++;
-  return out;
+  const counts = await Promise.all(
+    WAITLIST_STATUSES.map(async (status) => {
+      const { count } = await supabase
+        .from("waitlist_applications")
+        .select("id", { count: "exact", head: true })
+        .eq("kindergarten_id", kgId)
+        .eq("status", status);
+      return [status, count ?? 0] as const;
+    }),
+  );
+  return Object.fromEntries(counts) as Record<WaitlistStatus, number>;
 }

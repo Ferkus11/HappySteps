@@ -17,8 +17,13 @@ export default defineConfig({
     locale: "ru-RU",
     timezoneId: "Asia/Almaty",
     trace: "retain-on-failure",
-    // --lang makes native date/time inputs render like a Russian device (24h, dd.mm.yyyy).
-    launchOptions: { args: ["--lang=ru-RU"], ...(process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {}) },
+    // Native date/time inputs render like a Russian device (24h, dd.mm.yyyy). The headless shell takes the input
+    // format from the OS locale (LANG), not from `locale`/--lang, so both are set.
+    launchOptions: {
+      args: ["--lang=ru-RU"],
+      env: { ...process.env, LANG: "ru_RU.UTF-8", LANGUAGE: "ru_RU:ru" },
+      ...(process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {}),
+    },
   },
   projects: [
     { name: "e2e", testMatch: "e2e/**/*.spec.ts", use: { ...devices["Desktop Chrome"], locale: "ru-RU", viewport: { width: 1440, height: 900 } } },

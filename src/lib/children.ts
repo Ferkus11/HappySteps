@@ -36,7 +36,11 @@ export interface OverCapacity {
   capacity: number;
 }
 
-/** The group is already full (SPEC §5.1: a warning the head may confirm). */
+/**
+ * The group is already full (SPEC §5.1: a warning the head may confirm). `count` does not include the child being
+ * added, so `count >= capacity` means «the new child would exceed capacity» (20 of 20 → the 21st warns, the 20th
+ * does not). Used by both «Добавить ребёнка» and «Принять» in the waitlist.
+ */
 export async function groupOverCapacity(supabase: SupabaseClient, groupId: string | null): Promise<OverCapacity | null> {
   if (!groupId) return null;
   const [{ data: g }, { count }] = await Promise.all([

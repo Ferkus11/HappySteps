@@ -33,7 +33,7 @@ async function cleanup() {
   }
   const parents = await pg.query("select id from profiles where full_name like 'Очередина %'");
   for (const p of parents.rows) await service.auth.admin.deleteUser(p.id);
-  await pg.query("delete from waitlist_applications where child_name like 'Очередин %' or child_name like 'Спамов %' or child_name like 'Звонков %'");
+  await pg.query("delete from waitlist_applications where child_name like 'Очередин %' or child_name like 'Спамов %' or child_name like 'Звонков %' or child_name like 'Лимитов %'");
   await pg.query("delete from notifications where type = 'waitlist.new'");
   await pg.query("delete from waitlist_rate_limits");
 }
@@ -111,11 +111,84 @@ test("scenario 7: public application → «Принять» → the child and th
   await expect(page.getByText(CHILD.split(" ")[1]).first()).toBeVisible();
 });
 
+test("«Принять» that fails half-way leaves nothing behind and can be retried", async ({ page }) => {
+  const child = `Очередин Откат ${RUN}`;
+  const phone = randomPhone();
+  const id = (
+    await pg.query(
+      `insert into waitlist_applications (kindergarten_id, child_name, child_birth_date, parent_name, parent_phone, source, created_by)
+       select id, $1, '2022-02-02', 'Очередина Откат', $2, 'public', null from kindergartens where slug = 'e2e-a' returning id`,
+      [child, phone],
+    )
+  ).rows[0].id;
+  const foreignGroup = (await pg.query("select g.id from groups g join kindergartens k on k.id = g.kindergarten_id where k.slug = 'e2e-b' limit 1")).rows[0].id;
+
+  await login(page, PHONES.head);
+  await page.goto(`/waitlist/${id}`);
+  await page.getByTestId("wl-accept").click();
+  const dialog = page.getByRole("dialog");
+  // A forged request: a group of another garden. The parent's account is created first, then the database refuses.
+  await dialog.getByTestId("wl-accept-group").evaluate((el, gid) => {
+    const o = document.createElement("option");
+    o.value = gid;
+    o.textContent = "forged";
+    el.appendChild(o);
+    (el as HTMLSelectElement).value = gid;
+  }, foreignGroup);
+  await dialog.getByTestId("wl-accept-submit").click();
+  await expectToast(page, "Недостаточно прав");
+
+  // Nothing is left: no child, no parent account, no membership, the claim is released.
+  expect((await pg.query("select 1 from children where full_name = $1", [child])).rowCount).toBe(0);
+  expect((await pg.query("select 1 from profiles where phone = $1", [phone])).rowCount).toBe(0);
+  const app = await pg.query("select status, accepting_since, accepting_token from waitlist_applications where id = $1", [id]);
+  expect(app.rows).toEqual([{ status: "new", accepting_since: null, accepting_token: null }]);
+
+  // The real accept right after works and creates exactly one child and one parent.
+  await dialog.getByTestId("wl-accept-group").selectOption({ label: (await dialog.locator("option", { hasText: "Солнышко" }).innerText()).trim() });
+  await dialog.getByTestId("wl-accept-submit").click();
+  await expect(dialog.getByTestId("wl-accepted")).toBeVisible();
+  expect((await pg.query("select 1 from children where full_name = $1", [child])).rowCount).toBe(1);
+  const parent = await pg.query(
+    "select (select count(*)::int from memberships m where m.user_id = p.id and m.role = 'parent' and m.status = 'active') as memberships from profiles p where p.phone = $1",
+    [phone],
+  );
+  expect(parent.rows).toEqual([{ memberships: 1 }]);
+});
+
+test("public form rate limit: per IP per garden, keyed on the trusted proxy hop (first X-Forwarded-For entry is ignored)", async ({ page }) => {
+  await pg.query("delete from waitlist_rate_limits");
+  await page.context().clearCookies();
+  const send = async (n: number, realIp: string) => {
+    // A client rotating the first entry: with one trusted proxy only the last entry (added by it) counts.
+    await page.setExtraHTTPHeaders({ "x-forwarded-for": `6.6.6.${n}, ${realIp}` });
+    await page.goto("/apply/e2e-a");
+    await page.getByTestId("wl-child-name").fill(`Лимитов Тимур ${n} ${RUN}`);
+    await page.getByTestId("wl-child-birth").fill("2022-03-15");
+    await page.getByTestId("wl-parent-name").fill("Лимитова Мама");
+    await fillPhone(page, /Телефон родителя/, randomPhone());
+    await page.getByTestId("apply-submit").click();
+  };
+  for (let n = 1; n <= 10; n++) {
+    await send(n, "10.20.30.40");
+    await expect(page.getByTestId("apply-thanks")).toBeVisible();
+  }
+  await send(11, "10.20.30.40");
+  await expect(page.getByTestId("apply-error")).toContainText("Слишком много заявок");
+  await expect(page.getByTestId("apply-thanks")).toHaveCount(0);
+  // Another client (another proxy-seen IP) is not affected.
+  await send(12, "10.20.30.41");
+  await expect(page.getByTestId("apply-thanks")).toBeVisible();
+  await page.setExtraHTTPHeaders({});
+  await pg.query("delete from waitlist_rate_limits");
+});
+
 test("the public form: validation, honeypot, unknown garden, Kazakh", async ({ page }) => {
   await page.context().clearCookies();
   await page.goto("/apply/e2e-a");
   await page.getByTestId("apply-submit").click();
-  await expect(page.getByRole("alert").first()).toBeVisible();
+  await expect(page.getByTestId("apply-error")).toHaveText("Проверьте правильность заполнения.");
+  await expect(page.locator("[data-sonner-toast]")).toHaveCount(0);
   await expect(page.getByTestId("apply-thanks")).toHaveCount(0);
 
   // A bot fills the hidden field: it is told «thank you», nothing is stored.

@@ -41,25 +41,28 @@ export function desiredDateOk(iso: string | null, today: string): boolean {
   return !Number.isNaN(Date.parse(`${iso}T00:00:00Z`)) && iso <= `${y + 3}${today.slice(4)}`;
 }
 
-const utcToday = () => new Date(Date.now() + 5 * 3600_000).toISOString().slice(0, 10); // Asia/Almaty (UTC+5)
-
 /** Empty → «Обязательное поле» instead of the field's format error. */
 const required = <S extends z.ZodType<unknown, string>>(schema: S) => z.string().trim().min(1, "required").pipe(schema);
 
-export const applicationSchema = z.object({
-  childName: required(zName),
-  childBirthDate: required(zDate.refine((v) => birthDateOk(v, utcToday()), "dateInvalid")),
-  parentName: required(zName),
-  parentPhone: required(zPhone),
-  desiredDate: zOptionalDate.refine((v) => desiredDateOk(v, utcToday()), "dateInvalid"),
-  comment: zOptionalText(1000),
-});
-export type ApplicationInput = z.input<typeof applicationSchema>;
+/** An application; `today` is the garden's local date (its `timezone` setting) — date limits are relative to it. */
+export function applicationSchema(today: string) {
+  return z.object({
+    childName: required(zName),
+    childBirthDate: required(zDate.refine((v) => birthDateOk(v, today), "dateInvalid")),
+    parentName: required(zName),
+    parentPhone: required(zPhone),
+    desiredDate: zOptionalDate.refine((v) => desiredDateOk(v, today), "dateInvalid"),
+    comment: zOptionalText(1000),
+  });
+}
+export type ApplicationInput = z.input<ReturnType<typeof applicationSchema>>;
 
 /** The public form adds a honeypot field: real people never see or fill it. */
-export const publicApplicationSchema = applicationSchema.extend({
-  website: z.string().max(500).optional(),
-});
+export function publicApplicationSchema(today: string) {
+  return applicationSchema(today).extend({
+    website: z.string().max(500).optional(),
+  });
+}
 
 /** First name + initial of the last name, e.g. «Ахметова Д.» → for compact lists. */
 export function shortName(full: string): string {

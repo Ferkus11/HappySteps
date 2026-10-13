@@ -2,10 +2,9 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { CheckCircle2 } from "lucide-react";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ApplicationFields, readApplication } from "@/components/waitlist/application-fields";
-import { useAction } from "@/hooks/use-action";
 import { submitApplicationAction } from "./actions";
 
 export function ApplyForm({ slug, today }: { slug: string; today: string }) {
@@ -13,7 +12,35 @@ export function ApplyForm({ slug, today }: { slug: string; today: string }) {
   const formRef = React.useRef<HTMLFormElement>(null);
   const [sentTo, setSentTo] = React.useState<string | null>(null);
   const [formKey, setFormKey] = React.useState(0);
-  const { run, pending, fieldError } = useAction(submitApplicationAction, { refresh: false });
+  const te = useTranslations("errors");
+  // No toast here: on a phone it covers the header. The summary sits right above the button the visitor pressed.
+  const [pending, start] = React.useTransition();
+  const [error, setError] = React.useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
+  const message = (key: string) => (te.has(key) ? te(key) : te("generic"));
+  const fieldError = (name: string) => (fieldErrors[name] ? message(fieldErrors[name]) : undefined);
+
+  const submit = (slugArg: string, values: ReturnType<typeof readApplication> & { website: string }) =>
+    start(async () => {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        setError("offline");
+        return;
+      }
+      try {
+        const res = await submitApplicationAction(slugArg, values);
+        if (res.ok) {
+          setError(null);
+          setFieldErrors({});
+          setSentTo(values.parentPhone);
+        } else {
+          setFieldErrors(res.fieldErrors ?? {});
+          setError(res.error);
+        }
+      } catch (e) {
+        console.error(e);
+        setError("generic");
+      }
+    });
 
   if (sentTo) {
     return (
@@ -28,6 +55,7 @@ export function ApplyForm({ slug, today }: { slug: string; today: string }) {
           className="mt-6"
           onClick={() => {
             setSentTo(null);
+            setError(null);
             setFormKey((k) => k + 1);
           }}
           data-testid="apply-another"
@@ -44,13 +72,12 @@ export function ApplyForm({ slug, today }: { slug: string; today: string }) {
       ref={formRef}
       className="space-y-4"
       noValidate
-      onSubmit={async (e) => {
+      onSubmit={(e) => {
         e.preventDefault();
         const form = formRef.current!;
         const values = readApplication(form);
         const website = String(new FormData(form).get("website") ?? "");
-        const res = await run(slug, { ...values, website });
-        if (res?.ok) setSentTo(values.parentPhone);
+        submit(slug, { ...values, website });
       }}
     >
       <ApplicationFields idPrefix="apply" today={today} fieldError={fieldError} size="lg" />
@@ -59,6 +86,12 @@ export function ApplyForm({ slug, today }: { slug: string; today: string }) {
         <label htmlFor="apply-website">{t("honeypot")}</label>
         <input id="apply-website" name="website" type="text" tabIndex={-1} autoComplete="off" data-testid="apply-website" />
       </div>
+      {error ? (
+        <div className="flex items-start gap-2.5 rounded-2xl bg-danger-soft p-4 text-sm font-semibold text-danger" role="alert" data-testid="apply-error">
+          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <p>{message(error)}</p>
+        </div>
+      ) : null}
       <Button type="submit" size="lg" className="w-full" disabled={pending} data-testid="apply-submit">
         {pending ? t("sending") : t("submit")}
       </Button>
