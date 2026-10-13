@@ -10,6 +10,9 @@ on:
         description: Supabase project URL
         required: true
         default: https://felxihtrajbaaqrmgrgk.supabase.co
+      anon_key:
+        description: Public anon key of the project (Project Settings → API; not a secret)
+        required: true
       confirm:
         description: Type DEMO to confirm
         required: true
@@ -31,5 +34,6 @@ jobs:
       - run: npm run db:seed
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ inputs.supabase_url }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ inputs.anon_key }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
