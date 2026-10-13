@@ -32,12 +32,15 @@ export function fail(code: string, fieldErrors?: Record<string, string>): { ok: 
   return { ok: false, error: code, fieldErrors };
 }
 
-/** Converts zod issues to { field: messageKey }. */
+/**
+ * Converts zod issues to { field: messageKey }. Schemas pass keys of the "errors" namespace as messages; a zod
+ * default message (English prose such as "Too small: expected …") becomes "invalid" so it is never shown as is.
+ */
 export function zodFieldErrors(issues: { path: PropertyKey[]; message: string }[]): Record<string, string> {
   const out: Record<string, string> = {};
   for (const i of issues) {
     const k = i.path.map(String).join(".");
-    if (!out[k]) out[k] = i.message;
+    if (!out[k]) out[k] = /^[A-Za-z_]+$/.test(i.message) ? i.message : "invalid";
   }
   return out;
 }

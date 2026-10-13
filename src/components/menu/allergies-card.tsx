@@ -27,10 +27,10 @@ export async function AllergiesCard({ ctx }: { ctx: KgContext }) {
           {rows.map((r) => (
             <li key={r.child_id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2.5 first:pt-0 last:pb-0" data-testid="allergy-row">
               <div className="min-w-0 flex-1">
-                <div className="font-semibold break-words">{r.full_name}</div>
-                <div className="text-[13px] text-muted">{r.group_name ?? t("noGroup")}</div>
+                <div data-user-content className="font-semibold break-words">{r.full_name}</div>
+                <div data-user-content className="text-[13px] text-muted">{r.group_name ?? t("noGroup")}</div>
               </div>
-              <span className="max-w-full rounded-full bg-tile-late px-2.5 py-1 text-[13px] font-semibold break-words text-tile-late-fg">{r.allergies}</span>
+              <span data-user-content className="max-w-full rounded-full bg-tile-late px-2.5 py-1 text-[13px] font-semibold break-words text-tile-late-fg">{r.allergies}</span>
             </li>
           ))}
         </ul>

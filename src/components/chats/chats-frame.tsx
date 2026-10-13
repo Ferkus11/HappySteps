@@ -231,6 +231,8 @@ function ChatListItem({
   const t = useTranslations("chats");
   const tr = useTranslations("roles");
   const title = useChatTitle()(c);
+  // Group and person names are user content (not translated); the staff chat title is a translation.
+  const userTitle = c.kind === "group" ? !!c.group_name : c.kind === "direct" ? !!c.other_name : false;
   const subtitle =
     c.kind === "group"
       ? t("groupChat")
@@ -254,7 +256,7 @@ function ChatListItem({
   if (c.last_id) {
     if (c.last_deleted)
       preview = <span className="italic">{t("deletedShort")}</span>;
-    else if (c.last_body) preview = c.last_body;
+    else if (c.last_body) preview = <span data-user-content>{c.last_body}</span>;
     else if (c.last_file)
       preview = (
         <span className="inline-flex items-center gap-1">
@@ -289,6 +291,7 @@ function ChatListItem({
           <span
             className="min-w-0 flex-1 truncate text-[15px] font-bold text-text"
             data-testid="chat-title"
+            data-user-content={userTitle ? "" : undefined}
           >
             {title}
           </span>
@@ -297,7 +300,7 @@ function ChatListItem({
         <div className="mt-0.5 flex items-center gap-2">
           <span className="min-w-0 flex-1 truncate text-[13px] text-muted">
             {who ? (
-              <span className="font-semibold text-text/80">{who}: </span>
+              <span className="font-semibold text-text/80" data-user-content={mine ? undefined : ""}>{who}: </span>
             ) : null}
             {preview}
           </span>

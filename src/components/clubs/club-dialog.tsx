@@ -157,7 +157,7 @@ export function ClubDialog({ teachers, club }: { teachers: { id: string; name: s
             <Select id="club-teacher" name="teacherId" defaultValue={club?.teacher_id ?? ""} data-testid="club-teacher">
               <option value="">{t("form.noTeacher")}</option>
               {teachers.map((x) => (
-                <option key={x.id} value={x.id}>
+                <option data-user-content key={x.id} value={x.id}>
                   {x.name}
                 </option>
               ))}

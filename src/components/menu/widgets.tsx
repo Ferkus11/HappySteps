@@ -65,7 +65,7 @@ async function KitchenMenu({ ctx }: { ctx: KgContext }) {
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <h3 className={d === today ? "text-sm font-bold text-brand" : "text-sm font-bold text-muted"}>{await dayTitle(d, today)}</h3>
                   {!filled ? (
-                    <Link href={`/menu/edit?date=${d}`} className="text-sm font-semibold text-brand hover:underline">
+                    <Link href={`/menu/edit?date=${d}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-brand hover:underline">
                       {t("fill")}
                     </Link>
                   ) : null}

@@ -94,13 +94,14 @@ export function FilterSelect({
   name: string;
   value: string;
   label: string;
-  options: { value: string; label: string }[];
+  /** `user`: the label is user content (a group name). */
+  options: { value: string; label: string; user?: boolean }[];
 }) {
   const push = usePushParam();
   return (
     <Select aria-label={label} value={value} onChange={(e) => push(params, name, e.target.value)} className="w-auto min-w-0 flex-1 sm:w-48 sm:flex-none" data-testid={`filter-${name}`}>
       {options.map((o) => (
-        <option key={o.value} value={o.value}>
+        <option key={o.value} value={o.value} data-user-content={o.user ? "" : undefined}>
           {o.label}
         </option>
       ))}

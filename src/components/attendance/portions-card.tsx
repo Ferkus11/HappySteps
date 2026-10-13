@@ -39,7 +39,7 @@ export async function PortionsCard({ ctx }: { ctx: KgContext }) {
                 <li key={r.group_id} className="flex min-h-14 items-center gap-3 py-2" data-testid="portions-group" data-group={r.group_name}>
                   <span className="size-3 shrink-0 rounded-full" style={{ background: r.color }} aria-hidden />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-semibold">{r.group_name}</div>
+                    <div data-user-content className="truncate font-semibold">{r.group_name}</div>
                     <div className="text-xs text-muted">
                       {r.marked > 0
                         ? r.unmarked === 0

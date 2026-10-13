@@ -30,6 +30,7 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = await getLocale();
+  const t = await getTranslations("common");
   return (
     <html lang={locale}>
       <body className="antialiased">
@@ -41,8 +42,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             position="top-center"
             richColors
             closeButton
+            customAriaLabel={t("toasts")}
             mobileOffset={{ top: "max(16px, env(safe-area-inset-top))", left: 16, right: 16, bottom: "max(16px, env(safe-area-inset-bottom))" }}
-            toastOptions={{ className: "!rounded-2xl !font-sans" }}
+            toastOptions={{ className: "!rounded-2xl !font-sans", closeButtonAriaLabel: t("close") }}
           />
         </NextIntlClientProvider>
       </body>

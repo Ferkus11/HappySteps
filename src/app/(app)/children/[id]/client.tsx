@@ -131,7 +131,7 @@ export function ChildAdminActions({
               <Field label={t("group")} htmlFor="tc-g">
                 <Select id="tc-g" name="group">
                   {groups.map((g) => (
-                    <option key={g.id} value={g.id}>
+                    <option data-user-content key={g.id} value={g.id}>
                       {g.name}
                     </option>
                   ))}
@@ -205,7 +205,12 @@ export function GuardianRow({
         <div className="truncate font-semibold">{name}</div>
         <div className="truncate text-sm text-muted">
           {phone}
-          {relation ? ` · ${relation}` : ""}
+          {relation ? (
+            <>
+              {" · "}
+              <span data-user-content>{relation}</span>
+            </>
+          ) : null}
         </div>
       </div>
       {canUnlink ? (
@@ -285,7 +290,7 @@ export function PhotoUpload({ childId }: { childId: string }) {
     <>
       <button
         type="button"
-        className="absolute -right-1 -bottom-1 grid size-8 cursor-pointer place-items-center rounded-full border-2 border-surface bg-brand text-brand-fg"
+        className="absolute -right-1 -bottom-1 grid size-8 pointer-coarse:size-11 cursor-pointer place-items-center rounded-full border-2 border-surface bg-brand text-brand-fg"
         aria-label={t("uploadPhoto")}
         disabled={pending}
         onClick={() => inputRef.current?.click()}

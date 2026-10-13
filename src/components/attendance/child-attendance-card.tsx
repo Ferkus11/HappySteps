@@ -73,7 +73,7 @@ export async function ChildAttendanceCard({ ctx, child }: { ctx: KgContext; chil
       ) : null}
       {canReport ? <ReportAbsenceButton kids={[{ id: child.id, name: child.full_name }]} childId={child.id} today={today} className="mt-4 w-full" /> : null}
       {!isParent && child.group_id && ["owner", "head", "teacher"].includes(ctx.role) ? (
-        <Link href={`/attendance?group=${child.group_id}`} className="mt-3 block text-center text-sm font-semibold text-brand">
+        <Link href={`/attendance?group=${child.group_id}`} className="mt-3 flex min-h-11 items-center justify-center text-sm font-semibold text-brand">
           {t("openMarking")}
         </Link>
       ) : null}

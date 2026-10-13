@@ -1,6 +1,6 @@
 {
   "title": "Әрекеттер журналы",
-  "subtitle": "Бақшадағы маңызды әрекеттер",
+  "subtitle": "Балабақшадағы маңызды әрекеттер",
   "action": "Әрекет",
   "actor": "Кім",
   "when": "Қашан",
@@ -12,10 +12,10 @@
   "emptyHint": "Мұнда аккаунттарды құру, табельді түзету, төлемдерді растау және басқа әрекеттер пайда болады.",
   "system": "Жүйе",
   "actions": {
-    "kindergarten.create": "Бақша құрылды",
-    "kindergarten.block": "Бақша бұғатталды",
-    "kindergarten.unblock": "Бақша бұғаттан шығарылды",
-    "kindergarten.settings": "Бақша баптаулары өзгертілді",
+    "kindergarten.create": "Балабақша құрылды",
+    "kindergarten.block": "Балабақша бұғатталды",
+    "kindergarten.unblock": "Балабақша бұғаттан шығарылды",
+    "kindergarten.settings": "Балабақша баптаулары өзгертілді",
     "account.create": "Аккаунт құрылды",
     "account.update": "Адамның деректері өзгертілді",
     "account.archive": "Аккаунт мұрағатта",
@@ -39,7 +39,7 @@
     "worktime.override": "Кесте күні өзгертілді",
     "worktime.absence": "Қызметкердің болмауы белгіленді",
     "worktime.auto_close": "Күн автоматты түрде жабылды",
-    "attendance.edit_past": "Өткен күндердің келу есебін түзету",
+    "attendance.edit_past": "Өткен күндердің қатысуын түзету",
     "attendance.absence_cancel": "Ата-ана хабарлаған келмеу болдырылмады",
     "holidays.update": "Демалыс және мереке күндері өзгертілді",
     "announcement.delete": "Жарияланым жойылды",
@@ -58,5 +58,8 @@
     "receipt.revert": "Түбіртек бойынша шешім қайтарылды",
     "waitlist.delete": "Күту тізімінен өтінім жойылды",
     "club.delete": "Үйірме жойылды"
-  }
+  },
+  "sections": {"kindergarten":"Балабақша","account":"Аккаунттар","group":"Топтар","child":"Балалар","guardian":"Ата-аналар","worktime":"Жұмыс уақыты","attendance":"Қатысу","holidays":"Демалыс және мереке күндері","announcement":"Жарияланымдар","event":"Іс-шаралар","invoice":"Шоттар","receipt":"Түбіртектер","chat":"Чаттар","club":"Үйірмелер","waitlist":"Күту тізімі","document":"Құжаттар"},
+  "fromDate": "Басталу күні",
+  "toDate": "Аяқталу күні"
 }

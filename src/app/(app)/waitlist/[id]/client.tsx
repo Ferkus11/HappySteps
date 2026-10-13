@@ -142,7 +142,7 @@ export function AcceptDialog({
                 </option>
                 {groups.map((g) => (
                   <option key={g.id} value={g.id}>
-                    {g.name} · {g.activeCount}/{g.capacity}
+                    <span data-user-content>{g.name}</span> · {g.activeCount}/{g.capacity}
                   </option>
                 ))}
               </Select>

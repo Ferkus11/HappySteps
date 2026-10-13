@@ -45,7 +45,7 @@ export function ChildSwitcher({ tabs, panels, label }: { tabs: { id: string; nam
               )}
               data-testid="dash-child-tab"
             >
-              {t.name}
+              <span data-user-content>{t.name}</span>
               <span className="font-medium text-muted">· {t.caption}</span>
             </button>
           ))}

@@ -41,7 +41,7 @@ export default async function GroupsPage() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="size-3 shrink-0 rounded-full" style={{ background: g.color }} aria-hidden />
-                        <h2 className="truncate text-[17px] font-extrabold">{g.name}</h2>
+                        <h2 data-user-content className="truncate text-[17px] font-extrabold">{g.name}</h2>
                       </div>
                       {g.age_category ? <p className="mt-1 text-sm text-muted">{g.age_category}</p> : null}
                     </div>

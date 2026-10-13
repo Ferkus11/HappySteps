@@ -72,7 +72,7 @@ async function PendingReceipts({ ctx }: { ctx: KgContext }) {
                 <Link href={`/payments/${r.invoice_id}`} className="-mx-2 flex min-h-11 items-center gap-3 rounded-xl px-2 hover:bg-surface-muted">
                   <Avatar name={r.child.full_name} size={32} />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-semibold">{r.child.full_name}</div>
+                    <div data-user-content className="truncate text-sm font-semibold">{r.child.full_name}</div>
                     <div className="truncate text-xs text-faint">
                       {monthLabel(t, r.invoice.period)} · {formatDateTime(r.created_at, ctx.settings.timezone)}
                     </div>
@@ -133,7 +133,7 @@ async function DebtorsWidget({ ctx }: { ctx: KgContext }) {
               <li key={d.invoice_id}>
                 <Link href={`/payments/${d.invoice_id}`} className="-mx-2 flex min-h-11 items-center gap-3 rounded-xl px-2 hover:bg-surface-muted">
                   <Avatar name={d.full_name} size={32} />
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">{d.full_name}</span>
+                  <span data-user-content className="min-w-0 flex-1 truncate text-sm font-semibold">{d.full_name}</span>
                   <span className="shrink-0 text-sm font-semibold whitespace-nowrap text-danger">{formatMoney(d.debt)}</span>
                 </Link>
               </li>
@@ -156,7 +156,7 @@ async function ParentPayment({ ctx }: { ctx: KgContext }) {
       <div className="space-y-5">
         {items.map(({ kid, latest, receipts }) => (
           <div key={kid.id}>
-            {items.length > 1 ? <div className="mb-2 text-sm font-bold">{kid.full_name}</div> : null}
+            {items.length > 1 ? <div data-user-content className="mb-2 text-sm font-bold">{kid.full_name}</div> : null}
             <CurrentInvoice ctx={ctx} kid={kid} inv={latest!} receipts={receipts} compact />
           </div>
         ))}

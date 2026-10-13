@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Dialog as D } from "radix-ui";
 import { X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
 export const Dialog = D.Root;
@@ -23,6 +24,7 @@ export function DialogContent({
   /** "right" renders a sheet on desktop; on phones every dialog is a bottom sheet. */
   side?: "center" | "right";
 }) {
+  const t = useTranslations("common");
   return (
     <D.Portal>
       <D.Overlay className="fixed inset-0 z-50 bg-[rgb(16_24_40/0.35)] data-[state=open]:animate-in" />
@@ -45,8 +47,8 @@ export function DialogContent({
               <D.Description className="sr-only">{typeof title === "string" ? title : ""}</D.Description>
             )}
           </div>
-          <D.Close className="-mr-2 -mt-1 grid size-11 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-muted" aria-label="×">
-            <X className="size-5" />
+          <D.Close className="-mr-2 -mt-1 grid size-11 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-muted" aria-label={t("close")}>
+            <X className="size-5" aria-hidden />
           </D.Close>
         </div>
         <div className="overflow-y-auto px-5 py-5 pb-safe">{children}</div>

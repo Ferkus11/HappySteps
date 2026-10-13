@@ -51,7 +51,7 @@ export default async function ApplyPage({ params }: Props) {
                 {kg.name.trim().charAt(0).toUpperCase()}
               </span>
             )}
-            <p className="text-sm font-semibold text-muted" data-testid="apply-garden">
+            <p data-user-content className="text-sm font-semibold text-muted" data-testid="apply-garden">
               {kg.name}
             </p>
             <h1 className="mt-1 text-[26px] leading-tight font-extrabold tracking-tight">{t("title")}</h1>

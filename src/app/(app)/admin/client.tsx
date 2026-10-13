@@ -142,9 +142,11 @@ export function KindergartenRowActions({
           >
             <Field label={t("plan")} htmlFor={`plan-${id}`}>
               <Select id={`plan-${id}`} name="plan" defaultValue={plan}>
-                <option value="trial">trial</option>
-                <option value="basic">basic</option>
-                <option value="pro">pro</option>
+                {(["trial", "basic", "pro"] as const).map((p) => (
+                  <option key={p} value={p}>
+                    {t(`plans.${p}`)}
+                  </option>
+                ))}
               </Select>
             </Field>
             <Field label={t("subscription")} htmlFor={`st-${id}`}>

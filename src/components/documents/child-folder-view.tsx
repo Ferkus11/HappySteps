@@ -21,7 +21,7 @@ export function ChildFolderView({
   timezone,
 }: {
   child: { id: string; fullName: string };
-  subtitle: string;
+  subtitle: React.ReactNode;
   titleHref?: string;
   canUpload: boolean;
   first: ChildCategory;
@@ -37,7 +37,7 @@ export function ChildFolderView({
       <CardHeader
         title={
           <span className="flex flex-col">
-            <span>{child.fullName}</span>
+            <span data-user-content>{child.fullName}</span>
             <span className="text-[13px] font-medium text-muted">{subtitle}</span>
           </span>
         }

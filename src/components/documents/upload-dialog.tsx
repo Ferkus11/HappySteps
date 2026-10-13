@@ -140,7 +140,7 @@ export function UploadDocumentButton(props: Props & { size?: "sm" | "md"; classN
             {file ? (
               <p className="mt-2 flex items-center gap-2 truncate rounded-xl bg-sky-soft px-3 py-2 text-sm text-sky-strong" data-testid="doc-picked">
                 {isPdf ? <FileText className="size-4 shrink-0" aria-hidden /> : <ImageIcon className="size-4 shrink-0" aria-hidden />}
-                <span className="truncate">{file.name}</span>
+                <span data-user-content className="truncate">{file.name}</span>
               </p>
             ) : (
               <p className={error ? "mt-1.5 text-[13px] text-danger" : "mt-1.5 text-[13px] text-faint"} role={error ? "alert" : undefined}>

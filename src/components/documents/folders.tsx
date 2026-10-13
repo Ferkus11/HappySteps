@@ -43,7 +43,7 @@ export async function ChildFolder({
     <Card className="min-w-0" data-testid={`child-folder-${child.id}`}>
       <ChildFolderView
         child={{ id: child.id, fullName: child.fullName }}
-        subtitle={[child.groupName, t("count", { count: docs.length })].filter(Boolean).join(" · ")}
+        subtitle={withGroup(child.groupName, t("count", { count: docs.length }))}
         titleHref={titleHref}
         canUpload={canUpload}
         first={first}
@@ -85,7 +85,7 @@ export async function StaffFolder({
   return (
     <Card className="min-w-0" data-testid={own ? "my-documents" : `staff-folder-${userId}`}>
       <CardHeader
-        title={title}
+        title={own ? title : <span data-user-content>{title}</span>}
         action={
           canUpload ? (
             <UploadDocumentButton kind="staff" userId={userId} who={own ? undefined : title} size="sm" />
@@ -118,19 +118,33 @@ export async function StaffFolder({
 }
 
 /** Link row used in lists of children / staff. */
-export function FolderLink({ href, title, subtitle, right, testId }: { href: string; title: string; subtitle?: string; right?: ReactNode; testId?: string }) {
+export function FolderLink({ href, title, subtitle, right, testId }: { href: string; title: string; subtitle?: ReactNode; right?: ReactNode; testId?: string }) {
   return (
     <Link href={href} className="flex min-h-16 items-center gap-3 px-4 py-3 hover:bg-surface-muted md:px-5" data-testid={testId}>
       <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-sky-soft text-sky-strong">
         <FolderOpen className="size-5" aria-hidden />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-bold">{title}</span>
+        <span className="block truncate font-bold" data-user-content>
+          {title}
+        </span>
         {subtitle ? <span className="block truncate text-sm text-muted">{subtitle}</span> : null}
         {/* phones: the badge goes under the name so long names stay readable */}
         {right ? <span className="mt-1 block sm:hidden">{right}</span> : null}
       </span>
       {right ? <span className="hidden shrink-0 sm:block">{right}</span> : null}
     </Link>
+  );
+}
+
+/** «<group> · <caption>» (or just the group, or `caption` without one): the group name is user content. */
+export function withGroup(group: string | null | undefined, caption: string, groupOnly = false): ReactNode {
+  if (group && groupOnly) return <span data-user-content>{group}</span>;
+  return group ? (
+    <>
+      <span data-user-content>{group}</span> · {caption}
+    </>
+  ) : (
+    caption
   );
 }

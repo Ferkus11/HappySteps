@@ -70,6 +70,7 @@ const SAME_IN_BOTH = new Set([
   "settings.bank",
   "profile.title",
   "roles.accountant",
+  "chats.file",
 ]);
 
 describe("i18n: Kazakh is actually translated", async () => {
@@ -85,6 +86,28 @@ describe("i18n: Kazakh is actually translated", async () => {
         if (SAME_IN_BOTH.has(id)) continue;
         if (v.replace(/\{[^}]*\}|[\d\s.,:;!?()«»"'–—\-+/%₸#]/g, "").length < 4) continue;
         if (a[k] === v) offenders.push(id);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
+/** docs/kk-glossary.md: one Kazakh term per concept across all namespaces. */
+const KK_AVOID: [RegExp, string][] = [
+  [/(?<!\p{L})бақша/iu, "балабақша (not «бақша» / «бала бақша»)"],
+  [/келу есеб/iu, "қатысу (attendance)"],
+  [/(?<!\p{L})чек/iu, "түбіртек (receipt)"],
+  [/аспазшы/iu, "аспаз (cook)"],
+  [/күту парағ/iu, "күту тізімі (waitlist)"],
+];
+
+describe("i18n: Kazakh glossary", async () => {
+  const kk = await loadMessages("kk");
+  it("uses the glossary terms", () => {
+    const offenders: string[] = [];
+    for (const ns of namespaces) {
+      for (const [k, v] of Object.entries(flatten(kk[ns]))) {
+        for (const [re, want] of KK_AVOID) if (re.test(v)) offenders.push(`${ns}.${k}: ${want}`);
       }
     }
     expect(offenders).toEqual([]);

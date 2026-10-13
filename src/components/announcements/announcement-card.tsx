@@ -15,6 +15,8 @@ export async function audienceText(a: { audience: AnnouncementListItem["audience
 export async function AnnouncementCard({ a, timezone, compact }: { a: AnnouncementListItem; timezone: string; compact?: boolean }) {
   const t = await getTranslations("announcements");
   const audience = await audienceText(a);
+  // In the list the title sits right under the page <h1>; in the dashboard widget, under the card's <h2>.
+  const Heading = compact ? "h3" : "h2";
   return (
     <Link
       href={`/announcements/${a.id}`}
@@ -29,14 +31,20 @@ export async function AnnouncementCard({ a, timezone, compact }: { a: Announceme
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            {a.important ? <Pin className="size-4 shrink-0 text-brand" aria-label={t("important")} /> : null}
-            <h3 className={cn("min-w-0 truncate font-bold", !a.read && "text-text")}>{a.title}</h3>
-            {!a.read ? <span className="size-2.5 shrink-0 rounded-full bg-sky" data-testid="unread-dot" aria-label={t("unread")} /> : null}
+            {a.important ? <Pin className="size-4 shrink-0 text-brand" role="img" aria-label={t("important")} /> : null}
+            <Heading data-user-content className={cn("min-w-0 truncate font-bold", !a.read && "text-text")}>
+              {a.title}
+            </Heading>
+            {!a.read ? <span className="size-2.5 shrink-0 rounded-full bg-sky" data-testid="unread-dot" role="img" aria-label={t("unread")} /> : null}
           </div>
-          {!compact && a.body ? <p className="mt-1 line-clamp-2 text-sm text-muted">{a.body}</p> : null}
+          {!compact && a.body ? <p data-user-content className="mt-1 line-clamp-2 text-sm text-muted">{a.body}</p> : null}
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-faint">
             <span>{formatDate(a.created_at, timezone)}</span>
-            {!compact ? <span className="truncate">{audience}</span> : null}
+            {!compact ? (
+              <span className="truncate" data-user-content={a.audience === "groups" && a.groups.length ? "" : undefined}>
+                {audience}
+              </span>
+            ) : null}
             {a.photos ? (
               <span className="inline-flex items-center gap-1">
                 <ImageIcon className="size-3.5" aria-hidden /> {a.photos}

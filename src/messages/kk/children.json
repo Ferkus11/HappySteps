@@ -34,7 +34,7 @@
   "now": "қазір",
   "archive": "Мұрағатқа жіберу",
   "archiveReason": "Шығу себебі",
-  "archiveReasons": { "moved": "Көшіп кетті", "school": "Мектепке барды", "other_kindergarten": "Басқа бақшаға ауысты", "family": "Отбасылық жағдай", "health": "Денсаулығына байланысты", "other": "Басқа" },
+  "archiveReasons": { "moved": "Көшіп кетті", "school": "Мектепке барды", "other_kindergarten": "Басқа балабақшаға ауысты", "family": "Отбасылық жағдай", "health": "Денсаулығына байланысты", "other": "Басқа" },
   "restore": "Қалпына келтіру",
   "archived": "Бала мұрағатта",
   "statusActive": "Белсенді",

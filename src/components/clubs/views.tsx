@@ -125,7 +125,7 @@ export async function ParentClubs({ ctx, childParam }: { ctx: KgContext; childPa
                   >
                     <ClubPhoto name={c.name} src={c.photo_path ? photos[c.photo_path] : null} className="size-11 shrink-0 rounded-xl" />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-semibold">{c.name}</div>
+                      <div data-user-content className="truncate font-semibold">{c.name}</div>
                       <ScheduleText schedule={c.schedule} className="truncate text-[13px] text-muted" />
                     </div>
                     <EnrollmentBadge status={e.status} position={e.position} />
@@ -169,9 +169,9 @@ export async function PendingList({ items, ctx, canDecide }: { items: PendingIte
               <Link href={`/clubs/${r.club.id}`} className="flex min-w-0 flex-1 basis-60 items-center gap-3">
                 <Avatar name={r.child_name} size={40} />
                 <div className="min-w-0">
-                  <div className="truncate font-semibold">{r.child_name}</div>
+                  <div data-user-content className="truncate font-semibold">{r.child_name}</div>
                   <div className="truncate text-[13px] text-muted">
-                    {r.club.name} · {t("childAge", { count: r.age })} · {formatDate(r.requested_at, ctx.settings.timezone)}
+                    <span data-user-content>{r.club.name}</span> · {t("childAge", { count: r.age })} · {formatDate(r.requested_at, ctx.settings.timezone)}
                   </div>
                 </div>
               </Link>
@@ -212,6 +212,7 @@ export async function AdminClubs({ ctx }: { ctx: KgContext }) {
   return (
     <>
       <PendingList items={pending} ctx={ctx} canDecide />
+      {clubs.length ? <h2 className="sr-only">{t("catalog")}</h2> : null}
       {clubs.length ? (
         <CatalogGrid
           clubs={clubs}
@@ -274,5 +275,10 @@ export async function CatalogClubs({ ctx }: { ctx: KgContext }) {
       </Card>
     );
   }
-  return <CatalogGrid clubs={clubs} stats={stats} photos={photos} hrefOf={(c) => `/clubs/${c.id}`} />;
+  return (
+    <>
+      <h2 className="sr-only">{t("catalog")}</h2>
+      <CatalogGrid clubs={clubs} stats={stats} photos={photos} hrefOf={(c) => `/clubs/${c.id}`} />
+    </>
+  );
 }

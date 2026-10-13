@@ -61,5 +61,12 @@
   "hours": "{count, plural, one {# час} few {# часа} many {# часов} other {# часа}}",
   "days": "{count, plural, one {# день} few {# дня} many {# дней} other {# дня}}",
   "styleguide": "Дизайн-система",
-  "notificationsUnread": "{count, plural, one {Уведомления: # непрочитанное} few {Уведомления: # непрочитанных} many {Уведомления: # непрочитанных} other {Уведомления: # непрочитанного}}"
+  "notificationsUnread": "{count, plural, one {Уведомления: # непрочитанное} few {Уведомления: # непрочитанных} many {Уведомления: # непрочитанных} other {Уведомления: # непрочитанного}}",
+  "platformName": "Платформа Happy Steps",
+  "notFoundTitle": "Страница не найдена",
+  "notFoundText": "Возможно, ссылка устарела или у вас нет доступа к этой странице.",
+  "toHome": "На главную",
+  "errorTitle": "Не удалось открыть страницу",
+  "retry": "Повторить",
+  "toasts": "Всплывающие сообщения"
 }

@@ -180,7 +180,7 @@ export async function ParentPayments({ ctx }: { ctx: KgContext }) {
               <div className="mb-4 flex items-center gap-3">
                 <Avatar name={kid.full_name} size={44} />
                 <div className="min-w-0">
-                  <div className="truncate font-bold">{kid.full_name}</div>
+                  <div data-user-content className="truncate font-bold">{kid.full_name}</div>
                   <div className="text-sm text-muted">{latest ? monthLabel(t, latest.period) : t("noInvoices")}</div>
                 </div>
               </div>

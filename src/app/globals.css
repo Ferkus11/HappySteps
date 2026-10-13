@@ -23,11 +23,11 @@
 
   --text: #1d2330;
   --text-muted: #5f6878;
-  --text-faint: #8a93a3;
+  --text-faint: #646d7c; /* ≥ 4.5:1 on white, page bg and the pink «important» card (WCAG AA) */
 
   --danger: #c8321e;
   --danger-soft: #fdecea;
-  --success: #1b7f5c;
+  --success: #18744f;
   --success-soft: #e3f5ee;
   --warning: #8a5a00;
   --warning-soft: #fff4dc;

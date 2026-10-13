@@ -33,7 +33,7 @@ export interface ShellProps {
 
 function Logo({ name, logoUrl }: { name: string; logoUrl?: string | null }) {
   return (
-    <Link href="/" className="flex min-w-0 items-center gap-2.5">
+    <Link href="/" className="flex min-h-11 min-w-0 items-center gap-2.5">
       {logoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={logoUrl} alt="" className="size-9 rounded-xl object-cover" />
@@ -112,7 +112,7 @@ export function AppShell(props: ShellProps) {
               <Logo name={kgName} logoUrl={props.kindergarten?.logoUrl} />
             </div>
             {props.showSearch !== false ? (
-              <form action="/search" className="hidden max-w-md flex-1 md:block" role="search">
+              <form action="/search" className="hidden max-w-md flex-1 md:block" role="search" aria-label={tc("search")}>
                 <label className="relative block">
                   <span className="sr-only">{tc("search")}</span>
                   <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-faint" aria-hidden />
@@ -129,8 +129,13 @@ export function AppShell(props: ShellProps) {
             <div className="ml-auto flex items-center gap-1">
               <LanguageSwitcher />
               {props.nav.all.some((i) => i.key === "chats") ? (
-                <Link href="/chats" className="relative hidden size-11 place-items-center rounded-full text-muted hover:bg-surface-muted md:grid" aria-label={t("chats")}>
-                  <MessageCircle className="size-5" />
+                <Link
+                  href="/chats"
+                  className="relative hidden size-11 place-items-center rounded-full text-muted hover:bg-surface-muted md:grid"
+                  // The name carries the badge number too, so what is seen is part of what is announced (WCAG 2.5.3).
+                  aria-label={unreadChats ? `${t("chats")} ${unreadChats > 99 ? "99+" : unreadChats}` : t("chats")}
+                >
+                  <MessageCircle className="size-5" aria-hidden />
                   <CountDot n={unreadChats} />
                 </Link>
               ) : null}
@@ -140,7 +145,7 @@ export function AppShell(props: ShellProps) {
                 aria-label={unreadNotifications ? tc("notificationsUnread", { count: unreadNotifications }) : tc("notifications")}
                 data-testid="bell"
               >
-                <Bell className="size-5" />
+                <Bell className="size-5" aria-hidden />
                 <CountDot n={unreadNotifications} testId="unread-notifications" />
               </Link>
               <AccountMenu user={props.user} roleLabel={props.roleLabel} contexts={props.contexts} current={props.currentContext} />
@@ -156,6 +161,7 @@ export function AppShell(props: ShellProps) {
       {/* Phone bottom bar */}
       <nav
         aria-label={t("mainNavigation")}
+        data-testid="bottom-nav"
         className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 backdrop-blur md:hidden"
       >
         <ul className="mx-auto flex max-w-lg">

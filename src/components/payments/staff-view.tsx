@@ -90,8 +90,8 @@ async function ReviewQueue({ ctx, pending, canManage }: { ctx: KgContext; pendin
             <li key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 md:px-5" data-testid="receipt-item" data-child={r.child.full_name}>
               <Avatar name={r.child.full_name} />
               <div className="min-w-0 flex-1 basis-[calc(100%-52px)] sm:basis-0">
-                <Link href={`/payments/${r.invoice_id}`} className="block truncate font-bold hover:text-brand">
-                  {r.child.full_name}
+                <Link href={`/payments/${r.invoice_id}`} className="block truncate font-bold hover:text-brand pointer-coarse:flex pointer-coarse:min-h-11 pointer-coarse:items-center">
+                  <span data-user-content>{r.child.full_name}</span>
                 </Link>
                 <div className="text-sm text-muted">
                   {month} · {t("uploadedAt", { date: formatDateTime(r.created_at, tz) })}
@@ -192,7 +192,7 @@ async function MonthList({ ctx, sp, canManage }: { ctx: KgContext; sp: StaffPara
             name="group"
             value={group}
             label={t("filterGroup")}
-            options={[{ value: "", label: t("allGroups") }, ...groups.map((g) => ({ value: g.id, label: g.name })), { value: "none", label: t("noGroup") }]}
+            options={[{ value: "", label: t("allGroups") }, ...groups.map((g) => ({ value: g.id, label: g.name, user: true })), { value: "none", label: t("noGroup") }]}
           />
         </div>
       </Card>
@@ -222,7 +222,7 @@ async function MonthList({ ctx, sp, canManage }: { ctx: KgContext; sp: StaffPara
                   <Avatar name={r.child.full_name} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="truncate font-bold">{r.child.full_name}</span>
+                      <span data-user-content className="truncate font-bold">{r.child.full_name}</span>
                       {r.child.status === "archived" ? <Badge className="shrink-0">{t("archived")}</Badge> : null}
                       {r.starts_on && !r.adjusted_at ? (
                         <Badge tone="warning" className="shrink-0" title={t("startsOn", { date: formatDate(r.starts_on) })} data-testid="starts-on">
@@ -231,7 +231,7 @@ async function MonthList({ ctx, sp, canManage }: { ctx: KgContext; sp: StaffPara
                       ) : null}
                     </div>
                     <div className="truncate text-sm text-muted">
-                      {r.child.group_id ? gName.get(r.child.group_id) : t("noGroup")} · {formatMoney(r.amount)}
+                      {r.child.group_id ? <span data-user-content>{gName.get(r.child.group_id)}</span> : t("noGroup")} · {formatMoney(r.amount)}
                       {r.paid_amount > 0 ? ` · ${t("paid").toLowerCase()} ${formatMoney(r.paid_amount)}` : ""}
                     </div>
                   </div>
@@ -293,10 +293,10 @@ async function Debtors({ ctx }: { ctx: KgContext }) {
                 <Avatar name={d.full_name} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="truncate font-bold">{d.full_name}</span>
+                    <span data-user-content className="truncate font-bold">{d.full_name}</span>
                     {d.child_status === "archived" ? <Badge className="shrink-0">{t("archived")}</Badge> : null}
                   </div>
-                  <div className="truncate text-sm text-muted">{d.group_id ? gName.get(d.group_id) : t("noGroup")}</div>
+                  <div className="truncate text-sm text-muted">{d.group_id ? <span data-user-content>{gName.get(d.group_id)}</span> : t("noGroup")}</div>
                   <div className={cn("text-xs", days > 0 ? "font-semibold text-danger" : "text-faint")} data-testid="debtor-age">
                     {days > 0 ? `${t("debtSince", { date: formatDate(d.since) })} · ${t("overdueDays", { count: days })}` : t("notDueYet", { date: formatDate(d.since) })}
                   </div>

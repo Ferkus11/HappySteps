@@ -92,7 +92,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: S
               aria-current={g.id === group.id ? "page" : undefined}
             >
               <span className="size-2.5 rounded-full" style={{ background: g.color }} aria-hidden />
-              {g.name}
+              <span data-user-content>{g.name}</span>
             </Link>
           ))}
         </nav>
@@ -106,7 +106,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: S
           {groups.length === 1 ? (
             <div className="flex items-center justify-center gap-1.5 text-xs font-semibold text-muted">
               <span className="size-2 rounded-full" style={{ background: group.color }} aria-hidden />
-              <span className="truncate">{group.name}</span>
+              <span data-user-content className="truncate">{group.name}</span>
             </div>
           ) : null}
           <div className="truncate text-[15px] font-bold" data-testid="attendance-date">

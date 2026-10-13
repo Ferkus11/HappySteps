@@ -82,7 +82,7 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
       <PageHeader
         title={
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span data-testid="wl-title">{app.child_name}</span>
+            <span data-user-content data-testid="wl-title">{app.child_name}</span>
             <WaitlistStatusBadge status={app.status} className="px-3 py-1 text-sm tracking-normal" />
           </span>
         }
@@ -94,7 +94,7 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
             <dl className="grid gap-5 sm:grid-cols-2">
               <div>
                 <dt className="text-xs font-semibold text-faint uppercase">{t("child")}</dt>
-                <dd className="mt-1 font-bold">{app.child_name}</dd>
+                <dd data-user-content className="mt-1 font-bold">{app.child_name}</dd>
                 <dd className="text-sm text-muted">
                   {formatDate(app.child_birth_date)} · {tch("age", { count: ageOn(app.child_birth_date, today) })}
                 </dd>
@@ -105,7 +105,7 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
               </div>
               <div className="sm:col-span-2">
                 <dt className="text-xs font-semibold text-faint uppercase">{t("parent")}</dt>
-                <dd className="mt-1 font-bold">{app.parent_name}</dd>
+                <dd data-user-content className="mt-1 font-bold">{app.parent_name}</dd>
                 <dd className="text-sm text-muted" data-testid="wl-phone">
                   {formatPhone(app.parent_phone)}
                 </dd>
@@ -125,7 +125,7 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
               {app.comment ? (
                 <div className="sm:col-span-2">
                   <dt className="text-xs font-semibold text-faint uppercase">{t("parentComment")}</dt>
-                  <dd className="mt-1 rounded-2xl bg-surface-muted p-3 text-sm whitespace-pre-line">{app.comment}</dd>
+                  <dd data-user-content className="mt-1 rounded-2xl bg-surface-muted p-3 text-sm whitespace-pre-line">{app.comment}</dd>
                 </div>
               ) : null}
             </dl>
@@ -137,7 +137,7 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
                 <CheckCircle2 className="mt-0.5 size-6 shrink-0 text-success" aria-hidden />
                 <div className="min-w-0 flex-1">
                   <p className="font-bold text-success">{t("acceptedOn", { date: formatDate(app.accepted_at, tz) })}</p>
-                  {child ? <p className="text-sm text-text">{child.full_name}</p> : null}
+                  {child ? <p data-user-content className="text-sm text-text">{child.full_name}</p> : null}
                 </div>
               </div>
               {child ? (
@@ -188,7 +188,7 @@ export default async function ApplicationPage({ params }: { params: Promise<{ id
                   {e.author ? ` · ${e.author}` : ""}
                 </div>
                 {e.kind === "comment" ? (
-                  <p className="mt-0.5 text-sm whitespace-pre-line" data-testid="wl-comment">
+                  <p data-user-content className="mt-0.5 text-sm whitespace-pre-line" data-testid="wl-comment">
                     {e.body}
                   </p>
                 ) : e.kind === "status" && e.status ? (

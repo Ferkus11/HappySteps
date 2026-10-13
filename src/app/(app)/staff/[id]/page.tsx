@@ -37,7 +37,7 @@ export default async function StaffCard({ params }: { params: Promise<{ id: stri
           <div className="flex items-start gap-4">
             <Avatar name={p.fullName} size={64} />
             <div className="min-w-0 flex-1">
-              <h2 className="text-xl font-extrabold" data-testid="person-name">{p.fullName}</h2>
+              <h2 data-user-content className="text-xl font-extrabold" data-testid="person-name">{p.fullName}</h2>
               <p className="mt-0.5 text-muted">{formatPhone(p.phone)}</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {p.roles.map((r) => (

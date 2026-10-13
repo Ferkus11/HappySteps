@@ -98,7 +98,7 @@ export function AddStaffButton({ roles, groups }: { roles: Role[]; groups: { id:
                         checked={groupIds.includes(g.id)}
                         onCheckedChange={(v) => setGroupIds((s) => (v ? [...s, g.id] : s.filter((x) => x !== g.id)))}
                       />
-                      {g.name}
+                      <span data-user-content>{g.name}</span>
                     </label>
                   ))}
                 </div>

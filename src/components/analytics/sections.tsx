@@ -109,7 +109,7 @@ async function AttendanceSection(p: SectionProps) {
       </ChartCard>
       <div className="grid gap-4 lg:grid-cols-3">
         <ChartCard t={t} testId="chart-groups" title={t("charts.groups")} insight={renderInsight(t, groupsInsight(cur.groups), ph)}>
-          {rated.some((r) => r.value != null) ? <HBars label={t("charts.groups")} seriesName={t("series.attendance")} percent rows={rated} /> : <ChartEmpty text={t("empty.chart")} />}
+          {rated.some((r) => r.value != null) ? <HBars label={t("charts.groups")} seriesName={t("series.attendance")} percent rows={rated} userNames /> : <ChartEmpty text={t("empty.chart")} />}
         </ChartCard>
         <ChartCard
           t={t}
@@ -118,7 +118,7 @@ async function AttendanceSection(p: SectionProps) {
           insight={renderInsight(t, fillInsight(cur.groups), ph)}
           note={t("notes.fill", { date: formatDate(cur.on_date) })}
         >
-          {fills.length ? <HBars label={t("charts.fill")} seriesName={t("series.fill")} percent max={maxFill} rows={fills} /> : <ChartEmpty text={t("empty.noGroups")} />}
+          {fills.length ? <HBars label={t("charts.fill")} seriesName={t("series.fill")} percent max={maxFill} rows={fills} userNames /> : <ChartEmpty text={t("empty.noGroups")} />}
         </ChartCard>
         <ChartCard
           t={t}

@@ -60,6 +60,6 @@ export function useAction<A extends unknown[], T>(
     [fn, opts.success, opts.refresh],
   );
 
-  const fieldError = (name: string) => (fieldErrors[name] ? (te.has(fieldErrors[name]) ? te(fieldErrors[name]) : fieldErrors[name]) : undefined);
+  const fieldError = (name: string) => (fieldErrors[name] ? (te.has(fieldErrors[name]) ? te(fieldErrors[name]) : te("invalid")) : undefined);
   return { run, pending, fieldError };
 }

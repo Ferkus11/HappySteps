@@ -33,7 +33,7 @@ export function ClubCard({
       <ClubPhoto name={club.name} src={photo} className="h-24 w-full sm:h-32" />
       <div className="flex flex-1 flex-col gap-2 p-4">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="min-w-0 text-[16px] leading-snug font-bold group-hover:text-brand">{club.name}</h3>
+          <h3 data-user-content className="min-w-0 text-[16px] leading-snug font-bold group-hover:text-brand">{club.name}</h3>
           <Badge tone="lavender" className="shrink-0">
             <AgeRange from={club.age_from} to={club.age_to} />
           </Badge>
@@ -46,13 +46,13 @@ export function ClubCard({
           {club.place ? (
             <div className="flex gap-2">
               <MapPin className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-              <span className="truncate">{club.place}</span>
+              <span data-user-content className="truncate">{club.place}</span>
             </div>
           ) : null}
           {showTeacher && club.teacher_name ? (
             <div className="flex gap-2">
               <UserRound className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-              <span className="truncate">{club.teacher_name}</span>
+              <span data-user-content className="truncate">{club.teacher_name}</span>
             </div>
           ) : null}
         </div>

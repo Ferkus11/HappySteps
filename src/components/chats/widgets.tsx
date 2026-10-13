@@ -20,10 +20,14 @@ async function Preview({ c, ctx }: { c: ChatSummary; ctx: KgContext }) {
   return (
     <span className="block min-w-0">
       <span className="flex items-baseline gap-2">
-        <span className="min-w-0 flex-1 truncate font-semibold text-text/80">{who}</span>
+        <span className="min-w-0 flex-1 truncate font-semibold text-text/80" data-user-content={c.last_author_id === ctx.userId ? undefined : ""}>
+          {who}
+        </span>
         <span className="shrink-0 text-xs text-faint">{when}</span>
       </span>
-      <span className={c.last_deleted ? "block truncate italic" : "block truncate"}>{text}</span>
+      <span className={c.last_deleted ? "block truncate italic" : "block truncate"} data-user-content={c.last_body && !c.last_deleted ? "" : undefined}>
+        {text}
+      </span>
     </span>
   );
 }
@@ -65,7 +69,7 @@ async function GroupChatWidget({ ctx }: { ctx: KgContext }) {
                 </div>
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[15px] font-bold text-text">
+                <div data-user-content className="truncate text-[15px] font-bold text-text">
                   {c.group_name}
                 </div>
                 <div className="mt-0.5 text-[13px] text-muted">

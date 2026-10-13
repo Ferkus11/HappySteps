@@ -84,13 +84,21 @@ export default async function AnnouncementPage({ params }: { params: Promise<{ i
               <Pin className="size-3.5" aria-hidden /> {t("important")}
             </Badge>
           ) : null}
-          <h1 className="text-[22px] leading-tight font-extrabold tracking-tight md:text-[26px]" data-testid="announcement-heading">
+          <h1 data-user-content className="text-[22px] leading-tight font-extrabold tracking-tight md:text-[26px]" data-testid="announcement-heading">
             {a.title}
           </h1>
           <p className="mt-2 text-[13px] text-faint">
-            {[a.author?.full_name, formatDateTime(a.created_at, tz), await audienceText({ audience: a.audience, groups })].filter(Boolean).join(" · ")}
+            {a.author?.full_name ? (
+              <>
+                <span data-user-content>{a.author.full_name}</span>
+                {" · "}
+              </>
+            ) : null}
+            {formatDateTime(a.created_at, tz)}
+            {" · "}
+            <span data-user-content={a.audience === "groups" && groups.length ? "" : undefined}>{await audienceText({ audience: a.audience, groups })}</span>
           </p>
-          {a.body ? <div className="mt-4 text-[15px] leading-relaxed break-words whitespace-pre-wrap">{a.body}</div> : null}
+          {a.body ? <div data-user-content className="mt-4 text-[15px] leading-relaxed break-words whitespace-pre-wrap">{a.body}</div> : null}
           {photos.length ? (
             <div className="mt-5">
               <Gallery photos={photos} title={a.title} />
@@ -107,7 +115,7 @@ export default async function AnnouncementPage({ params }: { params: Promise<{ i
                     className="flex min-h-12 items-center gap-3 rounded-xl border border-border px-3 text-sm hover:bg-surface-muted"
                   >
                     <FileText className="size-5 shrink-0 text-sky-strong" aria-hidden />
-                    <span className="min-w-0 flex-1 truncate font-semibold">{f.name}</span>
+                    <span data-user-content className="min-w-0 flex-1 truncate font-semibold">{f.name}</span>
                   </a>
                 </li>
               ))}
@@ -153,7 +161,7 @@ export default async function AnnouncementPage({ params }: { params: Promise<{ i
                   {unread.map((u) => (
                     <li key={u.user_id} className="flex min-h-10 items-center gap-2.5 text-sm">
                       <Avatar name={u.full_name} size={28} />
-                      <span className="truncate">{u.full_name}</span>
+                      <span data-user-content className="truncate">{u.full_name}</span>
                     </li>
                   ))}
                 </ul>

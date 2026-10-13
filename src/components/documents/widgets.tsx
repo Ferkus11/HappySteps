@@ -23,7 +23,7 @@ async function MyExpiringDocuments({ ctx }: { ctx: KgContext }) {
       <ul className="space-y-2">
         {docs.map((d) => (
           <li key={d.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
-            <span className="min-w-0 truncate font-semibold">{d.title}</span>
+            <span data-user-content className="min-w-0 truncate font-semibold">{d.title}</span>
             <ExpiryBadge expiresOn={d.expiresOn} today={today} />
           </li>
         ))}

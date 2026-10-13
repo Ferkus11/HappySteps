@@ -27,7 +27,7 @@ export function ParentInvites({ invites }: { invites: ParentInviteResult[] }) {
       <p className="text-sm font-bold">{t("invitesTitle")}</p>
       {invites.map((i, idx) => (
         <div key={idx} className="space-y-2">
-          <p className="text-sm font-semibold">{i.name}</p>
+          <p data-user-content className="text-sm font-semibold">{i.name}</p>
           {i.existed ? <p className="text-sm text-success">{ti("alreadyRegistered")}</p> : null}
           {i.invite ? <InviteLink invite={i.invite} /> : null}
         </div>
@@ -117,7 +117,7 @@ export function AddChildButton({ groups, today }: { groups: { id: string; name: 
                 <Select id="ch-group" name="groupId" defaultValue={groups[0]?.id ?? ""}>
                   <option value="">{t("noGroup")}</option>
                   {groups.map((g) => (
-                    <option key={g.id} value={g.id}>
+                    <option data-user-content key={g.id} value={g.id}>
                       {g.name}
                     </option>
                   ))}
@@ -141,7 +141,7 @@ export function AddChildButton({ groups, today }: { groups: { id: string; name: 
                   {idx > 0 ? (
                     <button
                       type="button"
-                      className="absolute top-2 right-2 grid size-9 cursor-pointer place-items-center rounded-full text-muted hover:bg-surface"
+                      className="absolute top-2 right-2 grid size-9 pointer-coarse:size-11 cursor-pointer place-items-center rounded-full text-muted hover:bg-surface"
                       aria-label={tc("delete")}
                       onClick={() => setParents((s) => s.filter((x) => x.key !== p.key))}
                     >

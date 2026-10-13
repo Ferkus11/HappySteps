@@ -57,9 +57,9 @@ export function HolidaysEditor({ year, items }: { year: number; items: Item[] })
           {items.map((h) => (
             <li key={h.id} className="flex min-h-11 items-center gap-3 border-b border-border text-sm">
               <span className="w-24 shrink-0 font-semibold">{formatDate(h.date)}</span>
-              <span className="min-w-0 flex-1 truncate">{h.name}</span>
+              <span data-user-content className="min-w-0 flex-1 truncate">{h.name}</span>
               {h.kind !== "holiday" ? <Badge tone={h.kind === "working_day" ? "sky" : "lavender"}>{t(`kinds.${h.kind}`)}</Badge> : null}
-              <button type="button" className="grid size-9 cursor-pointer place-items-center rounded-full text-faint hover:bg-surface-muted" aria-label={t("remove")} onClick={() => remove.run(h.id)}>
+              <button type="button" className="grid size-9 pointer-coarse:size-11 cursor-pointer place-items-center rounded-full text-faint hover:bg-surface-muted" aria-label={t("remove")} onClick={() => remove.run(h.id)}>
                 <X className="size-4" />
               </button>
             </li>

@@ -148,7 +148,7 @@ export function Composer({
               aria-hidden
             />
           )}
-          <span className="min-w-0 flex-1 truncate">{file.name}</span>
+          <span data-user-content className="min-w-0 flex-1 truncate">{file.name}</span>
           <button
             type="button"
             onClick={() => setFile(null)}

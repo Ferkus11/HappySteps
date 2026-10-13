@@ -29,6 +29,15 @@ export const CHART = {
 } as const;
 
 const axisTick = { fill: CHART.axis, fontSize: 12 };
+
+/** Category tick that is a name (group, employee): user content, not translated (scenario 12 skips it). */
+function UserTick(props: { x?: number | string; y?: number | string; payload?: { value?: unknown } }) {
+  return (
+    <text x={props.x} y={props.y} dy={4} textAnchor="end" fill={CHART.axis} fontSize={12} data-user-content>
+      {clip(String(props.payload?.value ?? ""), 14)}
+    </text>
+  );
+}
 /** Legend text in neutral ink — Recharts colours it like the series, and the light «plan» blue is unreadable on white. */
 const legendText = (value: unknown) => <span style={{ color: "#1d2330" }}>{String(value)}</span>;
 const tooltipStyle: React.CSSProperties = {
@@ -107,8 +116,11 @@ export function HBars({
   percent = false,
   max,
   testId,
+  userNames = false,
 }: {
   label: string;
+  /** Category names are user content (group names). */
+  userNames?: boolean;
   rows: { name: string; value: number | null }[];
   seriesName: string;
   percent?: boolean;
@@ -120,7 +132,7 @@ export function HBars({
     <Frame label={label} height={Math.max(96, rows.length * 40 + 16)} testId={testId}>
       <BarChart data={rows} layout="vertical" margin={{ top: 4, right: 44, bottom: 4, left: 0 }} barCategoryGap={8} accessibilityLayer>
         <XAxis type="number" hide domain={[0, max ?? (percent ? 100 : "auto")]} />
-        <YAxis type="category" dataKey="name" tick={axisTick} tickLine={false} axisLine={false} width={104} tickFormatter={(v) => clip(String(v), 14)} />
+        <YAxis type="category" dataKey="name" tick={userNames ? <UserTick /> : axisTick} tickLine={false} axisLine={false} width={104} tickFormatter={(v) => clip(String(v), 14)} />
         <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "#f2f5f9" }} formatter={(v) => [fmt(v), seriesName]} />
         <Bar dataKey="value" name={seriesName} fill={CHART.primary} radius={[0, 4, 4, 0]} maxBarSize={24} isAnimationActive={false}>
           <LabelList dataKey="value" position="right" formatter={(v: unknown) => fmt(v)} style={{ fill: "#1d2330", fontSize: 12, fontWeight: 700 }} />
@@ -146,7 +158,7 @@ export function HPairBars({
     <Frame label={label} height={Math.max(120, rows.length * 56 + 48)} testId={testId}>
       <BarChart data={rows} layout="vertical" margin={{ top: 4, right: 40, bottom: 4, left: 0 }} barCategoryGap={10} barGap={2} accessibilityLayer>
         <XAxis type="number" hide />
-        <YAxis type="category" dataKey="name" tick={axisTick} tickLine={false} axisLine={false} width={104} tickFormatter={(v) => clip(String(v), 14)} />
+        <YAxis type="category" dataKey="name" tick={<UserTick />} tickLine={false} axisLine={false} width={104} />
         <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "#f2f5f9" }} />
         <Legend itemSorter={null} iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12 }} formatter={legendText} />
         <Bar dataKey="a" name={names.a} fill={CHART.light} radius={[0, 4, 4, 0]} maxBarSize={16} isAnimationActive={false}>

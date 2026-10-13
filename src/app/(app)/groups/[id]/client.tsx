@@ -41,7 +41,7 @@ export function TransferGroup({ fromId, groups, today }: { fromId: string; group
           <Field label={t("transferTo")} htmlFor="tg-to">
             <Select id="tg-to" name="to" required>
               {groups.map((g) => (
-                <option key={g.id} value={g.id}>
+                <option data-user-content key={g.id} value={g.id}>
                   {g.name}
                 </option>
               ))}

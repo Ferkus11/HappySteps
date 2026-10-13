@@ -71,7 +71,7 @@ export function Marking({ groupId, date, items, editable }: { groupId: string; d
             </div>
           </div>
         </div>
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--ring-track)]" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--ring-track)]" role="progressbar" aria-label={t("progressLabel")} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
           <div className="h-full rounded-full bg-success transition-all" style={{ width: `${pct}%` }} />
         </div>
         {editable && unmarked > 0 ? (
@@ -102,7 +102,7 @@ export function Marking({ groupId, date, items, editable }: { groupId: string; d
               <div className="flex items-center gap-3">
                 <Avatar name={c.name} src={c.photo} size={44} />
                 <div className="min-w-0 flex-1">
-                  <div className="text-[15px] leading-snug font-bold break-words">{c.name}</div>
+                  <div data-user-content className="text-[15px] leading-snug font-bold break-words">{c.name}</div>
                   {c.report ? (
                     <div className="mt-0.5 flex items-start gap-1.5 text-[13px] leading-snug font-semibold text-tile-absent-fg" data-testid="child-report">
                       <ReasonIcon reason={c.report.reason} className="mt-0.5 size-3.5" />

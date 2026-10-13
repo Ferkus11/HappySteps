@@ -225,7 +225,7 @@ export function EditSessionButton({ id, date, start, end }: { id: string; date: 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label={t("editSession")} data-testid="edit-session" className="size-9">
+        <Button variant="ghost" size="icon" aria-label={t("editSession")} data-testid="edit-session" className="size-9 pointer-coarse:size-11">
           <Pencil />
         </Button>
       </DialogTrigger>

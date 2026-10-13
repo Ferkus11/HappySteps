@@ -27,7 +27,7 @@ export function CardHeader({
     <div className={cn("mb-4 flex items-center justify-between gap-3", className)}>
       <h2 className="text-[15px] font-bold text-text">
         {href ? (
-          <Link href={href} className="inline-flex items-center gap-1 hover:text-brand">
+          <Link href={href} className="-my-2.5 inline-flex min-h-11 items-center gap-1 hover:text-brand">
             {title}
             <ChevronRight className="size-4 text-faint" aria-hidden />
           </Link>

@@ -51,7 +51,7 @@ export async function StaffDocumentsCard({ ctx, userId }: { ctx: KgContext; user
         <ul className="space-y-2.5 text-sm">
           {docs.slice(0, 6).map((d) => (
             <li key={d.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-              <span className="min-w-0 truncate font-semibold">{d.title}</span>
+              <span data-user-content className="min-w-0 truncate font-semibold">{d.title}</span>
               <ExpiryBadge expiresOn={d.expiresOn} today={today} />
             </li>
           ))}

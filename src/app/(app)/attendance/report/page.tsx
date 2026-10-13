@@ -61,7 +61,7 @@ export default async function AttendanceReportPage({ searchParams }: { searchPar
               )}
             >
               <span className="size-2.5 rounded-full" style={{ background: g.color }} aria-hidden />
-              {g.name}
+              <span data-user-content>{g.name}</span>
             </Link>
           ))}
         </nav>
@@ -112,9 +112,9 @@ export default async function AttendanceReportPage({ searchParams }: { searchPar
                 <tr>
                   <th className="sticky left-0 z-10 min-w-36 border-b border-border bg-surface px-3 py-3 text-left text-xs font-semibold text-faint md:px-4">{t("child")}</th>
                   {grid.days.map((d) => (
-                    <th key={d.date} className={cn("w-7 border-b border-border px-0 py-2 text-center font-semibold", d.working ? "text-muted" : "text-faint/60", d.date === today && "text-brand")}>
+                    <th key={d.date} className={cn("w-7 border-b border-border px-0 py-2 text-center font-semibold pointer-coarse:w-11", d.working ? "text-muted" : "font-normal text-faint", d.date === today && "text-brand")}>
                       {admin && d.working && d.date <= today ? (
-                        <Link href={`/attendance?group=${group.id}&date=${d.date}`} className="block rounded-md hover:bg-surface-muted">
+                        <Link href={`/attendance?group=${group.id}&date=${d.date}`} className="block rounded-md hover:bg-surface-muted pointer-coarse:flex pointer-coarse:min-h-11 pointer-coarse:flex-col pointer-coarse:justify-center">
                           <DayHead d={d.date} wd={t(`weekdaysShort.${d.weekday}` as "weekdaysShort.1")} />
                         </Link>
                       ) : (
@@ -129,7 +129,7 @@ export default async function AttendanceReportPage({ searchParams }: { searchPar
               <tbody>
                 {grid.rows.map((r) => (
                   <tr key={r.childId} data-testid="report-row">
-                    <th scope="row" className="sticky left-0 z-10 max-w-44 truncate border-b border-border bg-surface px-3 py-1.5 text-left font-semibold md:px-4" title={r.name}>
+                    <th scope="row" className="sticky left-0 z-10 max-w-44 truncate border-b border-border bg-surface px-3 py-1.5 text-left font-semibold md:px-4" title={r.name} data-user-content>
                       {r.name.split(" ").slice(0, 2).join(" ")}
                     </th>
                     {r.cells.map((c, i) => (

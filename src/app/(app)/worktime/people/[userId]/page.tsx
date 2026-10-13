@@ -101,7 +101,7 @@ export default async function WorktimePerson({
           <div className="flex items-start gap-4">
             <Avatar name={person.fullName} size={56} />
             <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-extrabold" data-testid="person-name">
+              <h2 data-user-content className="text-lg font-extrabold" data-testid="person-name">
                 {person.fullName}
               </h2>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -242,7 +242,7 @@ export default async function WorktimePerson({
                                   className="mt-0.5 size-3 shrink-0"
                                   aria-hidden
                                 />{" "}
-                                {s.comment}
+                                <span data-user-content>{s.comment}</span>
                               </p>
                             ) : null}
                           </div>

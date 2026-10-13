@@ -92,7 +92,7 @@ export function GroupDialog({ teachers, group }: { teachers: { id: string; name:
                       checked={teacherIds.includes(x.id)}
                       onCheckedChange={(v) => setTeacherIds((s) => (v ? [...s, x.id] : s.filter((y) => y !== x.id)))}
                     />
-                    {x.name}
+                    <span data-user-content>{x.name}</span>
                   </label>
                 ))}
               </div>

@@ -51,14 +51,14 @@ export default async function ChildPage({ params }: { params: Promise<{ id: stri
                 {isAdmin ? <PhotoUpload childId={child.id} /> : null}
               </div>
               <div className="min-w-0 flex-1">
-                <h2 className="text-xl font-extrabold" data-testid="child-name">{child.full_name}</h2>
+                <h2 data-user-content className="text-xl font-extrabold" data-testid="child-name">{child.full_name}</h2>
                 <p className="mt-0.5 text-muted">
                   {t("age", { count: ageOn(child.birth_date, today) })} · {formatDate(child.birth_date)}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {group ? (
                     <Badge tone="sky">
-                      <span className="size-2 rounded-full" style={{ background: group.color }} aria-hidden /> {group.name}
+                      <span className="size-2 rounded-full" style={{ background: group.color }} aria-hidden /> <span data-user-content>{group.name}</span>
                     </Badge>
                   ) : (
                     <Badge>{t("noGroup")}</Badge>
@@ -114,7 +114,9 @@ export default async function ChildPage({ params }: { params: Promise<{ id: stri
             <dl className="space-y-3 text-sm">
               <div>
                 <dt className="text-xs text-faint">{t("allergies")}</dt>
-                <dd className={child.allergies ? "font-semibold text-warning" : "text-muted"}>{child.allergies || "—"}</dd>
+                <dd className={child.allergies ? "font-semibold text-warning" : "text-muted"} data-user-content>
+                  {child.allergies || "—"}
+                </dd>
               </div>
               <div>
                 <dt className="text-xs text-faint">{t("medicalNotes")}</dt>
