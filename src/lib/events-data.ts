@@ -58,7 +58,7 @@ function toEvent(ctx: KgContext, r: Row): CalendarEvent {
  * this returns her children's ids and their groups; null when no narrowing is needed (role is not parent,
  * or parent is the only role — RLS already gives exactly the parent's view).
  */
-async function parentScope(ctx: KgContext): Promise<{ children: Set<string>; groups: Set<string> } | null> {
+export async function parentScope(ctx: KgContext): Promise<{ children: Set<string>; groups: Set<string> } | null> {
   if (ctx.role !== "parent" || ctx.roles.every((r) => r === "parent")) return null;
   return parentChildren(ctx.kg.id, ctx.userId);
 }

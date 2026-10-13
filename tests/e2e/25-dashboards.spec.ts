@@ -219,6 +219,28 @@ test("teacher who is also a parent, viewing as parent, sees only parent events",
   }
 });
 
+test("teacher who is also a parent, viewing as parent, sees only parent announcements", async ({ page }) => {
+  const owner = (await db.from("profiles").select("id").eq("phone", PHONES.owner).single()).data!.id as string;
+  await db.from("announcements").delete().like("title", "E2E-dash %");
+  const tag = Date.now().toString(36);
+  const { error } = await db
+    .from("announcements")
+    .insert({ kindergarten_id: S.A, author_id: owner, audience: "staff", title: `E2E-dash Для сотрудников ${tag}`, body: "", important: true });
+  if (error) throw new Error(error.message);
+  try {
+    await login(page, PHONES.teacherParent);
+    await switchContext(page, "Happy Steps E2E", "Родитель");
+    await page.goto("/announcements");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.locator("main")).not.toContainText(`Для сотрудников ${tag}`);
+    await switchContext(page, "Happy Steps E2E", "Воспитатель");
+    await page.goto("/announcements");
+    await expect(page.locator("main")).toContainText(`Для сотрудников ${tag}`);
+  } finally {
+    await db.from("announcements").delete().like("title", "E2E-dash %");
+  }
+});
+
 test("expiring documents: one «Требует внимания» line, archived staff not counted, their folder still open", async ({ page }) => {
   const domain = process.env.AUTH_EMAIL_DOMAIN ?? "users.happysteps.local";
   const owner = (await db.from("profiles").select("id").eq("phone", PHONES.owner).single()).data!.id as string;

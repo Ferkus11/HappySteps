@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { KgContext } from "@/lib/auth/context";
 import type { Audience } from "@/lib/audience";
+import { parentScope } from "@/lib/events-data";
 
 export interface AnnouncementListItem {
   id: string;
@@ -28,7 +29,7 @@ type Row = {
   created_at: string;
   author_id: string | null;
   author: { full_name: string } | null;
-  announcement_groups: { groups: { name: string; color: string } | null }[];
+  announcement_groups: { group_id: string; groups: { name: string; color: string } | null }[];
   announcement_files: { kind: "photo" | "pdf" }[];
 };
 
@@ -41,15 +42,18 @@ export async function listAnnouncements(
   let q = supabase
     .from("announcements")
     .select(
-      "id, title, body, important, audience, created_at, author_id, author:profiles!announcements_author_id_fkey(full_name), announcement_groups(groups(name, color)), announcement_files(kind)",
+      "id, title, body, important, audience, created_at, author_id, author:profiles!announcements_author_id_fkey(full_name), announcement_groups(group_id, groups(name, color)), announcement_files(kind)",
     )
     .eq("kindergarten_id", ctx.kg.id)
     .order("important", { ascending: false })
     .order("created_at", { ascending: false })
-    .limit(opts.limit ?? 100);
+    .limit(100);
   if (opts.importantOnly) q = q.eq("important", true);
-  const { data } = await q;
-  const rows = (data ?? []) as unknown as Row[];
+  const [{ data }, scope] = await Promise.all([q, parentScope(ctx)]);
+  // Viewing as parent with other roles too: RLS answers for all her roles, show only the parent audience.
+  const rows = ((data ?? []) as unknown as Row[])
+    .filter((r) => !scope || r.audience === "all" || (r.audience === "groups" && r.announcement_groups.some((g) => scope.groups.has(g.group_id))))
+    .slice(0, opts.limit ?? 100);
   if (!rows.length) return [];
   const ids = rows.map((r) => r.id);
   const [{ data: reads }, statsRes] = await Promise.all([
