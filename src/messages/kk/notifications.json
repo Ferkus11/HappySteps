@@ -3,20 +3,126 @@
   "empty": "Әзірге хабарландырулар жоқ",
   "markAllRead": "Барлығын оқылды деп белгілеу",
   "types": {
-    "message.new": { "title": "Жаңа хабарлама", "body": "{from}: {text}" },
-    "announcement.new": { "title": "Жаңа хабарландыру", "body": "{title}" },
-    "announcement.reminder": { "title": "Хабарландыру туралы еске салу", "body": "Оқып шығыңыз: {title}" },
-    "event.reminder": { "title": "Ертең: {title}", "body": "{date} {time} · {place}" },
-    "absence.reported": { "title": "{child} келмейді", "body": "{reason, select, sick {Ауырып тұр} vacation {Демалыс} family {Отбасылық жағдай} other {Басқа себеп}}: {period}" },
-    "attendance.not_marked": { "title": "Келу есебі белгіленбеген", "body": "«{group}» тобы бүгін әлі белгіленбеген" },
-    "receipt.new": { "title": "Тексеруге жаңа түбіртек", "body": "{child}: {amount}" },
-    "receipt.accepted": { "title": "Төлем расталды", "body": "{month}: {amount}" },
-    "receipt.rejected": { "title": "Түбіртек қабылданбады", "body": "{month}: {reason}. Түбіртекті қайта жүктеңіз." },
-    "club.request": { "title": "{status, select, queued {Үйірмеге өтінім — кезекке} other {Үйірмеге өтінім}}", "body": "{child} → {club}" },
-    "club.spot_free": { "title": "Үйірмеде орын босады", "body": "{club}: кезекте {count}" },
-    "club.decision": { "title": "«{club}» үйірмесі", "body": "{child}: {status, select, active {жазылды, сабақта күтеміз} queued {бос орын жоқ, бала кезекте} rejected {өтінім қабылданбады} excluded {үйірмеден шығарылды} closed {үйірме жабылды} other {мәртебе өзгерді}}" },
-    "waitlist.new": { "title": "Күту тізіміне жаңа өтінім", "body": "{child}, {parent}" },
-    "document.expiring": { "title": "Құжаттың мерзімі бітіп жатыр", "body": "{person}: {document} — {date} дейін" },
-    "worktime.auto_closed": { "title": "Жұмыс күні автоматты түрде жабылды", "body": "{date}: аяқталу уақыты — {time}" }
+    "message.new": {
+      "title": "Жаңа хабарлама",
+      "body": "{from}: {text}"
+    },
+    "announcement.new": {
+      "title": "Жаңа хабарландыру",
+      "body": "{title}"
+    },
+    "announcement.reminder": {
+      "title": "Хабарландыру туралы еске салу",
+      "body": "Оқып шығыңыз: {title}"
+    },
+    "event.reminder": {
+      "title": "Ертең: {title}",
+      "body": "{date} {time} · {place}"
+    },
+    "absence.reported": {
+      "title": "{child} келмейді",
+      "body": "{reason, select, sick {Ауырып тұр} vacation {Демалыс} family {Отбасылық жағдай} other {Басқа себеп}}: {period}"
+    },
+    "attendance.not_marked": {
+      "title": "Келу есебі белгіленбеген",
+      "body": "«{group}» тобы бүгін әлі белгіленбеген"
+    },
+    "receipt.new": {
+      "title": "Тексеруге жаңа түбіртек",
+      "body": "{child}: {amount}"
+    },
+    "receipt.accepted": {
+      "title": "Төлем расталды",
+      "body": "{month}: {amount}"
+    },
+    "receipt.rejected": {
+      "title": "Түбіртек қабылданбады",
+      "body": "{month}: {reason}. Түбіртекті қайта жүктеңіз."
+    },
+    "club.request": {
+      "title": "{status, select, queued {Үйірмеге өтінім — кезекке} other {Үйірмеге өтінім}}",
+      "body": "{child} → {club}"
+    },
+    "club.spot_free": {
+      "title": "Үйірмеде орын босады",
+      "body": "{club}: кезекте {count}"
+    },
+    "club.decision": {
+      "title": "«{club}» үйірмесі",
+      "body": "{child}: {status, select, active {жазылды, сабақта күтеміз} queued {бос орын жоқ, бала кезекте} rejected {өтінім қабылданбады} excluded {үйірмеден шығарылды} closed {үйірме жабылды} other {мәртебе өзгерді}}"
+    },
+    "waitlist.new": {
+      "title": "Күту тізіміне жаңа өтінім",
+      "body": "{child}, {parent}"
+    },
+    "document.expiring": {
+      "title": "Құжаттың мерзімі бітіп жатыр",
+      "body": "{person}: {document} — {date} дейін"
+    },
+    "worktime.auto_closed": {
+      "title": "Жұмыс күні автоматты түрде жабылды",
+      "body": "{date}: аяқталу уақыты — {time}"
+    }
+  },
+  "fallbackTitle": "Хабарландыру",
+  "emptyHint": "Мұнда жаңа хабарламалар, еске салулар және өтінімдер бойынша шешімдер пайда болады",
+  "allRead": "Барлық хабарландырулар оқылды",
+  "today": "Бүгін",
+  "yesterday": "Кеше",
+  "loadMore": "Тағы көрсету",
+  "settings": "Баптау",
+  "unread": "Оқылмаған",
+  "otherGardens": "Басқа балабақшада {count, plural, one {# оқылмаған хабарландыру} other {# оқылмаған хабарландыру}} бар — балабақшаны профиль мәзірінде ауыстырыңыз",
+  "monthYear": "{year} ж. {month}",
+  "months": {
+    "1": "Қаңтар",
+    "2": "Ақпан",
+    "3": "Наурыз",
+    "4": "Сәуір",
+    "5": "Мамыр",
+    "6": "Маусым",
+    "7": "Шілде",
+    "8": "Тамыз",
+    "9": "Қыркүйек",
+    "10": "Қазан",
+    "11": "Қараша",
+    "12": "Желтоқсан"
+  },
+  "prefs": {
+    "title": "Хабарландырулар",
+    "hint": "Өшірілген хабарландырулар қоңыраушаға да, телефонға да келмейді.",
+    "listTitle": "Не жіберу керек",
+    "types": {
+      "message.new": "Чаттардағы жаңа хабарламалар",
+      "announcement.new": "Жаңа хабарландырулар",
+      "announcement.reminder": "Оқылмаған хабарландырулар туралы еске салу",
+      "event.reminder": "Іс-шаралар туралы еске салу",
+      "absence.reported": "Бала келмейді",
+      "attendance.not_marked": "Топ белгіленбеген",
+      "receipt.new": "Тексеруге жаңа түбіртектер",
+      "receipt.accepted": "Төлем расталды",
+      "receipt.rejected": "Түбіртек қабылданбады",
+      "club.request": "Үйірмелерге өтінімдер",
+      "club.spot_free": "Үйірмеде орын босады",
+      "club.decision": "Үйірмелер бойынша шешімдер",
+      "waitlist.new": "Күту тізіміне жаңа өтінімдер",
+      "document.expiring": "Мерзімі бітетін құжаттар",
+      "worktime.auto_closed": "Жұмыс күні автоматты түрде жабылды"
+    }
+  },
+  "push": {
+    "title": "Осы құрылғыдағы push-хабарландырулар",
+    "on": "Қосулы. Қосымша жабық болса да, хабарландырулар келеді.",
+    "off": "Өшірулі. Хабарламалар мен еске салуларды жіберіп алмау үшін қосыңыз.",
+    "blocked": "Хабарландыруларға браузер баптауларында тыйым салынған. Осы сайтқа рұқсат беріп, бетті жаңартыңыз.",
+    "unsupported": "Бұл браузер push-хабарландыруларды қолдамайды. Хабарландырулар қоңыраушада болады.",
+    "ios": "Хабарландырулар алу үшін қосымшаны Басты экранға қосыңыз",
+    "enable": "Хабарландыруларды қосу",
+    "disable": "Өшіру",
+    "enabled": "Push-хабарландырулар қосылды",
+    "disabled": "Push-хабарландырулар өшірілді",
+    "failed": "Хабарландыруларды қосу мүмкін болмады. Қайталап көріңіз.",
+    "quietHint": "Балабақшаның тыныш сағаттарында ({start}–{end}) push таңертең келеді, қоңыраушада — бірден.",
+    "enabledShort": "Қосулы"
   }
 }

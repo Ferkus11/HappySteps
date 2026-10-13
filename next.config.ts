@@ -29,6 +29,8 @@ const nextConfig: NextConfig = {
           { key: "Service-Worker-Allowed", value: "/" },
         ],
       },
+      // Push handlers imported by the service worker (and registered alone until the PWA worker exists).
+      { source: "/sw-push.js", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }] },
     ];
   },
 };

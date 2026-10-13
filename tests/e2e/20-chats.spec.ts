@@ -292,7 +292,8 @@ test("quiet hours: the parent is warned, staff get the bell now and the push in 
       expect(byPhone[staff], staff).toBeInstanceOf(Date);
       expect(byPhone[staff]!.getTime(), staff).toBeGreaterThan(Date.now());
     }
-    expect(byPhone[PARENT2.phone]).toBeNull();
+    // Stage 6: garden quiet hours defer pushes of every type, so the other parent's push waits for the morning too.
+    expect(byPhone[PARENT2.phone]).toBeInstanceOf(Date);
     await parent.context().close();
   } finally {
     await db.query("update kindergarten_settings set quiet_hours_start = $2::time, quiet_hours_end = $3::time where kindergarten_id = $1", [kgA, prev.s, prev.e]);

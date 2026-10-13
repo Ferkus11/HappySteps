@@ -13,6 +13,8 @@ import { AccountMenu, type ContextOption } from "./account-menu";
 import { LanguageSwitcher } from "./language-switcher";
 import { OfflineBanner } from "./offline-banner";
 import { useLiveUnreadChats } from "@/components/chats/live-unread";
+import { useLiveUnreadNotifications } from "@/components/notifications/live-bell";
+import { PushSync } from "@/components/notifications/push-sync";
 
 export interface ShellProps {
   nav: { all: NavItem[]; mobile: NavItem[]; more: NavItem[] };
@@ -60,6 +62,7 @@ export function AppShell(props: ShellProps) {
   const tc = useTranslations("common");
   const pathname = usePathname();
   const unreadChats = useLiveUnreadChats(props.unreadChats, props.nav.all.some((i) => i.key === "chats"));
+  const unreadNotifications = useLiveUnreadNotifications(props.unreadNotifications);
   const [moreOpen, setMoreOpen] = React.useState(false);
   const kgName = props.kindergarten?.name ?? tc("appName");
 
@@ -127,7 +130,7 @@ export function AppShell(props: ShellProps) {
               ) : null}
               <Link href="/notifications" className="relative grid size-11 place-items-center rounded-full text-muted hover:bg-surface-muted" aria-label={tc("notifications")}>
                 <Bell className="size-5" />
-                <CountDot n={props.unreadNotifications} testId="unread-notifications" />
+                <CountDot n={unreadNotifications} testId="unread-notifications" />
               </Link>
               <AccountMenu user={props.user} roleLabel={props.roleLabel} contexts={props.contexts} current={props.currentContext} />
             </div>
@@ -135,6 +138,7 @@ export function AppShell(props: ShellProps) {
         </header>
 
         <OfflineBanner />
+        <PushSync />
         <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 pt-5 pb-28 md:px-8 md:pt-7 md:pb-12">{props.children}</main>
       </div>
 

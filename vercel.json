@@ -20,6 +20,10 @@
     {
       "path": "/api/cron/invoices-accrue",
       "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/cron/push-deferred",
+      "schedule": "*/5 * * * *"
     }
   ]
 }
