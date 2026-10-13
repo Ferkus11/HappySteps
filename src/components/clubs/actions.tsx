@@ -19,6 +19,7 @@ import {
   requestClubAction,
 } from "@/app/(app)/clubs/actions";
 import { startDirectChatAction } from "@/app/(app)/chats/actions";
+import { useOfflineGuard } from "@/lib/pwa/offline-guard";
 
 /** Parent: the screen's main action — «Записаться». */
 export function EnrollButton({ clubId, childId, label, full }: { clubId: string; childId: string; label: string; full: boolean }) {
@@ -113,6 +114,7 @@ export function ReasonButton({ enrollmentId, kind, child, club }: { enrollmentId
 export function WriteButton({ userId }: { userId: string }) {
   const t = useTranslations("clubs");
   const te = useTranslations("errors");
+  const offline = useOfflineGuard();
   const router = useRouter();
   const [busy, setBusy] = React.useState(false);
   return (
@@ -122,10 +124,14 @@ export function WriteButton({ userId }: { userId: string }) {
       disabled={busy}
       data-testid="write-parent"
       onClick={async () => {
-        if (!navigator.onLine) return toast.error(te("offline"));
+        if (offline.blocked()) return;
         setBusy(true);
         try {
-          const r = await startDirectChatAction(userId);
+          const r = await startDirectChatAction(userId).catch((e) => {
+            if (!offline.failed(e)) throw e;
+            return null;
+          });
+          if (!r) return;
           if (!r.ok) return toast.error(te.has(r.error) ? te(r.error) : te("generic"));
           router.push(`/chats/${r.data.id}`);
         } finally {

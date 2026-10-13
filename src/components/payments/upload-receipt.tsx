@@ -10,6 +10,7 @@ import { uploadReceiptAction } from "@/app/(app)/payments/actions";
 import { RECEIPT_MAX_BYTES } from "@/lib/payments";
 import { prepareDocumentFile } from "@/lib/heic";
 import { cn } from "@/lib/utils";
+import { useOfflineGuard } from "@/lib/pwa/offline-guard";
 
 /** «Загрузить чек»: opens the file picker and uploads right away — one tap for the parent. */
 export function UploadReceiptButton({
@@ -27,6 +28,7 @@ export function UploadReceiptButton({
 }) {
   const t = useTranslations("payments");
   const te = useTranslations("errors");
+  const offline = useOfflineGuard();
   const router = useRouter();
   const input = React.useRef<HTMLInputElement>(null);
   const [busy, setBusy] = React.useState(false);
@@ -39,10 +41,7 @@ export function UploadReceiptButton({
 
   async function onFile(raw: File | undefined) {
     if (!raw) return;
-    if (!navigator.onLine) {
-      toast.error(te("offline"));
-      return;
-    }
+    if (offline.blocked()) return;
     setBusy(true);
     try {
       // iPhone photos are HEIC: converted to JPEG here; the server checks the real type from the file's bytes.
@@ -55,6 +54,7 @@ export function UploadReceiptButton({
       toast.success(t("uploaded"));
       router.refresh();
     } catch (e) {
+      if (offline.failed(e)) return;
       const code = e instanceof Error ? e.message : "generic";
       toast.error(te.has(code) ? te(code) : te("generic"));
     } finally {

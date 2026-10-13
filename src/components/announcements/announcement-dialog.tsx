@@ -17,6 +17,7 @@ import {
   uploadAnnouncementFileAction,
 } from "@/app/(app)/announcements/actions";
 import { AudienceFields, readAudience, type Audience, type TargetGroup } from "./audience-fields";
+import { useOfflineGuard } from "@/lib/pwa/offline-guard";
 
 const MAX_FILE = 15 * 1024 * 1024;
 const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -43,6 +44,7 @@ export function AnnouncementDialog({
 }) {
   const t = useTranslations("announcements");
   const te = useTranslations("errors");
+  const offline = useOfflineGuard();
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
@@ -90,10 +92,7 @@ export function AnnouncementDialog({
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!navigator.onLine) {
-      toast.error(te("offline"));
-      return;
-    }
+    if (offline.blocked()) return;
     const f = new FormData(e.currentTarget);
     const { audience, groupIds } = readAudience(f);
     if (audience === "groups" && !groupIds.length) {
@@ -119,6 +118,7 @@ export function AnnouncementDialog({
       if (announcement) router.refresh();
       else router.push(`/announcements/${id}`);
     } catch (err) {
+      if (offline.failed(err)) return;
       console.error(err);
       toast.error(te("generic"));
     } finally {

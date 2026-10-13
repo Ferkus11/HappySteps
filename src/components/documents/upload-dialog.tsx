@@ -11,6 +11,7 @@ import { Field, Input, Select } from "@/components/ui/input";
 import { CHILD_CATEGORIES, DOCUMENT_ACCEPT, DOCUMENT_TYPES, MAX_DOCUMENT_SIZE, STAFF_DOC_TYPES, isHeic } from "@/lib/documents-logic";
 import { prepareDocumentFile } from "@/lib/heic";
 import { uploadChildDocumentAction, uploadStaffDocumentAction } from "@/app/(app)/documents/actions";
+import { useOfflineGuard } from "@/lib/pwa/offline-guard";
 
 type Props =
   | { kind: "child"; childId: string; defaultCategory?: string; who?: string }
@@ -23,6 +24,7 @@ type Props =
 export function UploadDocumentButton(props: Props & { size?: "sm" | "md"; className?: string }) {
   const t = useTranslations("documents");
   const te = useTranslations("errors");
+  const offline = useOfflineGuard();
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [file, setFile] = React.useState<File | null>(null);
@@ -52,10 +54,7 @@ export function UploadDocumentButton(props: Props & { size?: "sm" | "md"; classN
       setError(t("chooseFirst"));
       return;
     }
-    if (typeof navigator !== "undefined" && !navigator.onLine) {
-      toast.error(te("offline"));
-      return;
-    }
+    if (offline.blocked()) return;
     const fd = new FormData(e.currentTarget);
     fd.delete("pick");
     fd.delete("camera");
@@ -78,6 +77,7 @@ export function UploadDocumentButton(props: Props & { size?: "sm" | "md"; classN
       setFile(null);
       router.refresh();
     } catch (err) {
+      if (offline.failed(err)) return;
       console.error(err);
       toast.error(err instanceof Error && err.message === "fileTooLarge" ? te("fileTooLarge") : te("fileType"));
     } finally {

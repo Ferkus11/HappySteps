@@ -111,6 +111,10 @@ the foreground without redirection.
 - Kazakh screenshots: set cookie `hs_locale=kk` for the base URL before navigating.
 - Realtime delivers DELETE events without RLS (Supabase behaviour) — use soft delete (`deleted_at`) for anything users subscribe to.
 - Audit/notification label keys contain dots; look them up via `t.raw(...)` maps, not `t("a.b.c")`.
+- Service worker (stage 6): blocked in Playwright by default (`serviceWorkers: "block"`); a spec that needs it uses
+  `test.use({ serviceWorkers: "allow" })` and sets `PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS=1` around itself so
+  offline emulation/routes reach the worker (see `tests/e2e/28-pwa.spec.ts`). `E2E_SW=1 npm run e2e` runs everything with it on.
+- Mutations outside `useAction` must call `useOfflineGuard()` (`@/lib/pwa/offline-guard`): `blocked()` before, `failed(e)` in catch.
 
 ## 6. Registration points (expect trivial merge conflicts here — keep edits to one line each)
 - `src/messages/index.ts` — add your namespace.

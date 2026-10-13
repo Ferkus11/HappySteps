@@ -7,12 +7,14 @@ import { Languages } from "lucide-react";
 import { Dropdown, DropdownContent, DropdownItem, DropdownTrigger } from "@/components/ui/dropdown";
 import { setLocaleAction } from "@/lib/actions/session";
 import { locales } from "@/i18n/config";
+import { useOfflineGuard } from "@/lib/pwa/offline-guard";
 
 export function LanguageSwitcher() {
   const t = useTranslations("common");
   const locale = useLocale();
   const router = useRouter();
   const [pending, start] = React.useTransition();
+  const offline = useOfflineGuard();
   return (
     <Dropdown>
       <DropdownTrigger
@@ -29,12 +31,17 @@ export function LanguageSwitcher() {
           <DropdownItem
             key={l}
             data-testid={`locale-${l}`}
-            onSelect={() =>
+            onSelect={() => {
+              if (offline.blocked()) return;
               start(async () => {
-                await setLocaleAction(l);
-                router.refresh();
-              })
-            }
+                try {
+                  await setLocaleAction(l);
+                  router.refresh();
+                } catch (e) {
+                  if (!offline.failed(e)) throw e;
+                }
+              });
+            }}
             className={l === locale ? "font-bold text-brand" : undefined}
           >
             {t(`languages.${l}`)}
