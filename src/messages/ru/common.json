@@ -60,5 +60,6 @@
   "minutes": "{count, plural, one {# минута} few {# минуты} many {# минут} other {# минуты}}",
   "hours": "{count, plural, one {# час} few {# часа} many {# часов} other {# часа}}",
   "days": "{count, plural, one {# день} few {# дня} many {# дней} other {# дня}}",
-  "styleguide": "Дизайн-система"
+  "styleguide": "Дизайн-система",
+  "notificationsUnread": "{count, plural, one {Уведомления: # непрочитанное} few {Уведомления: # непрочитанных} many {Уведомления: # непрочитанных} other {Уведомления: # непрочитанного}}"
 }

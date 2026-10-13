@@ -86,3 +86,40 @@ export async function unsubscribePush(): Promise<string | null> {
   await sub.unsubscribe().catch(() => false);
   return endpoint;
 }
+
+/**
+ * Logout on a possibly shared device: unsubscribes this browser so the next person on it never sees the previous
+ * user's pushes, and returns the endpoint so the server can delete its row. Never throws and never holds the
+ * logout for long (`timeoutMs`).
+ */
+export async function releaseDevicePush(timeoutMs = 3000): Promise<string | null> {
+  if (!pushSupported()) return null;
+  let endpoint: string | null = null;
+  const work = (async () => {
+    const sub = await currentSubscription();
+    if (!sub) return;
+    endpoint = sub.endpoint;
+    await sub.unsubscribe().catch(() => false);
+  })().catch(() => undefined);
+  await Promise.race([work, new Promise((r) => setTimeout(r, timeoutMs))]);
+  return endpoint;
+}
+
+/** sessionStorage marker of PushSync: «this tab already re-saved the subscription for this user». */
+const SYNC_PREFIX = "hs_push_synced";
+
+export function pushSyncKey(userId: string): string {
+  return `${SYNC_PREFIX}:${userId}`;
+}
+
+/** Forgets every sync marker of this tab (logout, context switch): the next user's shell syncs again. */
+export function clearPushSyncMarkers(): void {
+  try {
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const k = sessionStorage.key(i);
+      if (k?.startsWith(SYNC_PREFIX)) sessionStorage.removeItem(k);
+    }
+  } catch {
+    // storage blocked: there is no marker either
+  }
+}

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { isIos, isIosSafari, isStandalone, shouldOfferIosInstall } from "@/lib/pwa/detect";
 import { isNetworkError } from "@/lib/pwa/network-error";
-import { USER_CACHE_PREFIX, isSignedOutPath } from "@/lib/pwa/caches";
+import { CONTEXT_KEY, USER_CACHE_PREFIX, contextChanged, isSignedOutPath } from "@/lib/pwa/caches";
 import manifest from "@/app/manifest";
 
 const UA = {
@@ -152,11 +152,42 @@ describe("service worker cache rules", () => {
 });
 
 describe("signed-out screens clear personal pages", () => {
-  it("login and invite only", () => {
+  it("login, invite, no access and blocked garden", () => {
     expect(isSignedOutPath("/login")).toBe(true);
     expect(isSignedOutPath("/invite/abc")).toBe(true);
+    expect(isSignedOutPath("/no-access")).toBe(true);
+    expect(isSignedOutPath("/blocked")).toBe(true);
     expect(isSignedOutPath("/")).toBe(false);
     expect(isSignedOutPath("/loginx")).toBe(false);
+    expect(isSignedOutPath("/notifications")).toBe(false);
+  });
+});
+
+describe("a change of user / garden / role clears personal pages", () => {
+  const memory = () => {
+    const m = new Map<string, string>();
+    return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), m };
+  };
+  it("reports a change once and remembers the new context", () => {
+    const s = memory();
+    expect(contextChanged("u1|kgA:parent", s)).toBe(true); // first visit on this device: nothing known, clear
+    expect(s.m.get(CONTEXT_KEY)).toBe("u1|kgA:parent");
+    expect(contextChanged("u1|kgA:parent", s)).toBe(false);
+    expect(contextChanged("u1|kgB:parent", s)).toBe(true); // a push click switched the garden
+    expect(contextChanged("u1|kgB:teacher", s)).toBe(true); // role
+    expect(contextChanged("u2|kgB:teacher", s)).toBe(true); // another account
+    expect(contextChanged("u2|kgB:teacher", s)).toBe(false);
+  });
+  it("outside the app or without storage nothing happens", () => {
+    expect(contextChanged("", memory())).toBe(false);
+    expect(contextChanged("u1|x", null)).toBe(false);
+    const broken = {
+      getItem: () => {
+        throw new Error("SecurityError");
+      },
+      setItem: () => undefined,
+    };
+    expect(contextChanged("u1|x", broken)).toBe(false);
   });
 });
 

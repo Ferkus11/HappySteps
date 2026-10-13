@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
+const OPEN_NOTIFICATION = /^\/notifications\/[0-9a-f-]{36}\/open$/i;
 const PUBLIC_PREFIXES = ["/styleguide", "/login", "/invite", "/apply", "/api/cron", "/api/health", "/offline"];
 
 /**
@@ -36,6 +37,8 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.search = "";
+    // A push opened after the session expired: come back to it after signing in.
+    if (OPEN_NOTIFICATION.test(path)) url.searchParams.set("next", path);
     return NextResponse.redirect(url);
   }
   return response;

@@ -60,5 +60,6 @@
   "minutes": "{count, plural, one {# минут} other {# минут}}",
   "hours": "{count, plural, one {# сағат} other {# сағат}}",
   "days": "{count, plural, one {# күн} other {# күн}}",
-  "styleguide": "Дизайн жүйесі"
+  "styleguide": "Дизайн жүйесі",
+  "notificationsUnread": "{count, plural, one {Хабарландырулар: # оқылмаған} other {Хабарландырулар: # оқылмаған}}"
 }

@@ -7,7 +7,16 @@
   "use strict";
 
   var ICON = "/icons/icon-192.png";
-  var BADGE = "/icons/icon-192.png";
+  // Android shows the badge as a white silhouette in the status bar: a monochrome transparent mark.
+  var BADGE = "/icons/badge-96.png";
+
+  /** A same-origin app path only: no `//host`, no `/\\host` (browsers treat a backslash as a slash). Mirrors safeAppPath. */
+  function safePath(url) {
+    if (typeof url !== "string" || url.charAt(0) !== "/") return null;
+    var second = url.charAt(1);
+    return second === "/" || second === "\\" ? null : url;
+  }
+  self.hsSafePushPath = safePath;
 
   function parse(event) {
     if (!event.data) return null;
@@ -32,7 +41,7 @@
       tag: typeof data.tag === "string" && data.tag ? data.tag : undefined,
       // A newer message of the same chat replaces the old one and still alerts.
       renotify: typeof data.tag === "string" && data.tag.indexOf("chat:") === 0,
-      data: { url: typeof data.url === "string" && data.url.charAt(0) === "/" && data.url.charAt(1) !== "/" ? data.url : "/notifications", id: data.id || null },
+      data: { url: safePath(data.url) || "/notifications", id: data.id || null },
     };
     event.waitUntil(self.registration.showNotification(title, options));
   });

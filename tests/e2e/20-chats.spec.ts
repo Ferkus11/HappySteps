@@ -286,14 +286,14 @@ test("quiet hours: the parent is warned, staff get the bell now and the push in 
         phone: string;
         deliver_after: Date | null;
       }[];
-    await expect.poll(async () => (await rows()).length).toBeGreaterThanOrEqual(3);
+    await expect.poll(async () => (await rows()).length).toBeGreaterThanOrEqual(4);
     const byPhone = Object.fromEntries((await rows()).map((r) => [r.phone, r.deliver_after]));
     for (const staff of [PHONES.teacher, PHONES.head, PHONES.owner]) {
       expect(byPhone[staff], staff).toBeInstanceOf(Date);
       expect(byPhone[staff]!.getTime(), staff).toBeGreaterThan(Date.now());
     }
-    // Stage 6: garden quiet hours defer pushes of every type, so the other parent's push waits for the morning too.
-    expect(byPhone[PARENT2.phone]).toBeInstanceOf(Date);
+    // Chat messages keep the chat rule only (garden quiet hours are not added): the other parent gets the push now.
+    expect(byPhone[PARENT2.phone]).toBeNull();
     await parent.context().close();
   } finally {
     await db.query("update kindergarten_settings set quiet_hours_start = $2::time, quiet_hours_end = $3::time where kindergarten_id = $1", [kgA, prev.s, prev.e]);

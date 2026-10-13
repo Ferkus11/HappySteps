@@ -6,7 +6,8 @@ export interface NotificationMessages {
   fallbackTitle: string;
   months: Record<string, string>;
   monthYear: string;
-  types: Record<string, { title: string; body: string }>;
+  /** `pushBody` (optional): a shorter body for the lock screen, used by Web Push instead of `body`. */
+  types: Record<string, { title: string; body: string; pushBody?: string }>;
 }
 
 export type NotificationParams = Record<string, string | number | null | undefined>;
@@ -44,16 +45,21 @@ const tidy = (s: string) =>
     .replace(/^[\s·:,.—]+|[\s·:,—]+$/g, "")
     .trim();
 
-/** Title and body of a notification in `locale`, from its `type` + `params` (DECISIONS D-013). */
+/**
+ * Title and body of a notification in `locale`, from its `type` + `params` (DECISIONS D-013).
+ * `variant: "push"` uses the type's `pushBody` when it has one (less private detail on a lock screen).
+ */
 export function renderNotification(
   messages: NotificationMessages,
   locale: Locale,
   type: string,
   params: NotificationParams | null | undefined,
+  variant: "bell" | "push" = "bell",
 ): { title: string; body: string } {
   const tpl = messages.types[type];
   if (!tpl) return { title: messages.fallbackTitle, body: "" };
-  const values = prepareParams(messages, locale, params ?? {}, [tpl.title, tpl.body]);
+  const bodyTpl = variant === "push" && tpl.pushBody ? tpl.pushBody : tpl.body;
+  const values = prepareParams(messages, locale, params ?? {}, [tpl.title, bodyTpl]);
   const safe = (template: string) => {
     try {
       return tidy(fmt(locale, template, values));
@@ -61,5 +67,5 @@ export function renderNotification(
       return "";
     }
   };
-  return { title: safe(tpl.title) || messages.fallbackTitle, body: safe(tpl.body) };
+  return { title: safe(tpl.title) || messages.fallbackTitle, body: safe(bodyTpl) };
 }

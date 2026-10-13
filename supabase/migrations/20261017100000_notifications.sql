@@ -60,6 +60,9 @@ revoke insert, update on public.push_subscriptions from authenticated;
 create index notifications_deferred_idx on public.notifications (deliver_after)
   where pushed_at is null and deliver_after is not null;
 
+-- delete_chat_message() finds the bell rows of a removed chat message by its id.
+create index notifications_message_idx on public.notifications ((params->>'message_id')) where type = 'message.new';
+
 -- Claims due deferred rows atomically (service role only): marks them pushed and returns them.
 create or replace function public.claim_deferred_pushes(p_limit int default 500)
   returns setof public.notifications

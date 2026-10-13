@@ -1,13 +1,10 @@
 "use client";
 
-import * as React from "react";
 import { useTranslations } from "next-intl";
-import { toast } from "sonner";
 import { BellOff, BellRing, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { deletePushSubscriptionAction, savePushSubscriptionAction } from "@/app/(app)/notifications/actions";
-import { detectPushState, subscribePush, unsubscribePush, type PushState } from "./push-client";
+import { usePush } from "./use-push";
 
 /**
  * Push on this device: unsupported / iOS outside the installed app / blocked / on / off.
@@ -15,51 +12,7 @@ import { detectPushState, subscribePush, unsubscribePush, type PushState } from 
  */
 export function PushCard({ publicKey, quiet }: { publicKey: string | null; quiet: { start: string; end: string } | null }) {
   const t = useTranslations("notifications.push");
-  const [state, setState] = React.useState<PushState>("loading");
-  const [busy, setBusy] = React.useState(false);
-
-  React.useEffect(() => {
-    let alive = true;
-    detectPushState(publicKey)
-      .then((s) => alive && setState(s))
-      .catch(() => alive && setState("unsupported"));
-    return () => {
-      alive = false;
-    };
-  }, [publicKey]);
-
-  const enable = async () => {
-    if (!publicKey) return;
-    setBusy(true);
-    try {
-      const r = await subscribePush(publicKey);
-      if (r === "blocked" || r === "off") {
-        setState(r);
-        return;
-      }
-      const saved = await savePushSubscriptionAction(r);
-      if (!saved.ok) throw new Error(saved.error);
-      setState("on");
-      toast.success(t("enabled"));
-    } catch (e) {
-      console.error("push enable", e);
-      toast.error(t("failed"));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const disable = async () => {
-    setBusy(true);
-    try {
-      const endpoint = await unsubscribePush();
-      if (endpoint) await deletePushSubscriptionAction(endpoint);
-      setState("off");
-      toast.success(t("disabled"));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const { state, busy, enable, disable } = usePush(publicKey);
 
   const text = state === "loading" ? "" : t(state);
   const Icon = state === "on" ? BellRing : state === "ios" ? Smartphone : BellOff;

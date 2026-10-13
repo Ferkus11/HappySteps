@@ -14,9 +14,11 @@ import {
   DropdownSeparator,
   DropdownTrigger,
 } from "@/components/ui/dropdown";
-import { logoutAction, switchContextAction } from "@/lib/actions/session";
+import { switchContextAction } from "@/lib/actions/session";
 import { clearUserCaches } from "@/lib/pwa/caches";
 import { useOfflineGuard } from "@/lib/pwa/offline-guard";
+import { clearPushSyncMarkers } from "@/components/notifications/push-client";
+import { useLogout } from "./use-logout";
 
 export interface ContextOption {
   value: string; // `${kindergartenId}:${role}` or "superadmin"
@@ -39,6 +41,7 @@ export function AccountMenu({
   const router = useRouter();
   const [, start] = React.useTransition();
   const offline = useOfflineGuard();
+  const { logout } = useLogout();
   return (
     <Dropdown>
       <DropdownTrigger className="ml-1 flex cursor-pointer items-center gap-2.5 rounded-full p-1 pr-1 hover:bg-surface-muted md:pr-3" data-testid="account-menu">
@@ -70,6 +73,7 @@ export function AccountMenu({
                   start(async () => {
                     // Saved pages belong to the role/garden they were rendered for.
                     await clearUserCaches();
+                    clearPushSyncMarkers();
                     await switchContextAction(c.value);
                     router.push("/");
                     router.refresh();
@@ -88,14 +92,8 @@ export function AccountMenu({
         <DropdownSeparator />
         <DropdownItem
           data-testid="logout"
-          onSelect={() => {
-            if (offline.blocked()) return;
-            // Saved pages are personal: drop them before the session ends (the login screen clears them again).
-            start(async () => {
-              await clearUserCaches();
-              await logoutAction();
-            });
-          }}
+          // Saved pages and this device's push subscription are personal: removed before the session ends.
+          onSelect={logout}
         >
           <LogOut /> {t("logout")}
         </DropdownItem>

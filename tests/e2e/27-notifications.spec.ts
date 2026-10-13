@@ -1,10 +1,10 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { config } from "dotenv";
 import { Pool } from "pg";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { createDecipheriv, createECDH, createHmac, randomBytes, type ECDH } from "node:crypto";
-import { PHONES, login } from "./helpers";
+import { PHONES, expectToast, login } from "./helpers";
 
 config({ path: ".env.local", quiet: true });
 test.describe.configure({ mode: "serial" });
@@ -82,6 +82,7 @@ test.afterAll(async () => {
   await db.query("update profiles set locale = 'ru' where id = $1", [parentId]);
   await db.query("delete from notifications where url = $1 or params::text like '%E2E %'", [`/chats/${sun}`]);
   await db.query("delete from messages where body like 'E2E %'");
+  await db.query("delete from announcements where title like $1", [`E2E %${RUN}`]);
   await db.end();
   server.close();
 });
@@ -92,6 +93,52 @@ async function as(browser: Browser, phone: string): Promise<Page> {
   await login(page, phone);
   return page;
 }
+
+/**
+ * Stand-in browser push APIs (headless Chromium has no push service): permission prompt + pushManager. State lives
+ * in localStorage, so it survives navigations like a real browser profile. `permission` = the starting permission.
+ * Also inert service-worker events/controller (PwaRoot listens to them).
+ */
+async function stubPush(ctx: BrowserContext, ep: string, permission: NotificationPermission = "default") {
+  await ctx.addInitScript(
+    ({ ep, p256dh, auth, permission }) => {
+      const store = {
+        get: (k: string) => localStorage.getItem(`__push_${k}`),
+        set: (k: string, v: string | null) => (v === null ? localStorage.removeItem(`__push_${k}`) : localStorage.setItem(`__push_${k}`, v)),
+      };
+      if (!store.get("permission")) store.set("permission", permission);
+      const N = {
+        get permission() {
+          return store.get("permission") as NotificationPermission;
+        },
+        requestPermission: async () => {
+          if (store.get("permission") === "default") store.set("permission", "granted");
+          return store.get("permission") as NotificationPermission;
+        },
+      };
+      Object.defineProperty(window, "Notification", { value: N, configurable: true });
+      Object.defineProperty(window, "PushManager", { value: function PushManager() {}, configurable: true });
+      const sub = {
+        endpoint: ep,
+        toJSON: () => ({ endpoint: ep, keys: { p256dh, auth } }),
+        unsubscribe: async () => (store.set("sub", null), true),
+      };
+      const reg = {
+        active: {},
+        addEventListener() {},
+        pushManager: { getSubscription: async () => (store.get("sub") ? sub : null), subscribe: async () => (store.set("sub", "1"), sub) },
+      };
+      Object.defineProperty(navigator, "serviceWorker", {
+        value: { getRegistration: async () => reg, register: async () => reg, ready: Promise.resolve(reg), controller: null, addEventListener() {}, removeEventListener() {} },
+        configurable: true,
+      });
+    },
+    { ep, p256dh: ecdh.getPublicKey("base64url"), auth: authSecret.toString("base64url"), permission },
+  );
+}
+
+const subscribedHere = (page: Page) => page.evaluate(() => localStorage.getItem("__push_sub") === "1");
+const subOwner = async (ep: string) => (await one("select user_id from push_subscriptions where endpoint = $1", [ep]))?.user_id ?? null;
 
 const bell = (page: Page) => page.getByTestId("unread-notifications");
 
@@ -149,23 +196,7 @@ test("bell count, the centre in the reader's language, live updates, mark read a
 
 test("profile: only the parent's types, a switch is saved, the push card subscribes this device", async ({ browser }) => {
   const ctx = await browser.newContext({ locale: "ru-RU", timezoneId: "Asia/Almaty", viewport: { width: 1440, height: 900 } });
-  // Stand-in browser push APIs (headless Chromium has no push service): permission prompt + pushManager.
-  await ctx.addInitScript(
-    ({ ep, p256dh, auth }) => {
-      const N = { permission: "default" as NotificationPermission, requestPermission: async () => ((N.permission = "granted"), "granted" as const) };
-      Object.defineProperty(window, "Notification", { value: N, configurable: true });
-      Object.defineProperty(window, "PushManager", { value: function PushManager() {}, configurable: true });
-      let current: unknown = null;
-      const sub = { endpoint: ep, toJSON: () => ({ endpoint: ep, keys: { p256dh, auth } }), unsubscribe: async () => ((current = null), true) };
-      const reg = { active: {}, addEventListener() {}, pushManager: { getSubscription: async () => current, subscribe: async () => (current = sub) } };
-      Object.defineProperty(navigator, "serviceWorker", {
-        // (the PWA root also listens for worker updates — give it an inert event target)
-        value: { getRegistration: async () => reg, register: async () => reg, ready: Promise.resolve(reg), controller: null, addEventListener() {}, removeEventListener() {} },
-        configurable: true,
-      });
-    },
-    { ep: `${endpoint}-ui`, p256dh: ecdh.getPublicKey("base64url"), auth: authSecret.toString("base64url") },
-  );
+  await stubPush(ctx, `${endpoint}-ui`);
   const page = await ctx.newPage();
   await login(page, PHONES.parent);
   await page.goto("/profile");
@@ -194,6 +225,107 @@ test("profile: only the parent's types, a switch is saved, the push card subscri
   await ctx.close();
 });
 
+test("shared device: logout removes this device's subscription; a second account in the same tab re-syncs it", async ({ browser }) => {
+  const ep = `${endpoint}-shared`;
+  const teacherId = (await one("select id from profiles where phone = $1", [PHONES.teacher])).id;
+  const ctx = await browser.newContext({ locale: "ru-RU", timezoneId: "Asia/Almaty", viewport: { width: 1440, height: 900 } });
+  await stubPush(ctx, ep);
+  const page = await ctx.newPage();
+  try {
+    await login(page, PHONES.parent);
+    await page.goto("/profile");
+    await page.getByTestId("push-card").getByTestId("push-enable").click();
+    await expect.poll(() => subOwner(ep)).toBe(parentId);
+
+    // The session ends without a logout (expired) and the teacher signs in on the same device and tab:
+    // the subscription follows the signed-in account (the sync marker is per user).
+    await login(page, PHONES.teacher);
+    await expect.poll(() => subOwner(ep), { timeout: 15_000 }).toBe(teacherId);
+
+    // Logout: unsubscribed in the browser and deleted on the server — nothing reaches the lock screen any more.
+    await page.getByTestId("account-menu").click();
+    await page.getByTestId("logout").click();
+    await page.waitForURL(/\/login$/);
+    await expect.poll(() => subOwner(ep)).toBeNull();
+    expect(await subscribedHere(page)).toBe(false);
+  } finally {
+    await ctx.close();
+    await db.query("delete from push_subscriptions where endpoint = $1", [ep]);
+  }
+});
+
+test("dashboard prompt: enable push in one tap; «Не сейчас» hides it on this device; not offered when blocked", async ({ browser }) => {
+  const ep = `${endpoint}-prompt`;
+  const open = async (permission: NotificationPermission) => {
+    const ctx = await browser.newContext({ locale: "ru-RU", timezoneId: "Asia/Almaty", viewport: { width: 390, height: 844 } });
+    await stubPush(ctx, ep, permission);
+    const page = await ctx.newPage();
+    await login(page, PHONES.parent);
+    await expect(page.getByTestId("dashboard")).toBeVisible();
+    return page;
+  };
+  try {
+    const page = await open("default");
+    const prompt = page.getByTestId("push-prompt");
+    await expect(prompt).toBeVisible();
+    await expect(prompt).toContainText("Включите уведомления");
+    await prompt.getByTestId("push-prompt-enable").click();
+    await expectToast(page, "Push-уведомления включены");
+    await expect(prompt).toHaveCount(0);
+    await expect.poll(() => subOwner(ep)).toBe(parentId);
+    await page.reload();
+    await expect(page.getByTestId("dashboard")).toBeVisible();
+    await page.waitForTimeout(1000);
+    await expect(page.getByTestId("push-prompt")).toHaveCount(0); // already on
+    await page.context().close();
+    await db.query("delete from push_subscriptions where endpoint = $1", [ep]);
+
+    const later = await open("default");
+    await later.getByTestId("push-prompt-dismiss").click();
+    await expect(later.getByTestId("push-prompt")).toHaveCount(0);
+    await later.reload();
+    await expect(later.getByTestId("dashboard")).toBeVisible();
+    await later.waitForTimeout(1000);
+    await expect(later.getByTestId("push-prompt")).toHaveCount(0);
+    expect(await subOwner(ep)).toBeNull();
+    await later.context().close();
+
+    const blocked = await open("denied");
+    await blocked.waitForTimeout(1000);
+    await expect(blocked.getByTestId("push-prompt")).toHaveCount(0);
+    await blocked.context().close();
+  } finally {
+    await db.query("delete from push_subscriptions where endpoint = $1", [ep]);
+  }
+});
+
+test("a push opened after the session expired: login, then straight to the notification", async ({ browser }) => {
+  const id = await insertFor(parentId, "receipt.accepted", { month: "2026-10", amount: say("1 ₸") }, "/payments");
+  const ctx = await browser.newContext({ locale: "ru-RU", timezoneId: "Asia/Almaty" });
+  const page = await ctx.newPage();
+  await page.goto(`/notifications/${id}/open`);
+  await page.waitForURL(/\/login\?next=/);
+  expect(new URL(page.url()).searchParams.get("next")).toBe(`/notifications/${id}/open`);
+  const input = page.getByLabel("Номер телефона");
+  await input.click();
+  await input.pressSequentially(PHONES.parent.replace(/^\+7/, ""));
+  await page.getByLabel("Пароль").fill("Test1234!");
+  await page.getByTestId("login-submit").click();
+  await page.waitForURL(/\/payments$/);
+  expect((await one("select read_at from notifications where id = $1", [id])).read_at).not.toBeNull();
+
+  // a foreign `next` is ignored
+  await ctx.clearCookies();
+  await page.goto("/login?next=//evil.example/x");
+  await input.click();
+  await input.pressSequentially(PHONES.parent.replace(/^\+7/, ""));
+  await page.getByLabel("Пароль").fill("Test1234!");
+  await page.getByTestId("login-submit").click();
+  await page.waitForURL((u) => !u.pathname.startsWith("/login"));
+  expect(page.url()).not.toContain("evil");
+  await ctx.close();
+});
+
 test.describe("Web Push end-to-end", () => {
   let teacher: Page;
 
@@ -218,6 +350,10 @@ test.describe("Web Push end-to-end", () => {
     await db.query("update chat_reads set last_read_at = now() - interval '1 hour' where chat_id = $1", [sun]);
   }
   async function send(text: string) {
+    if (!teacher.url().endsWith(`/chats/${sun}`)) {
+      await teacher.goto(`/chats/${sun}`);
+      await expect(teacher.getByTestId("conversation")).toHaveAttribute("data-live", "true");
+    }
     await teacher.getByTestId("composer-input").fill(text);
     await teacher.getByTestId("composer-send").click();
     await expect(teacher.getByTestId("message").filter({ hasText: text }).last()).toBeVisible();
@@ -251,17 +387,38 @@ test.describe("Web Push end-to-end", () => {
     await parent.context().close();
   });
 
-  test("quiet hours: the bell row appears at once, the push waits; the cron sends it once in the reader's language", async ({ request }) => {
+  /** The teacher publishes an announcement to Солнышко (the parent's group); returns its notification row for the parent. */
+  async function announce(title: string, important: boolean) {
+    await teacher.goto("/announcements");
+    await teacher.getByTestId("new-announcement").click();
+    await teacher.getByTestId("announcement-title").fill(title);
+    await teacher.getByTestId("announcement-body").fill("Подробности у воспитателя.");
+    await teacher.getByTestId("group-option-Солнышко").check();
+    if (important) await teacher.getByTestId("announcement-important").click();
+    await teacher.getByTestId("announcement-submit").click();
+    await teacher.waitForURL(/\/announcements\/[0-9a-f-]{36}$/);
+    const url = new URL(teacher.url()).pathname;
+    await expect.poll(async () => (await db.query("select 1 from notifications where user_id = $1 and url = $2", [parentId, url])).rowCount).toBe(1);
+    return one("select id, deliver_after, pushed_at from notifications where user_id = $1 and url = $2", [parentId, url]);
+  }
+
+  test("quiet hours: chat messages to a parent go out at once; a routine announcement waits for the cron (reader's language), an important one does not", async ({ request }) => {
     await db.query("update kindergarten_settings set quiet_hours_start = '00:00', quiet_hours_end = '23:59' where kindergarten_id = $1", [kgA]);
     await db.query("update profiles set locale = 'kk' where id = $1", [parentId]);
     try {
+      // staff → parent chat message: the chat module defers only parent → staff, garden quiet hours are not added
       await freshChat();
       received.length = 0;
-      await send(say("Поздний вопрос"));
-      await expect.poll(async () => (await parentRow())?.id ?? null).not.toBeNull();
-      const row = await parentRow();
-      expect(row.deliver_after.getTime()).toBeGreaterThan(Date.now());
-      expect(row.pushed_at).toBeNull();
+      await send(say("Поздний ответ"));
+      await expect.poll(() => received.length).toBe(1);
+      expect((await parentRow()).deliver_after).toBeNull();
+      expect(decrypt(received[0].body)).toMatchObject({ title: "Жаңа хабарлама" });
+
+      // routine announcement: the bell row at once, the push in the morning
+      received.length = 0;
+      const routine = await announce(say("Плановое объявление"), false);
+      expect(routine.deliver_after.getTime()).toBeGreaterThan(Date.now());
+      expect(routine.pushed_at).toBeNull();
       expect((await request.get("/api/cron/push-deferred")).status()).toBe(401);
       const c = cron("/api/cron/push-deferred");
       expect((await request.get(c.path, { headers: c.headers })).status()).toBe(200);
@@ -269,17 +426,24 @@ test.describe("Web Push end-to-end", () => {
       expect(received).toHaveLength(0);
 
       // morning comes
-      await db.query("update notifications set deliver_after = now() - interval '1 minute' where id = $1", [row.id]);
+      await db.query("update notifications set deliver_after = now() - interval '1 minute' where id = $1", [routine.id]);
       const res = await request.get(c.path, { headers: c.headers });
       expect(res.status()).toBe(200);
       expect((await res.json()).sent).toBeGreaterThanOrEqual(1);
       await expect.poll(() => received.length).toBe(1);
-      expect(decrypt(received[0].body)).toMatchObject({ id: row.id, title: "Жаңа хабарлама" });
-      expect((await parentRow()).pushed_at).not.toBeNull();
+      expect(decrypt(received[0].body)).toMatchObject({ id: routine.id, title: "Жаңа жарияланым" });
+      expect((await one("select pushed_at from notifications where id = $1", [routine.id])).pushed_at).not.toBeNull();
       // idempotent
       await request.get(c.path, { headers: c.headers });
       await new Promise((r) => setTimeout(r, 500));
       expect(received).toHaveLength(1);
+
+      // important announcement: not held back
+      received.length = 0;
+      const important = await announce(say("Важное объявление"), true);
+      expect(important.deliver_after).toBeNull();
+      await expect.poll(() => received.length).toBe(1);
+      expect(decrypt(received[0].body)).toMatchObject({ id: important.id, title: "Жаңа жарияланым" });
     } finally {
       await db.query("update kindergarten_settings set quiet_hours_start = '00:00', quiet_hours_end = '00:00' where kindergarten_id = $1", [kgA]);
       await db.query("update profiles set locale = 'ru' where id = $1", [parentId]);

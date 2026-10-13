@@ -35,6 +35,9 @@ import type { Locale } from "@/i18n/config";
 import type { NotificationItem } from "@/lib/notifications-data";
 import { subscribeAuthed, uniqueTopic } from "@/components/chats/realtime";
 import { NOTIFICATIONS_CHANGED } from "@/components/notifications/live-bell";
+import { isOnline } from "@/lib/pwa/connectivity";
+import { useOfflineGuard } from "@/lib/pwa/offline-guard";
+import { safeAppPath } from "@/lib/safe-path";
 import { loadNotificationsAction, markAllNotificationsReadAction, markNotificationReadAction } from "./actions";
 
 const ICONS: Record<string, LucideIcon> = {
@@ -56,7 +59,6 @@ const ICONS: Record<string, LucideIcon> = {
 };
 
 const changed = () => window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED));
-const safePath = (url: string | null) => (url && url.startsWith("/") && !url.startsWith("//") && !url.startsWith("/\\") ? url : null);
 
 function dayKey(iso: string, tz: string) {
   return todayIn(tz, new Date(iso));
@@ -68,6 +70,7 @@ export function NotificationCentre(props: { items: NotificationItem[]; more: boo
   const locale = useLocale() as Locale;
   const messages = (useMessages() as unknown as { notifications: NotificationMessages }).notifications;
   const router = useRouter();
+  const { blocked, failed } = useOfflineGuard();
   const [items, setItems] = React.useState(props.items);
   const [more, setMore] = React.useState(props.more);
   const [loading, setLoading] = React.useState(false);
@@ -78,9 +81,10 @@ export function NotificationCentre(props: { items: NotificationItem[]; more: boo
   const unread = Math.max(serverUnread, items.filter((i) => !i.read_at).length);
 
   const loadMore = React.useCallback(async () => {
-    if (loading || !more || !items.length) return;
+    if (loading || !more || !items.length || !isOnline()) return;
     setLoading(true);
-    const r = await loadNotificationsAction(items[items.length - 1].created_at).catch(() => null);
+    const last = items[items.length - 1];
+    const r = await loadNotificationsAction({ createdAt: last.created_at, id: last.id }).catch((e: unknown) => (failed(e), null));
     setLoading(false);
     if (!r?.ok) return;
     setItems((cur) => {
@@ -88,7 +92,7 @@ export function NotificationCentre(props: { items: NotificationItem[]; more: boo
       return [...cur, ...r.data.items.filter((i) => !seen.has(i.id))];
     });
     setMore(r.data.more);
-  }, [items, loading, more]);
+  }, [items, loading, more, failed]);
 
   // Infinite scroll; the button stays as a fallback.
   React.useEffect(() => {
@@ -105,6 +109,8 @@ export function NotificationCentre(props: { items: NotificationItem[]; more: boo
     const fetchNewest = () => {
       clearTimeout(timer);
       timer = setTimeout(async () => {
+        // Offline the saved page stays as it is; the channel re-fetches once it reconnects.
+        if (!isOnline()) return;
         const r = await loadNotificationsAction(null).catch(() => null);
         if (!r?.ok) return;
         setItems((cur) => {
@@ -130,20 +136,28 @@ export function NotificationCentre(props: { items: NotificationItem[]; more: boo
   }, []);
 
   const open = async (item: NotificationItem) => {
-    if (!item.read_at) {
+    // Offline: the link still opens (a saved page may exist), the row stays unread until the next visit.
+    if (!item.read_at && isOnline()) {
       setItems((cur) => cur.map((i) => (i.id === item.id ? { ...i, read_at: new Date().toISOString() } : i)));
       setServerUnread((n) => Math.max(0, n - 1));
-      await markNotificationReadAction(item.id).catch(() => null);
+      await markNotificationReadAction(item.id).catch((e: unknown) => failed(e));
       changed();
     }
-    const path = safePath(item.url);
+    const path = safeAppPath(item.url);
     if (path) router.push(path);
   };
 
   const readAll = async () => {
+    if (blocked()) return;
     setMarkingAll(true);
-    const r = await markAllNotificationsReadAction().catch(() => null);
-    setMarkingAll(false);
+    let r: Awaited<ReturnType<typeof markAllNotificationsReadAction>> | null = null;
+    try {
+      r = await markAllNotificationsReadAction();
+    } catch (e) {
+      if (failed(e)) return;
+    } finally {
+      setMarkingAll(false);
+    }
     if (!r?.ok) {
       toast.error(te("generic"));
       return;

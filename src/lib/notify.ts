@@ -2,7 +2,7 @@ import "server-only";
 import { after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { filterByPreferences, type NotificationType } from "@/lib/notification-types";
-import { laterOf, quietHoursEnd } from "@/lib/quiet-hours";
+import { deferredByQuietHours, laterOf, quietHoursEnd } from "@/lib/quiet-hours";
 import { deliverNow } from "@/lib/push";
 
 export { NOTIFICATION_TYPES, type NotificationType } from "@/lib/notification-types";
@@ -15,6 +15,8 @@ export interface NotifyInput {
   url?: string | null;
   /** Push only after this moment (e.g. the end of quiet hours); the in-app row appears at once. */
   deliverAfter?: string | null;
+  /** An important announcement: its push is not held back by quiet hours (see deferredByQuietHours). */
+  important?: boolean;
 }
 
 /** Users who switched this type off in their profile (they get neither a bell row nor a push). */
@@ -54,8 +56,8 @@ function schedule(task: () => Promise<void>) {
  * Creates in-app notifications and sends Web Push (lib/push.ts).
  * Call ONLY after the action has verified the actor's permissions — this uses the service role.
  * - Types a recipient switched off in the profile are skipped entirely (no bell row, no push).
- * - During the garden's quiet hours the bell row appears at once, the push waits for the end of them
- *   (`deliver_after`; /api/cron/push-deferred sends it).
+ * - During the garden's quiet hours the bell row appears at once; the push of a routine type waits for the end
+ *   of them (`deliver_after`; /api/cron/push-deferred sends it). Which types wait: deferredByQuietHours().
  * Never throws: a notification problem must not fail the action that caused it.
  */
 export async function notify(input: NotifyInput): Promise<void> {
@@ -65,7 +67,8 @@ export async function notify(input: NotifyInput): Promise<void> {
     ids = filterByPreferences(ids, await disabledUsers(input.type, ids));
     if (!ids.length) return;
     const now = new Date();
-    const deliverAfter = laterOf(input.deliverAfter, await quietUntil(input.kindergartenId, now));
+    const garden = deferredByQuietHours(input.type, { important: input.important }) ? await quietUntil(input.kindergartenId, now) : null;
+    const deliverAfter = laterOf(input.deliverAfter, garden);
     const rows = ids.map((user_id) => ({
       kindergarten_id: input.kindergartenId,
       user_id,

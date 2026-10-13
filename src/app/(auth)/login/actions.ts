@@ -7,11 +7,14 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { serverEnv } from "@/lib/env";
 import { normalizePhone, phoneToAuthEmail } from "@/lib/phone";
+import { safeNextPath } from "@/lib/safe-path";
 
 export interface LoginState {
   error?: "invalidCredentials" | "tooManyAttempts" | "phoneInvalid" | "passwordMin";
   retryMinutes?: number;
   phone?: string;
+  /** Signed in with a `next` path: the form opens it with a full page load (it may be a route handler). */
+  redirectTo?: string;
 }
 
 const WINDOW_MIN = 15;
@@ -45,5 +48,8 @@ export async function loginAction(_prev: LoginState, form: FormData): Promise<Lo
   });
   await service.rpc("login_attempts_record", { p_phone: phone, p_ip: ip, p_success: !error });
   if (error) return { error: "invalidCredentials", phone: rawPhone };
+  // `next`: same-origin path only (e.g. a push opened while signed out) — never an open redirect.
+  const next = safeNextPath(form.get("next"));
+  if (next) return { redirectTo: next };
   redirect("/");
 }

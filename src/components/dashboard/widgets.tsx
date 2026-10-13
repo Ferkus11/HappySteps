@@ -12,6 +12,7 @@ import { paymentsWidgets } from "@/components/payments/widgets";
 import { chatsWidgets } from "@/components/chats/widgets";
 import { waitlistWidgets } from "@/components/waitlist/widgets";
 import { clubsWidgets } from "@/components/clubs/widgets";
+import { notificationsWidgets } from "@/components/notifications/widgets";
 import { coreWidgets } from "./core-widgets";
 import { WidgetSkeleton, type SkeletonKind } from "./skeletons";
 
@@ -56,6 +57,7 @@ export const dashboardWidgets: DashboardWidget[] = [
   ...chatsWidgets,
   ...waitlistWidgets,
   ...clubsWidgets,
+  ...notificationsWidgets,
 ];
 
 export function widgetsFor(role: Role, slot: DashboardWidget["slot"]): DashboardWidget[] {

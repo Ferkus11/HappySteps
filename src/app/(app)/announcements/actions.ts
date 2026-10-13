@@ -54,6 +54,7 @@ export async function createAnnouncementAction(input: AnnouncementInput) {
       type: "announcement.new",
       params: { title: v.title },
       url: `/announcements/${id}`,
+      important: v.important,
     });
     return { id };
   });

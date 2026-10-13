@@ -74,15 +74,26 @@ export function chatIdOf(url: string | null): string | null {
   return m ? m[1].toLowerCase() : null;
 }
 
-/** Payload and push-service options for one notification in the recipient's language. */
+/** Characters of a chat message shown on the lock screen (the full text is in the app). */
+export const PUSH_CHAT_PREVIEW = 100;
+
+const clip = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 1)}…` : s);
+
+/**
+ * Payload and push-service options for one notification in the recipient's language.
+ * Lock-screen privacy: an absence shows the child and the period only (the reason stays in the bell);
+ * a chat message shows the sender and the first ~100 characters.
+ */
 export function buildPush(row: PushRow, locale: Locale): { payload: PushPayload; urgency: webpush.Urgency; topic?: string } {
-  const { title, body } = renderNotification(MESSAGES[locale] ?? MESSAGES.ru, locale, row.type, row.params);
+  const params = { ...(row.params ?? {}) };
+  if (row.type === "message.new" && typeof params.text === "string") params.text = clip(params.text, PUSH_CHAT_PREVIEW);
+  const { title, body } = renderNotification(MESSAGES[locale] ?? MESSAGES.ru, locale, row.type, params, "push");
   const chat = chatIdOf(row.url);
   return {
     payload: {
       id: row.id,
       title,
-      body: body.length > 300 ? `${body.slice(0, 299)}…` : body,
+      body: clip(body, 300),
       url: `/notifications/${row.id}/open`,
       tag: chat ? `chat:${chat}` : `n:${row.id}`,
     },
@@ -90,6 +101,18 @@ export function buildPush(row: PushRow, locale: Locale): { payload: PushPayload;
     // Push services keep only the newest pending message per topic (≤ 32 URL-safe characters).
     topic: chat ? chat.replace(/-/g, "") : undefined,
   };
+}
+
+/** Parallel requests to push services at most (a large fan-out must not open hundreds of sockets at once). */
+const SEND_CONCURRENCY = 20;
+
+/** Runs the tasks with at most `limit` in flight. */
+export async function runLimited(tasks: (() => Promise<void>)[], limit: number): Promise<void> {
+  let next = 0;
+  const worker = async () => {
+    while (next < tasks.length) await tasks[next++]();
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
 }
 
 type Subscription = { id: string; user_id: string; endpoint: string; p256dh: string; auth: string };
@@ -142,16 +165,15 @@ export async function sendPushes(rows: PushRow[]): Promise<{ sent: number; remov
 
     const gone = new Set<string>();
     const used = new Set<string>();
-    await Promise.all(
-      rows.flatMap((row) => {
-        const push = buildPush(row, locale.get(row.user_id) ?? "ru");
-        return (byUser.get(row.user_id) ?? []).map(async (s) => {
-          const r = await sendOne(s, push, keys);
-          if (r === "gone") gone.add(s.id);
-          if (r === "ok") used.add(s.id);
-        });
-      }),
-    );
+    const tasks = rows.flatMap((row) => {
+      const push = buildPush(row, locale.get(row.user_id) ?? "ru");
+      return (byUser.get(row.user_id) ?? []).map((s) => async () => {
+        const r = await sendOne(s, push, keys);
+        if (r === "gone") gone.add(s.id);
+        if (r === "ok") used.add(s.id);
+      });
+    });
+    await runLimited(tasks, SEND_CONCURRENCY);
     if (gone.size) await db.from("push_subscriptions").delete().in("id", [...gone]);
     if (used.size) await db.from("push_subscriptions").update({ last_used_at: new Date().toISOString() }).in("id", [...used]);
     return { sent: used.size, removed: gone.size };
@@ -198,6 +220,7 @@ export async function deliverDeferred(now = new Date()): Promise<{ claimed: numb
     const rows = (data ?? []) as (PushRow & { read_at: string | null; deliver_after: string })[];
     claimed += rows.length;
     const due = rows.filter((r) => !r.read_at && now.getTime() - new Date(r.deliver_after).getTime() < STALE_MS);
+    if (due.length < rows.length) console.info("push deferred: claimed but not sent (read meanwhile or stale)", rows.length - due.length);
     const r = await sendPushes(due);
     sent += r.sent;
     removed += r.removed;

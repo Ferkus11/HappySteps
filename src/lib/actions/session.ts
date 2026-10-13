@@ -41,8 +41,22 @@ export async function switchContextAction(value: string) {
   await supabase.from("profiles").update({ last_context: value }).eq("id", data.user.id);
 }
 
-export async function logoutAction() {
+/**
+ * Ends the session. `endpoint` = this browser's push subscription (already unsubscribed on the device by the
+ * client, see useLogout): its row is deleted first, while the user is still signed in (RLS: own rows only), so a
+ * shared device stops receiving this user's pushes. A form submit passes FormData instead — ignored.
+ * Never fails because of the subscription.
+ */
+export async function logoutAction(endpoint?: string | FormData | null) {
   const supabase = await createClient();
+  if (typeof endpoint === "string" && endpoint.length <= 2048 && /^https?:\/\//.test(endpoint)) {
+    try {
+      const { error } = await supabase.from("push_subscriptions").delete().eq("endpoint", endpoint);
+      if (error) console.error("logout: push subscription", error.message);
+    } catch (e) {
+      console.error("logout: push subscription", e instanceof Error ? e.message : e);
+    }
+  }
   await supabase.auth.signOut();
   const store = await cookies();
   store.delete(CONTEXT_COOKIE);

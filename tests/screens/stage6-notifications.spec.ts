@@ -41,6 +41,7 @@ test.beforeAll(async () => {
   await seed(parentId, [
     ["message.new", { from: "Нурланова Асель Ериковна · Солнышко", text: "Завтра прогулка в парке, оденьте детей потеплее" }, "/chats", 3, false],
     ["receipt.rejected", { month: "2026-10", reason: "На фото не видна сумма" }, "/payments", 40, false],
+    ["message.new", { from: "Касымова Жанар Нурлановна · Солнышко", deleted: "yes" }, "/chats", 50, true],
     ["event.reminder", { title: "Осенний утренник", date: "15.10.2026", time: "10:00–11:00", place: "Музыкальный зал" }, "/events", 120, true],
     ["club.decision", { club: "Шахматы", child: "Алихан", status: "active" }, "/clubs", 60 * 24 + 30, true],
     ["announcement.new", { title: "Родительское собрание в пятницу" }, "/announcements", 60 * 24 + 90, true],
@@ -123,3 +124,25 @@ for (const state of ["off", "on", "blocked", "unsupported", "ios"] as const) {
     await ctx.close();
   });
 }
+
+test("dashboard · «Включите уведомления» prompt (parent ru, kk; teacher on iPhone)", async ({ browser }) => {
+  const ctx = await browser.newContext({ locale: "ru-RU", timezoneId: "Asia/Almaty" });
+  await pushApis(ctx, "off");
+  const page = await ctx.newPage();
+  await login(page, PHONES.parent);
+  await expect(page.getByTestId("push-prompt")).toBeVisible();
+  await snap(page, STAGE, "dashboard-parent-push-prompt");
+  await setLocale(page, "kk");
+  await page.reload();
+  await expect(page.getByTestId("push-prompt")).toContainText("Хабарландыруларды қосыңыз");
+  await snap(page, STAGE, "dashboard-parent-push-prompt-kk");
+  await ctx.close();
+
+  const ios = await browser.newContext({ locale: "ru-RU", timezoneId: "Asia/Almaty" });
+  await pushApis(ios, "ios");
+  const teacher = await ios.newPage();
+  await login(teacher, PHONES.teacher);
+  await expect(teacher.getByTestId("push-prompt")).toHaveAttribute("data-state", "ios");
+  await snap(teacher, STAGE, "dashboard-teacher-push-prompt-ios");
+  await ios.close();
+});

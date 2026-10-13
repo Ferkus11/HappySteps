@@ -168,9 +168,28 @@ async function networkFirstPage(event, url) {
     if (cacheable) {
       const pages = await caches.open(rules.PAGES_CACHE);
       const hit = await pages.match(key);
-      if (hit) return hit;
+      if (hit) {
+        // The browser may still think it is online (server down, Wi-Fi without internet): tell the page so it
+        // shows the offline banner. The page also probes /api/health itself on load.
+        event.waitUntil(tellServedFromCache(event));
+        return hit;
+      }
     }
     return offlinePage();
+  }
+}
+
+/** Posts `served-from-cache` to the window the navigation creates (it appears shortly after the response). */
+async function tellServedFromCache(event) {
+  const id = event.resultingClientId || event.clientId;
+  if (!id) return;
+  for (let i = 0; i < 20; i++) {
+    const client = await self.clients.get(id);
+    if (client) {
+      client.postMessage({ type: "served-from-cache" });
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 250));
   }
 }
 

@@ -112,6 +112,8 @@ export async function sendMessageAction(form: FormData) {
         params: {
           from: groupName ? `${ctx.profile.full_name} · ${groupName}` : ctx.profile.full_name,
           text: preview(body || (hasFile ? (file as File).name : "")),
+          // delete_chat_message() strips the text of this row when the message is removed
+          message_id: v.id,
         },
         url: `/chats/${v.chatId}`,
         deliverAfter,

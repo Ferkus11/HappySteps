@@ -9,7 +9,7 @@ import { ActionError, dbErrorCode, fail, type ActionResult } from "@/lib/actions
 import { check, parse, ValidationError } from "@/lib/actions/safe";
 import { zUuid } from "@/lib/validation";
 import { NOTIFICATION_TYPES } from "@/lib/notification-types";
-import { loadNotifications, scopeOr, unreadCount, type NotificationItem } from "@/lib/notifications-data";
+import { loadNotifications, scopeOr, unreadCount, type NotificationCursor, type NotificationItem } from "@/lib/notifications-data";
 import { isAllowedEndpoint } from "@/lib/push";
 
 /** Any signed-in user with a usable context (kindergarten or superadmin) — notifications are personal. */
@@ -28,10 +28,10 @@ async function userAction<T>(body: (ctx: AppContext, supabase: SupabaseClient) =
   }
 }
 
-const zCursor = z.string().datetime({ offset: true }).nullable().optional();
+const zCursor = z.object({ createdAt: z.string().datetime({ offset: true }), id: zUuid }).nullable();
 
-/** Next page of the centre (older than `before`), or the newest page when `before` is empty. */
-export async function loadNotificationsAction(before?: string | null): Promise<ActionResult<{ items: NotificationItem[]; more: boolean }>> {
+/** Next page of the centre (older than the `before` row), or the newest page when `before` is empty. */
+export async function loadNotificationsAction(before?: NotificationCursor | null): Promise<ActionResult<{ items: NotificationItem[]; more: boolean }>> {
   return userAction(async (ctx, supabase) => loadNotifications(supabase, ctx, parse(zCursor, before ?? null)));
 }
 
@@ -90,8 +90,12 @@ export async function savePushSubscriptionAction(input: z.input<typeof subSchema
   return userAction(async (ctx) => {
     const v = parse(subSchema, input);
     if (!isAllowedEndpoint(v.endpoint)) throw new ActionError("invalid");
+    const service = createServiceClient();
+    const { data: prev } = await service.from("push_subscriptions").select("user_id").eq("endpoint", v.endpoint).maybeSingle();
+    // Expected on a shared device (another account signs in); logged so an unusual pattern can be noticed.
+    if (prev && prev.user_id !== ctx.userId) console.info("push subscription reassigned to another user", new URL(v.endpoint).host);
     check(
-      await createServiceClient()
+      await service
         .from("push_subscriptions")
         .upsert(
           { user_id: ctx.userId, endpoint: v.endpoint, p256dh: v.keys.p256dh, auth: v.keys.auth, user_agent: v.userAgent?.slice(0, 500) ?? null, last_used_at: new Date().toISOString() },

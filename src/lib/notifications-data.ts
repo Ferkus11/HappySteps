@@ -28,17 +28,28 @@ export function scopeOr(ctx: AppContext): string {
   return ctx.kind === "kindergarten" ? `kindergarten_id.eq.${ctx.kg.id},kindergarten_id.is.null` : "kindergarten_id.is.null";
 }
 
-/** Newest first; `before` = created_at of the last loaded row (keyset pagination). */
-export async function loadNotifications(supabase: SupabaseClient, ctx: AppContext, before?: string | null): Promise<{ items: NotificationItem[]; more: boolean }> {
+/** Keyset cursor of the centre: the last loaded row's `created_at` and `id` (rows may share a timestamp). */
+export interface NotificationCursor {
+  createdAt: string;
+  id: string;
+}
+
+/** Newest first, ordered by (created_at, id); `before` = the last loaded row (keyset pagination). */
+export async function loadNotifications(supabase: SupabaseClient, ctx: AppContext, before?: NotificationCursor | null): Promise<{ items: NotificationItem[]; more: boolean }> {
   let q = supabase
     .from("notifications")
     .select(COLUMNS)
     .eq("user_id", ctx.userId)
-    .or(scopeOr(ctx))
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(PAGE_SIZE + 1);
-  if (before) q = q.lt("created_at", before);
+  if (before) {
+    // One logic tree (scope AND older than the cursor): `created_at < c OR (created_at = c AND id < i)`.
+    const c = `"${before.createdAt}"`;
+    q = q.or(`and(or(${scopeOr(ctx)}),or(created_at.lt.${c},and(created_at.eq.${c},id.lt.${before.id})))`);
+  } else {
+    q = q.or(scopeOr(ctx));
+  }
   const { data, error } = await q;
   if (error) throw error;
   const rows = (data ?? []) as NotificationItem[];
@@ -75,8 +86,4 @@ export async function disabledTypes(supabase: SupabaseClient, userId: string): P
   return (data ?? []).map((r) => r.type as string);
 }
 
-/** A same-origin path only (no `//host`, no scheme) — notification links are always app paths. */
-export function safeAppPath(url: string | null | undefined): string | null {
-  if (!url || !url.startsWith("/") || url.startsWith("//") || url.startsWith("/\\")) return null;
-  return url;
-}
+export { safeAppPath } from "@/lib/safe-path";

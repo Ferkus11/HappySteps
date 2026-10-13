@@ -34,6 +34,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         roleLabel={tr(role)}
         contexts={contexts}
         currentContext={ctx.contextValue}
+        userId={ctx.userId}
         unreadChats={counters.chats}
         unreadNotifications={counters.notifications}
         showSearch={ctx.kind === "kindergarten" && role !== "parent"}

@@ -148,6 +148,50 @@ test("server unreachable while the device reports online: same banner and messag
   await expect(page.getByTestId("offline-banner")).toHaveCount(0, { timeout: 15_000 });
 });
 
+test("server unreachable while the device reports online: a page from the saved copy shows the banner", async ({ page, context }) => {
+  await login(page, PHONES.parent);
+  await waitForWorker(page);
+  await page.goto("/profile");
+  await expect(page.getByTestId("pwa-app-section")).toBeVisible();
+  await waitForCached(page, "/profile");
+  await expect(page.getByTestId("offline-banner")).toHaveCount(0);
+
+  // No setOffline: the browser still thinks it is online, only the server does not answer.
+  await context.route("**/*", (r) => r.abort("connectionrefused"));
+  const saved = await page.goto("/profile");
+  expect(saved?.fromServiceWorker()).toBe(true);
+  await expect(page.getByRole("heading", { name: "Профиль" })).toBeVisible();
+  await expect(page.getByTestId("offline-banner")).toHaveText("Нет подключения — данные только для просмотра");
+
+  await context.unrouteAll({ behavior: "ignoreErrors" });
+  await expect(page.getByTestId("offline-banner")).toHaveCount(0, { timeout: 15_000 });
+});
+
+test("saved pages are dropped when the garden/role changes behind the app's back (e.g. a push click)", async ({ page, context }) => {
+  await login(page, PHONES.teacherParent);
+  await waitForWorker(page);
+  await page.goto("/notifications");
+  await waitForCached(page, "/notifications");
+  await page.goto("/profile");
+  await waitForCached(page, "/profile");
+
+  // What /notifications/<id>/open does for a notification of another garden: the server switches the context cookie.
+  const shown = (await page.locator("[data-hs-context]").getAttribute("data-hs-context")) ?? "";
+  const [kg, role] = shown.split("|")[1].split(":");
+  await context.addCookies([{ name: "hs_ctx", value: `${kg}:${role === "parent" ? "teacher" : "parent"}`, url: page.url(), httpOnly: true, sameSite: "Lax" }]);
+  await page.goto("/");
+  await expect(page.locator("[data-hs-context]")).not.toHaveAttribute("data-hs-context", shown);
+  await expect.poll(() => cachedPages(page)).not.toContain("/notifications");
+  expect(await cachedPages(page)).not.toContain("/profile");
+});
+
+test("the offline page speaks Russian and Kazakh", async ({ page }) => {
+  await page.goto("/offline");
+  await expect(page.getByRole("heading", { name: "Нет подключения к интернету" })).toBeVisible();
+  await expect(page.getByTestId("offline-page-kk")).toContainText("Интернет байланысы жоқ");
+  await expect(page.getByTestId("offline-retry")).toHaveText(/Повторить · Қайталау/);
+});
+
 test("a new version offers «Обновить» and takes over after the tap", async ({ page }) => {
   await login(page, PHONES.parent);
   await waitForWorker(page);

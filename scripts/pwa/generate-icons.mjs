@@ -13,14 +13,18 @@ const BRAND = "#c02a62"; // --brand in src/app/globals.css
 const BRAND_LIGHT = "#d6336c";
 const font = readFileSync(path.join(ROOT, "node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2")).toString("base64");
 
-/** full: square fills the canvas (maskable / Apple — the OS rounds it); scale: «H» height relative to the canvas. */
-function html(size, { full, scale }) {
+/**
+ * full: square fills the canvas (maskable / Apple — the OS rounds it); scale: «H» height relative to the canvas.
+ * badge: only the white «H» on a transparent canvas (Android draws the notification badge as a silhouette).
+ */
+function html(size, { full, scale, badge }) {
   const radius = full ? 0 : Math.round(size * 0.225);
+  const bg = badge ? "transparent" : `linear-gradient(160deg, ${BRAND_LIGHT} 0%, ${BRAND} 70%)`;
   return `<!doctype html><html><head><style>
 @font-face { font-family: M; src: url(data:font/woff2;base64,${font}) format("woff2"); font-weight: 200 800; }
 html, body { margin: 0; background: transparent; }
 .i { width: ${size}px; height: ${size}px; border-radius: ${radius}px; display: grid; place-items: center;
-  background: linear-gradient(160deg, ${BRAND_LIGHT} 0%, ${BRAND} 70%); }
+  background: ${bg}; }
 .h { font-family: M; font-weight: 800; color: #fff; font-size: ${Math.round(size * scale)}px; line-height: 1;
   transform: translateY(-2%); letter-spacing: -0.02em; }
 </style></head><body><div class="i"><span class="h">H</span></div></body></html>`;
@@ -34,6 +38,8 @@ const targets = [
   { file: "public/icons/maskable-192.png", size: 192, full: true, scale: 0.46 },
   // iOS draws its own rounded corners and needs an opaque image.
   { file: "public/icons/apple-touch-icon.png", size: 180, full: true, scale: 0.56 },
+  // Notification badge (status bar): monochrome, transparent.
+  { file: "public/icons/badge-96.png", size: 96, full: false, scale: 0.78, badge: true },
   { file: "favicon-32", size: 32, full: false, scale: 0.66 },
   { file: "favicon-48", size: 48, full: false, scale: 0.66 },
 ];
@@ -49,7 +55,7 @@ for (const t of targets) {
     await document.fonts.load("800 100px M");
     await document.fonts.ready;
   });
-  const png = await page.locator(".i").screenshot({ omitBackground: !t.full });
+  const png = await page.locator(".i").screenshot({ omitBackground: !t.full || t.badge });
   if (t.file.startsWith("favicon")) ico.push({ size: t.size, png });
   else writeFileSync(path.join(ROOT, t.file), png);
 }

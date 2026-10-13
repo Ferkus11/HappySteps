@@ -345,6 +345,53 @@ describe("chats · writing, editing, moderation", () => {
     });
   });
 
+  it("deleting a message strips its text from the bell rows and cancels their pending (quiet-hours) push", async () => {
+    await inTx(async (c, become) => {
+      const p = await post(c, become, "parent", chat.sun, "Личный вопрос");
+      const other = await post(c, become, "parent", chat.sun, "Другой вопрос");
+      await c.query("reset role");
+      const ins = async (user: string, messageId: string, deliverAfter: string | null, pushedAt: string | null) =>
+        (
+          await c.query(
+            "insert into notifications (kindergarten_id, user_id, type, params, url, deliver_after, pushed_at) values ($1, $2, 'message.new', $3, $4, $5, $6) returning id",
+            [F.A, user, JSON.stringify({ from: "Родитель", text: "Личный вопрос", message_id: messageId }), `/chats/${chat.sun}`, deliverAfter, pushedAt],
+          )
+        ).rows[0].id as string;
+      const later = new Date(Date.now() + 3600_000).toISOString();
+      const sentAt = new Date(Date.now() - 60_000).toISOString();
+      const pending = await ins(F.users.teacher, p, later, null);
+      const sent = await ins(F.users.head, p, null, sentAt);
+      const untouched = await ins(F.users.owner, other, later, null);
+
+      // a member who may not delete changes nothing
+      await become(F.users.teacher);
+      expect(await rejects(c, "select public.delete_chat_message($1)", [p])).toBe(true);
+      await c.query("reset role");
+      expect((await c.query("select params->>'text' as t from notifications where id = $1", [pending])).rows[0].t).toBe("Личный вопрос");
+
+      await become(F.users.parent);
+      await c.query("select public.delete_chat_message($1)", [p]);
+      await c.query("reset role");
+      const row = async (id: string) => (await c.query("select params, pushed_at from notifications where id = $1", [id])).rows[0];
+      const a = await row(pending);
+      expect(a.params.text).toBeUndefined();
+      expect(a.params.deleted).toBe("yes");
+      expect(a.params.message_id).toBe(p);
+      expect(a.pushed_at).not.toBeNull(); // handled: the cron will not send it
+      const b = await row(sent);
+      expect(b.params.text).toBeUndefined();
+      expect(new Date(b.pushed_at).toISOString()).toBe(sentAt); // already sent: the timestamp stays
+      const u = await row(untouched);
+      expect(u.params.text).toBe("Личный вопрос");
+      expect(u.pushed_at).toBeNull();
+      // morning: the cron's claim skips the cancelled row and still takes the other one
+      await c.query("update notifications set deliver_after = now() - interval '1 minute' where id = any($1)", [[pending, untouched]]);
+      const claimed = (await c.query("select id from public.claim_deferred_pushes(2000)")).rows.map((r) => r.id);
+      expect(claimed).not.toContain(pending);
+      expect(claimed).toContain(untouched);
+    });
+  });
+
   it("«только сотрудники пишут»: parents read but cannot post; only owner/head switch it", async () => {
     await inTx(async (c, become) => {
       await become(F.users.teacher);

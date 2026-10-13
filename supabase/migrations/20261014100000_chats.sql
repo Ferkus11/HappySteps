@@ -529,6 +529,10 @@ begin
   end if;
   if m.deleted_at is not null then return; end if;
   update messages set deleted_at = now(), deleted_by = auth.uid(), body = '' where id = p_id;
+  -- The bell keeps no copy of a removed message: its text is dropped («Сообщение удалено») and a push that has
+  -- not gone out yet (quiet hours) is marked handled so the cron never sends it.
+  update notifications set params = (params - 'text') || jsonb_build_object('deleted', 'yes'), pushed_at = coalesce(pushed_at, now())
+  where type = 'message.new' and params->>'message_id' = p_id::text;
   if moderated then
     perform public.log_action(c.kindergarten_id, 'chat.message_delete', 'message', p_id::text,
       jsonb_build_object('chat_id', c.id, 'group_id', c.group_id, 'author_id', m.author_id, 'text', left(m.body, 200)));

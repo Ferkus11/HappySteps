@@ -3,8 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { UserX } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Button } from "@/components/ui/button";
-import { logoutAction } from "@/lib/actions/session";
+import { LogoutButton } from "@/components/shell/logout-button";
 import { loadContext } from "@/lib/auth/context";
 
 export default async function NoAccessPage() {
@@ -12,7 +11,6 @@ export default async function NoAccessPage() {
   if (r.state === "anonymous") redirect("/login");
   if (r.state === "ok") redirect("/");
   const t = await getTranslations("auth");
-  const tc = await getTranslations("common");
   const archived = r.state === "no-access" && r.archived;
   return (
     <Card>
@@ -20,11 +18,7 @@ export default async function NoAccessPage() {
         icon={UserX}
         title={archived ? t("archivedTitle") : t("noAccess")}
         hint={archived ? t("archivedText") : undefined}
-        action={
-          <form action={logoutAction}>
-            <Button variant="outline" data-testid="no-access-logout">{tc("logout")}</Button>
-          </form>
-        }
+        action={<LogoutButton testId="no-access-logout" />}
       />
     </Card>
   );

@@ -3,7 +3,7 @@ import { loadContext } from "@/lib/auth/context";
 import { CONTEXT_COOKIE } from "@/lib/auth/constants";
 import { createClient } from "@/lib/supabase/server";
 import { NOTIFICATION_AUDIENCE, isNotificationType } from "@/lib/notification-types";
-import { safeAppPath } from "@/lib/notifications-data";
+import { safeAppPath } from "@/lib/safe-path";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const home = go("/notifications");
   const r = await loadContext();
-  if (r.state === "anonymous") return go("/login");
+  // Signed out (session expired): back here after the login.
+  if (r.state === "anonymous") return go(UUID.test(id) ? `/login?next=${encodeURIComponent(`/notifications/${id}/open`)}` : "/login");
   if (r.state !== "ok" || !UUID.test(id)) return home;
   const ctx = r.ctx;
   const supabase = await createClient();

@@ -23,6 +23,8 @@ export interface ShellProps {
   roleLabel: string;
   contexts: ContextOption[];
   currentContext: string | null;
+  /** Signed-in user (push sync marker, the personal-data context PwaRoot watches). */
+  userId?: string;
   unreadChats?: number;
   unreadNotifications?: number;
   showSearch?: boolean;
@@ -67,7 +69,11 @@ export function AppShell(props: ShellProps) {
   const kgName = props.kindergarten?.name ?? tc("appName");
 
   return (
-    <div className="min-h-dvh md:grid md:grid-cols-[260px_1fr]">
+    <div
+      className="min-h-dvh md:grid md:grid-cols-[260px_1fr]"
+      // Whose data this page shows (user + garden + role): PwaRoot drops saved pages when it changes.
+      data-hs-context={props.userId ? `${props.userId}|${props.currentContext ?? ""}` : undefined}
+    >
       {/* Desktop sidebar: the grid column carries the white background and border down the whole page
           (it stretches with the content); the menu inside stays sticky at viewport height. */}
       <div className="hidden border-r border-border bg-surface md:block" data-testid="sidebar-column">
@@ -128,7 +134,12 @@ export function AppShell(props: ShellProps) {
                   <CountDot n={unreadChats} />
                 </Link>
               ) : null}
-              <Link href="/notifications" className="relative grid size-11 place-items-center rounded-full text-muted hover:bg-surface-muted" aria-label={tc("notifications")}>
+              <Link
+                href="/notifications"
+                className="relative grid size-11 place-items-center rounded-full text-muted hover:bg-surface-muted"
+                aria-label={unreadNotifications ? tc("notificationsUnread", { count: unreadNotifications }) : tc("notifications")}
+                data-testid="bell"
+              >
                 <Bell className="size-5" />
                 <CountDot n={unreadNotifications} testId="unread-notifications" />
               </Link>
@@ -138,7 +149,7 @@ export function AppShell(props: ShellProps) {
         </header>
 
         <OfflineBanner />
-        <PushSync />
+        <PushSync userId={props.userId} />
         <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 pt-5 pb-28 md:px-8 md:pt-7 md:pb-12">{props.children}</main>
       </div>
 
