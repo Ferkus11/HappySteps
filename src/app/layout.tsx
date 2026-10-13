@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Toaster } from "sonner";
+import { PwaRoot } from "@/components/pwa/pwa-root";
 import "./globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -11,7 +12,12 @@ export async function generateMetadata(): Promise<Metadata> {
     applicationName: t("appName"),
     manifest: "/manifest.webmanifest",
     appleWebApp: { capable: true, title: t("appName"), statusBarStyle: "default" },
-    icons: { icon: "/icons/icon-192.png", apple: "/icons/apple-touch-icon.png" },
+    // Older iOS versions only honour the apple-prefixed tag for Home Screen standalone mode.
+    other: { "apple-mobile-web-app-capable": "yes" },
+    icons: {
+      icon: { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      apple: { url: "/icons/apple-touch-icon.png", sizes: "180x180" },
+    },
   };
 }
 
@@ -29,6 +35,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="antialiased">
         <NextIntlClientProvider>
           {children}
+          <PwaRoot />
           {/* Phones: the 16px page gutter on the sides, below the notch/status bar on top. */}
           <Toaster
             position="top-center"

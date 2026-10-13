@@ -58,6 +58,7 @@ import {
 import { ChatAvatar, useChatsFrame } from "./chats-frame";
 import { Composer, type Draft } from "./composer";
 import { subscribeAuthed, uniqueTopic } from "./realtime";
+import { useOfflineGuard } from "@/lib/pwa/offline-guard";
 
 export interface ConversationProps {
   chat: {
@@ -92,6 +93,7 @@ export function Conversation(p: ConversationProps) {
   const t = useTranslations("chats");
   const te = useTranslations("errors");
   const tc = useTranslations("common");
+  const offline = useOfflineGuard();
   const router = useRouter();
   const frame = useChatsFrame();
   const chatId = p.chat.id;
@@ -377,12 +379,13 @@ export function Conversation(p: ConversationProps) {
 
   // ── sending ──
   async function send(d: Draft, retryId?: string) {
-    if (!navigator.onLine) {
-      toast.error(te("offline"));
-      return false;
-    }
+    if (offline.blocked()) return false;
     if (editing) {
-      const r = await editMessageAction(editing.id, d.body);
+      const r = await editMessageAction(editing.id, d.body).catch((e) => {
+        if (!offline.failed(e)) throw e;
+        return null;
+      });
+      if (!r) return false;
       if (!r.ok) {
         toast.error(te.has(r.error) ? te(r.error) : te("generic"));
         return false;
@@ -432,7 +435,11 @@ export function Conversation(p: ConversationProps) {
     fd.set("body", d.body);
     if (d.replyTo) fd.set("replyTo", d.replyTo.id);
     if (d.file) fd.set("file", d.file);
-    const r = await sendMessageAction(fd).catch(() => null);
+    let networkFailed = false;
+    const r = await sendMessageAction(fd).catch((e) => {
+      networkFailed = offline.failed(e);
+      return null;
+    });
     if (r?.ok) {
       setMessages((s) => mergeMessages(s, [r.data]));
       setLocal((l) => {
@@ -441,7 +448,7 @@ export function Conversation(p: ConversationProps) {
       });
       return true;
     }
-    toast.error(r && !r.ok && te.has(r.error) ? te(r.error) : te("generic"));
+    if (!networkFailed) toast.error(r && !r.ok && te.has(r.error) ? te(r.error) : te("generic"));
     setLocal((l) => ({
       ...l,
       [id]: { failed: d, localFile: l[id]?.localFile },
@@ -451,8 +458,12 @@ export function Conversation(p: ConversationProps) {
 
   async function confirmDelete() {
     const m = toDelete;
-    if (!m) return;
-    const r = await deleteMessageAction(m.id);
+    if (!m || offline.blocked()) return;
+    const r = await deleteMessageAction(m.id).catch((e) => {
+      if (!offline.failed(e)) throw e;
+      return null;
+    });
+    if (!r) return;
     if (!r.ok)
       return toast.error(te.has(r.error) ? te(r.error) : te("generic"));
     setMessages((s) =>
@@ -713,11 +724,17 @@ function ModerationMenu({
 }) {
   const t = useTranslations("chats");
   const te = useTranslations("errors");
+  const offline = useOfflineGuard();
   const [busy, setBusy] = React.useState(false);
   async function toggle(staffOnly: boolean) {
+    if (offline.blocked()) return;
     setBusy(true);
     try {
-      const r = await setParentsCanWriteAction(chatId, !staffOnly);
+      const r = await setParentsCanWriteAction(chatId, !staffOnly).catch((e) => {
+        if (!offline.failed(e)) throw e;
+        return null;
+      });
+      if (!r) return;
       if (!r.ok)
         return toast.error(te.has(r.error) ? te(r.error) : te("generic"));
       onChange(!staffOnly);

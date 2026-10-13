@@ -15,6 +15,8 @@ import {
   DropdownTrigger,
 } from "@/components/ui/dropdown";
 import { logoutAction, switchContextAction } from "@/lib/actions/session";
+import { clearUserCaches } from "@/lib/pwa/caches";
+import { useOfflineGuard } from "@/lib/pwa/offline-guard";
 
 export interface ContextOption {
   value: string; // `${kindergartenId}:${role}` or "superadmin"
@@ -36,6 +38,7 @@ export function AccountMenu({
   const t = useTranslations("common");
   const router = useRouter();
   const [, start] = React.useTransition();
+  const offline = useOfflineGuard();
   return (
     <Dropdown>
       <DropdownTrigger className="ml-1 flex cursor-pointer items-center gap-2.5 rounded-full p-1 pr-1 hover:bg-surface-muted md:pr-3" data-testid="account-menu">
@@ -62,13 +65,16 @@ export function AccountMenu({
               <DropdownItem
                 key={c.value}
                 data-testid={`context-${c.value}`}
-                onSelect={() =>
+                onSelect={() => {
+                  if (offline.blocked()) return;
                   start(async () => {
+                    // Saved pages belong to the role/garden they were rendered for.
+                    await clearUserCaches();
                     await switchContextAction(c.value);
                     router.push("/");
                     router.refresh();
-                  })
-                }
+                  });
+                }}
               >
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold">{c.kindergartenName}</span>
@@ -80,7 +86,17 @@ export function AccountMenu({
           </>
         ) : null}
         <DropdownSeparator />
-        <DropdownItem data-testid="logout" onSelect={() => start(() => logoutAction())}>
+        <DropdownItem
+          data-testid="logout"
+          onSelect={() => {
+            if (offline.blocked()) return;
+            // Saved pages are personal: drop them before the session ends (the login screen clears them again).
+            start(async () => {
+              await clearUserCaches();
+              await logoutAction();
+            });
+          }}
+        >
           <LogOut /> {t("logout")}
         </DropdownItem>
       </DropdownContent>

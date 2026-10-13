@@ -29,6 +29,11 @@ const nextConfig: NextConfig = {
           { key: "Service-Worker-Allowed", value: "/" },
         ],
       },
+      {
+        // Imported by /sw.js: must be re-checked on every update check as well.
+        source: "/sw-push.js",
+        headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }],
+      },
     ];
   },
 };

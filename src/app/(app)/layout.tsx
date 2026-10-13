@@ -6,6 +6,7 @@ import { navFor } from "@/lib/nav";
 import { formatPhone } from "@/lib/phone";
 import { signedUrl } from "@/lib/kg-assets";
 import { getShellCounters } from "@/lib/shell-counters";
+import { IosInstallSheet } from "@/components/pwa/ios-install-sheet";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireAnyContext();
@@ -38,6 +39,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         showSearch={ctx.kind === "kindergarten" && role !== "parent"}
       >
         {children}
+        {role === "parent" ? <IosInstallSheet /> : null}
       </AppShell>
     </div>
   );

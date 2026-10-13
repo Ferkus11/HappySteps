@@ -16,12 +16,14 @@ import {
   startDirectChatAction,
   type ChatContact,
 } from "@/app/(app)/chats/actions";
+import { useOfflineGuard } from "@/lib/pwa/offline-guard";
 
 /** «Новый чат»: people the current user may write to (rules in SQL: parents never see other parents). */
 export function NewChatDialog() {
   const t = useTranslations("chats");
   const tr = useTranslations("roles");
   const te = useTranslations("errors");
+  const offline = useOfflineGuard();
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [contacts, setContacts] = React.useState<ChatContact[] | null>(null);
@@ -49,10 +51,14 @@ export function NewChatDialog() {
   );
 
   async function start(c: ChatContact) {
-    if (!navigator.onLine) return toast.error(te("offline"));
+    if (offline.blocked()) return;
     setBusy(c.user_id);
     try {
-      const r = await startDirectChatAction(c.user_id);
+      const r = await startDirectChatAction(c.user_id).catch((e) => {
+        if (!offline.failed(e)) throw e;
+        return null;
+      });
+      if (!r) return;
       if (!r.ok)
         return toast.error(te.has(r.error) ? te(r.error) : te("generic"));
       setOpen(false);

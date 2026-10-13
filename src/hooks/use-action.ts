@@ -5,6 +5,9 @@ import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { ActionResult } from "@/lib/actions/result";
+import { isOnline, reportNetworkFailure } from "@/lib/pwa/connectivity";
+import { isNetworkError } from "@/lib/pwa/network-error";
+import { showOfflineToast } from "@/lib/pwa/offline-guard";
 
 /**
  * Runs a server action that returns ActionResult, shows a toast on error
@@ -22,8 +25,9 @@ export function useAction<A extends unknown[], T>(
   const run = React.useCallback(
     (...args: A) =>
       new Promise<ActionResult<T> | null>((resolve) => {
-        if (typeof navigator !== "undefined" && !navigator.onLine) {
-          toast.error(te("offline"));
+        // Offline (SPEC §8): nothing is sent, the user gets one clear message instead of a spinner.
+        if (!isOnline()) {
+          showOfflineToast(te("offline"));
           resolve(null);
           return;
         }
@@ -41,8 +45,13 @@ export function useAction<A extends unknown[], T>(
             }
             resolve(res);
           } catch (e) {
-            console.error(e);
-            toast.error(te("generic"));
+            if (isNetworkError(e)) {
+              reportNetworkFailure();
+              showOfflineToast(te("offline"));
+            } else {
+              console.error(e);
+              toast.error(te("generic"));
+            }
             resolve(null);
           }
         });
