@@ -121,7 +121,7 @@ export async function CurrentInvoice({
       ) : null}
       {due > 0 ? (
         <div className="mt-4">
-          <UploadReceiptButton invoiceId={inv.id} again={inv.status === "rejected"} className="w-full sm:w-auto sm:px-8" variant={inv.status === "review" ? "outline" : "primary"} />
+          <UploadReceiptButton invoiceId={inv.id} again={inv.status === "rejected"} className="w-full sm:w-auto sm:px-8" variant={compact || inv.status === "review" ? "outline" : "primary"} />
           {!compact ? <p className="mt-1.5 text-xs text-faint">{t("uploadHint")}</p> : null}
         </div>
       ) : null}

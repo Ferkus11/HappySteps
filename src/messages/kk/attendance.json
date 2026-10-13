@@ -87,6 +87,7 @@
   "groupMarked": "Топ белгіленді",
   "groupNotMarked": "Әлі белгіленбеген",
   "presentOf": "бақшада {total} ішінен {present}",
+  "noneReported": "Ешкім келмейтінін ескертпеді",
   "wontCome": "Келмейді",
   "mark": "Белгілеу",
   "open": "Тізімді ашу",

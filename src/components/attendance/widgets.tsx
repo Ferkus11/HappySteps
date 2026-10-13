@@ -5,6 +5,7 @@ import type { KgContext } from "@/lib/auth/context";
 import type { DashboardWidget } from "@/components/dashboard/widgets";
 import { createClient } from "@/lib/supabase/server";
 import { attendanceGroups, isWorkingDayDb, loadGroupDay, loadPortions } from "@/lib/attendance";
+import { myOpenSession } from "@/lib/queries/worktime";
 import { todayIn } from "@/lib/format";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Stat } from "@/components/ui/stat";
@@ -47,7 +48,12 @@ async function AttendanceTodayStat({ ctx }: { ctx: KgContext }) {
   );
 }
 
-/** Teacher: "Моя группа сегодня" — marked or not, who won't come and why, "Отметить". */
+/**
+ * Teacher: "Моя группа сегодня" — marked or not, who won't come and why, "Отметить".
+ * One primary action per screen (SPEC §8): while «Начать рабочий день» is shown (no open session),
+ * «Отметить» is secondary; once the day has started it becomes the primary action (of the first unmarked group).
+ * One group fills the row on desktop (status · who won't come · button side by side).
+ */
 async function TeacherToday({ ctx }: { ctx: KgContext }) {
   const t = await getTranslations("attendance");
   const supabase = await createClient();
@@ -68,14 +74,22 @@ async function TeacherToday({ ctx }: { ctx: KgContext }) {
       </Card>
     );
   }
-  const days = await Promise.all(groups.map((g) => loadGroupDay(supabase, g.id, today)));
+  const [days, open] = await Promise.all([
+    Promise.all(groups.map((g) => loadGroupDay(supabase, g.id, today))),
+    myOpenSession(supabase, ctx.kg.id, ctx.userId),
+  ]);
+  const single = groups.length === 1;
+  const isDone = (list: (typeof days)[number]) => list.length > 0 && list.every((c) => c.effective.status !== "none");
+  // With several groups only the first unmarked one gets the primary button.
+  const primaryAt = open ? days.findIndex((list) => !isDone(list)) : -1;
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className={cn("grid gap-4", !single && "lg:grid-cols-2")}>
       {groups.map((g, i) => {
         const list = days[i];
         const marked = list.filter((c) => c.effective.status !== "none").length;
         const present = list.filter((c) => c.effective.status === "present").length;
-        const done = list.length > 0 && marked === list.length;
+        const done = isDone(list);
+        const variant = done ? "outline" : i === primaryAt ? "primary" : "secondary";
         const away = list.filter((c) => c.effective.status === "absent");
         return (
           <Card key={g.id} data-testid="teacher-today">
@@ -87,6 +101,7 @@ async function TeacherToday({ ctx }: { ctx: KgContext }) {
                 </span>
               }
             />
+            <div className={cn(single && "lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_auto] lg:items-start lg:gap-8")}>
             <div className="flex items-center gap-3">
               <span className={cn("grid size-11 shrink-0 place-items-center rounded-full", done ? "bg-success-soft text-success" : "bg-tile-unmarked text-tile-unmarked-fg")}>
                 {done ? <CheckCircle2 className="size-5" aria-hidden /> : <CircleDashed className="size-5" aria-hidden />}
@@ -99,7 +114,7 @@ async function TeacherToday({ ctx }: { ctx: KgContext }) {
               </div>
             </div>
             {away.length ? (
-              <div className="mt-4">
+              <div className={cn("mt-4", single && "lg:mt-0")}>
                 <div className="mb-2 text-xs font-semibold text-faint">{t("wontCome")}</div>
                 <ul className="space-y-1.5">
                   {away.map((c) => {
@@ -116,12 +131,17 @@ async function TeacherToday({ ctx }: { ctx: KgContext }) {
                   })}
                 </ul>
               </div>
+            ) : single ? (
+              <p className="mt-4 text-sm text-muted lg:mt-2.5" data-testid="teacher-today-none-away">
+                {t("noneReported")}
+              </p>
             ) : null}
-            <Button asChild size="lg" variant={done ? "outline" : "primary"} className="mt-4 w-full">
-              <Link href={`/attendance?group=${g.id}`} data-testid="teacher-mark">
+            <Button asChild size="lg" variant={variant} className={cn("mt-4 w-full", single && "lg:mt-0 lg:w-auto lg:px-8")}>
+              <Link href={`/attendance?group=${g.id}`} data-testid="teacher-mark" data-variant={variant}>
                 <ClipboardCheck /> {done ? t("open") : t("mark")}
               </Link>
             </Button>
+            </div>
           </Card>
         );
       })}

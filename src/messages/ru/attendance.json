@@ -87,6 +87,7 @@
   "groupMarked": "Группа отмечена",
   "groupNotMarked": "Ещё не отмечена",
   "presentOf": "в саду {present} из {total}",
+  "noneReported": "Никто не предупредил об отсутствии",
   "wontCome": "Не придут",
   "mark": "Отметить",
   "open": "Открыть список",

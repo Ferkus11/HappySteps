@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import type { KgContext } from "@/lib/auth/context";
 import type { DashboardWidget } from "@/components/dashboard/widgets";
@@ -8,35 +7,8 @@ import { todayIn } from "@/lib/format";
 import { listStaffDocuments } from "@/lib/documents";
 import { ExpiryBadge } from "./expiry-badge";
 
-/** Owner/head: «Истекающие документы» — expired or expiring within 30 days; hidden when there are none. */
-async function ExpiringDocuments({ ctx }: { ctx: KgContext }) {
-  const supabase = await createClient();
-  const today = todayIn(ctx.settings.timezone);
-  const docs = await listStaffDocuments(supabase, ctx.kg.id, { expiringFrom: today });
-  if (!docs.length) return null;
-  const t = await getTranslations("documents");
-  return (
-    <Card data-testid="expiring-documents">
-      <CardHeader title={t("expiringWidget")} href="/documents?tab=staff&filter=expiring" />
-      <ul className="space-y-1">
-        {docs.slice(0, 5).map((d) => (
-          <li key={d.id}>
-            <Link href={`/documents/staff/${d.userId}`} className="-mx-2 flex min-h-12 items-center justify-between gap-3 rounded-xl px-2 py-1.5 hover:bg-surface-muted">
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold">{d.personName}</span>
-                <span className="block truncate text-[13px] text-muted">{d.title}</span>
-              </span>
-              <span className="shrink-0 whitespace-nowrap">
-                <ExpiryBadge expiresOn={d.expiresOn} today={today} />
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-      {docs.length > 5 ? <p className="mt-2 text-sm text-muted">{t("andMore", { count: docs.length - 5 })}</p> : null}
-    </Card>
-  );
-}
+// Owner/head: expiring staff documents are one line of «Требует внимания» (dashboard core widgets),
+// not a separate card — the card only repeated that line.
 
 /** Other staff: a small card only when one of their own documents expires within 30 days (or has expired). */
 async function MyExpiringDocuments({ ctx }: { ctx: KgContext }) {
@@ -62,6 +34,5 @@ async function MyExpiringDocuments({ ctx }: { ctx: KgContext }) {
 }
 
 export const documentsWidgets: DashboardWidget[] = [
-  { id: "expiring-documents", roles: ["owner", "head"], slot: "main", order: 60, wide: true, Component: ExpiringDocuments },
   { id: "my-expiring-documents", roles: ["accountant", "teacher", "club_teacher", "cook"], slot: "main", order: 60, Component: MyExpiringDocuments },
 ];
