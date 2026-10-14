@@ -62,7 +62,10 @@ function Frame({ label, height, children, testId }: { label: string; height: num
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
-/** A line over time: `points` = [{ label, value }]. `percent` fixes the axis at 0–100. */
+/**
+ * A line over time: `points` = [{ label, value }]. `percent` fixes the axis at 0–100; counts start at 0 too, so a
+ * change of one child does not look like a jump (an axis from 2 to 6 exaggerates it).
+ */
 export function TrendLine({
   label,
   points,
@@ -81,13 +84,14 @@ export function TrendLine({
     <Frame label={label} height={220} testId={testId}>
       <LineChart data={points} margin={{ top: 12, right: 16, bottom: 0, left: -4 }} accessibilityLayer>
         <CartesianGrid vertical={false} stroke={CHART.grid} />
-        <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={{ stroke: CHART.grid }} minTickGap={24} interval="preserveStartEnd" />
+        {/* padding: the first date label stays clear of the lowest y-axis label at 390px */}
+        <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={{ stroke: CHART.grid }} minTickGap={24} interval="preserveStartEnd" padding={{ left: 14, right: 8 }} />
         <YAxis
           tick={axisTick}
           tickLine={false}
           axisLine={false}
           width={48}
-          domain={percent ? [0, 100] : ["auto", "auto"]}
+          domain={percent ? [0, 100] : [0, (max: number) => Math.max(1, Math.ceil(max * 1.15))]}
           allowDecimals={false}
           tickFormatter={(v) => (percent ? `${v}%` : String(v))}
         />
@@ -134,7 +138,8 @@ export function HBars({
         <XAxis type="number" hide domain={[0, max ?? (percent ? 100 : "auto")]} />
         <YAxis type="category" dataKey="name" tick={userNames ? <UserTick /> : axisTick} tickLine={false} axisLine={false} width={104} tickFormatter={(v) => clip(String(v), 14)} />
         <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "#f2f5f9" }} formatter={(v) => [fmt(v), seriesName]} />
-        <Bar dataKey="value" name={seriesName} fill={CHART.primary} radius={[0, 4, 4, 0]} maxBarSize={24} isAnimationActive={false}>
+        {/* minPointSize: a zero still gets a sliver and its «0» label instead of an empty row */}
+        <Bar dataKey="value" name={seriesName} fill={CHART.primary} radius={[0, 4, 4, 0]} maxBarSize={24} minPointSize={2} isAnimationActive={false}>
           <LabelList dataKey="value" position="right" formatter={(v: unknown) => fmt(v)} style={{ fill: "#1d2330", fontSize: 12, fontWeight: 700 }} />
         </Bar>
       </BarChart>

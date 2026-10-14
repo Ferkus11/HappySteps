@@ -106,4 +106,26 @@ body {
   .scrollbar-none::-webkit-scrollbar {
     display: none;
   }
+  /*
+   * A horizontal scroller that shows there is more: a soft shadow appears at an edge only while content is hidden
+   * behind it (the «local» covers scroll with the content and hide the shadows at the ends). Children with their own
+   * background cover the shadow, so use it on tables and grids; chip rows use .edge-fade-x.
+   * --fade-bg = the scroller's background (default: card white).
+   */
+  .scroll-shadow-x {
+    --fade-bg: var(--surface);
+    background:
+      linear-gradient(to right, var(--fade-bg) 40%, transparent) left center / 28px 100% no-repeat local,
+      linear-gradient(to left, var(--fade-bg) 40%, transparent) right center / 28px 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, rgb(16 24 40 / 0.16), transparent) left center / 14px 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, rgb(16 24 40 / 0.16), transparent) right center / 14px 100% no-repeat scroll,
+      var(--fade-bg);
+  }
+  /*
+   * Chip rows that bleed into the 16px page gutter (-mx-4 px-4): the gutters fade out, so a chip cut by the screen
+   * edge visibly continues; at the ends the chips sit inside the padding and are not faded.
+   */
+  .edge-fade-x {
+    mask-image: linear-gradient(to right, transparent 0, #000 16px, #000 calc(100% - 20px), transparent 100%);
+  }
 }

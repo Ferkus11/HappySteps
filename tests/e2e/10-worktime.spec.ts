@@ -79,10 +79,13 @@ test("scenario 2: a teacher starts the day late → head's tile «Опоздал
   await page.goto("/worktime");
   await page.getByTestId("worktime-finish").click();
   await expectToast(page, "Рабочий день закончен");
-  await expect(page.getByTestId("worktime-start")).toBeVisible();
+  // the day has begun: the button continues it, the card sums up the day instead of counting intervals
+  await expect(page.getByTestId("worktime-start")).toHaveText(/Продолжить рабочий день/);
+  await expect(page.getByTestId("workday-card")).toHaveAttribute("data-state", "paused");
+  await expect(page.getByTestId("workday-late")).toContainText(/опоздание/i);
   await page.getByTestId("worktime-start").click();
   await expect(page.getByTestId("worktime-finish")).toBeVisible();
-  await expect(page.getByTestId("workday-card")).toContainText("2 интервала");
+  await expect(page.getByTestId("workday-card")).not.toContainText("интервал");
   await page.getByTestId("worktime-finish").click();
   await expect(page.getByTestId("worktime-start")).toBeVisible();
   const { count } = await svc.from("work_sessions").select("id", { count: "exact", head: true }).eq("user_id", teacher).eq("work_date", d);

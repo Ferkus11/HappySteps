@@ -35,7 +35,7 @@ import {
   type StaffRow,
 } from "@/lib/analytics";
 import { formatMoney } from "@/lib/format";
-import { buildTables, formatCell, periodLabel, periodThan, periodWhen, insightText, type T } from "@/lib/analytics-view";
+import { buildTables, changeTone, formatCell, periodLabel, periodThan, periodWhen, insightText, type T } from "@/lib/analytics-view";
 import type { FinanceData } from "@/lib/analytics-data";
 import ru from "@/messages/ru/analytics.json";
 import kk from "@/messages/kk/analytics.json";
@@ -332,5 +332,17 @@ describe("analytics · insights (ru + kk, plurals)", () => {
     expect(insightText(tRu, activeInsight(f), ph(tRu))).toBe("В конце периода активных детей — 103, на 3 больше, чем в начале");
     expect(funnelInsight({ ...f, applications: 0 })).toBeNull();
     expect(churnInsight({ ...f, joined: 0, left: 0 })).toBeNull();
+  });
+});
+
+describe("KPI change tone (good / bad per KPI)", () => {
+  it("the good direction is decided per KPI; no direction or no change is neutral", () => {
+    expect(changeTone({ dir: "up", value: 5 }, "up")).toBe("good");
+    expect(changeTone({ dir: "down", value: 25 }, "down")).toBe("good"); // sickness falls
+    expect(changeTone({ dir: "up", value: 213 }, "down")).toBe("bad"); // debt grows
+    expect(changeTone({ dir: "down", value: 1 }, "up")).toBe("bad"); // attendance falls
+    expect(changeTone({ dir: "same", value: 0 }, "up")).toBe("neutral");
+    expect(changeTone({ dir: "up", value: 10 }, undefined)).toBe("neutral");
+    expect(changeTone(null, "up")).toBe("neutral");
   });
 });

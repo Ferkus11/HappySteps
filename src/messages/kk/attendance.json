@@ -81,6 +81,8 @@
   "portionsNotMarked": "әлі белгіленбеген",
   "ofActive": "{total} ішінен",
   "todayCard": "Бүгінгі қатысу",
+  "notMarkedStat": "Әлі белгіленбеген · {total} топ ішінен {marked}",
+  "expectedLabel": "күтілгендердің келгені",
   "absentToday": "{count, plural, one {# жоқ} other {# жоқ}}",
   "groupsUnmarked": "{count, plural, one {# топ белгіленбеген} other {# топ белгіленбеген}}",
   "myGroupToday": "Менің тобым бүгін",

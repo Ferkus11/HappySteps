@@ -81,6 +81,8 @@
   "portionsNotMarked": "ещё не отмечена",
   "ofActive": "из {total}",
   "todayCard": "Посещаемость сегодня",
+  "notMarkedStat": "Ещё не отмечено · {marked} из {total, plural, one {# группы} other {# групп}}",
+  "expectedLabel": "пришли из ожидаемых",
   "absentToday": "{count, plural, one {# отсутствует} few {# отсутствуют} many {# отсутствуют} other {# отсутствуют}}",
   "groupsUnmarked": "{count, plural, one {# группа не отмечена} few {# группы не отмечены} many {# групп не отмечены} other {# группы не отмечены}}",
   "myGroupToday": "Моя группа сегодня",

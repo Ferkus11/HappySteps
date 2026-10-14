@@ -15,7 +15,11 @@ import { cn } from "@/lib/utils";
 import { PortionsCard } from "./portions-card";
 import { ReasonIcon } from "./reason";
 
-/** Owner/head top row (and accountant main): present / absent today with a ring (% of active). */
+/**
+ * Owner/head top row: present today with a ring. Before any child is marked the card is neutral (dashed ring,
+ * «Ещё не отмечено · 0 из 2 групп») — a big 0 and an empty 0% ring read as «nobody came». Once marking has started
+ * the ring shows who came of those expected (active children minus the absent ones).
+ */
 async function AttendanceTodayStat({ ctx }: { ctx: KgContext }) {
   const t = await getTranslations("attendance");
   const supabase = await createClient();
@@ -24,16 +28,26 @@ async function AttendanceTodayStat({ ctx }: { ctx: KgContext }) {
   const active = rows.reduce((s, r) => s + r.active, 0);
   const present = rows.reduce((s, r) => s + (r.present ?? 0), 0);
   const absent = rows.reduce((s, r) => s + r.absent, 0);
-  const unmarkedGroups = rows.filter((r) => r.active > 0 && r.unmarked > 0).length;
+  const withChildren = rows.filter((r) => r.active > 0);
+  const unmarkedGroups = withChildren.filter((r) => r.unmarked > 0).length;
+  // nothing marked yet: no teacher mark in any group (a parent's report alone does not start the day)
+  const notStarted = working && active > 0 && rows.every((r) => r.marked === 0);
+  const expected = rows.reduce((s, r) => s + r.expected, 0);
   return (
     <Link href="/attendance" className="block h-full">
-      <Card className="flex h-full items-center justify-between gap-3 hover:shadow-md">
+      <Card className="flex h-full items-center justify-between gap-3 hover:shadow-md" data-testid="dash-attendance" data-state={!working ? "off" : notStarted ? "pending" : "marked"}>
         <Stat
-          value={<span data-testid="dash-attendance-present">{working ? present : "—"}</span>}
+          value={
+            <span data-testid="dash-attendance-present" data-present={present} className={notStarted ? "text-faint" : undefined}>
+              {working && !notStarted ? present : "—"}
+            </span>
+          }
           label={t("todayCard")}
           sub={
             !working ? (
               t("dayOff")
+            ) : notStarted ? (
+              <span data-testid="dash-attendance-absent">{t("notMarkedStat", { marked: 0, total: withChildren.length })}</span>
             ) : (
               <span data-testid="dash-attendance-absent">
                 {t("absentToday", { count: absent })}
@@ -42,7 +56,7 @@ async function AttendanceTodayStat({ ctx }: { ctx: KgContext }) {
             )
           }
         />
-        {working ? <Ring value={active ? (present / active) * 100 : 0} color="var(--success)" /> : null}
+        {working ? <Ring value={expected > 0 ? (present / expected) * 100 : 0} color="var(--success)" pending={notStarted} label={t("expectedLabel")} /> : null}
       </Card>
     </Link>
   );

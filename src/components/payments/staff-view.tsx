@@ -38,7 +38,7 @@ export async function StaffPayments({ ctx, sp }: { ctx: KgContext; sp: StaffPara
   const tabHref = (k: StaffTab) => (k === "review" ? "/payments" : `/payments?tab=${k}${sp.month && k === "month" ? `&month=${sp.month}` : ""}`);
   return (
     <>
-      <nav className="scrollbar-none mb-4 flex w-full gap-1 overflow-x-auto rounded-2xl bg-surface-muted p-1 sm:inline-flex sm:w-auto sm:max-w-full" aria-label={t("title")}>
+      <nav className="scrollbar-none scroll-shadow-x mb-4 flex w-full gap-1 overflow-x-auto rounded-2xl p-1 [--fade-bg:var(--surface-muted)] sm:inline-flex sm:w-auto sm:max-w-full" aria-label={t("title")}>
         {STAFF_TABS.map((k) => (
           <Link
             key={k}
@@ -46,7 +46,7 @@ export async function StaffPayments({ ctx, sp }: { ctx: KgContext; sp: StaffPara
             aria-current={tab === k ? "page" : undefined}
             data-testid={`tab-${k}`}
             className={cn(
-              "inline-flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl px-2 text-sm font-semibold whitespace-nowrap text-muted sm:h-10 sm:flex-none sm:shrink-0 sm:px-4",
+              "inline-flex h-11 shrink-0 grow items-center justify-center gap-1.5 rounded-xl px-2 text-[13px] font-semibold whitespace-nowrap text-muted sm:h-10 sm:grow-0 sm:px-4 sm:text-sm",
               tab === k && "bg-surface text-text shadow-sm",
             )}
           >
@@ -177,7 +177,7 @@ async function MonthList({ ctx, sp, canManage }: { ctx: KgContext; sp: StaffPara
         <div className="mt-4 grid gap-2 sm:grid-cols-3 sm:gap-3">
           <Total label={t("accrued")} value={sum.accrued} testId="total-accrued" />
           <Total label={t("paid")} value={sum.paid} testId="total-paid" />
-          <Total label={t("debt")} value={sum.debt} testId="total-debt" danger={sum.debt > 0} />
+          <Total label={t("debtFor", { month: t(`monthsLower.${Number(month.slice(5, 7))}`) })} value={sum.debt} testId="total-debt" danger={sum.debt > 0} />
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <FilterSelect
@@ -221,8 +221,9 @@ async function MonthList({ ctx, sp, canManage }: { ctx: KgContext; sp: StaffPara
                 >
                   <Avatar name={r.child.full_name} />
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span data-user-content className="truncate font-bold">{r.child.full_name}</span>
+                    {/* the name wraps to two lines on phones instead of being cut next to the status badge */}
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <span data-user-content className="line-clamp-2 min-w-0 font-bold break-words" data-testid="month-row-name">{r.child.full_name}</span>
                       {r.child.status === "archived" ? <Badge className="shrink-0">{t("archived")}</Badge> : null}
                       {r.starts_on && !r.adjusted_at ? (
                         <Badge tone="warning" className="shrink-0" title={t("startsOn", { date: formatDate(r.starts_on) })} data-testid="starts-on">
@@ -231,7 +232,9 @@ async function MonthList({ ctx, sp, canManage }: { ctx: KgContext; sp: StaffPara
                       ) : null}
                     </div>
                     <div className="truncate text-sm text-muted">
-                      {r.child.group_id ? <span data-user-content>{gName.get(r.child.group_id)}</span> : t("noGroup")} · {formatMoney(r.amount)}
+                      {r.child.group_id ? <span data-user-content>{gName.get(r.child.group_id)}</span> : t("noGroup")}
+                      {/* the amount only when it differs from the balance on the right (no «65 000 ₸» twice in a row) */}
+                      {r.paid_amount > 0 || r.advance > 0 || r.balance !== r.amount ? ` · ${formatMoney(r.amount)}` : ""}
                       {r.paid_amount > 0 ? ` · ${t("paid").toLowerCase()} ${formatMoney(r.paid_amount)}` : ""}
                     </div>
                   </div>
@@ -292,8 +295,8 @@ async function Debtors({ ctx }: { ctx: KgContext }) {
               <Link href={`/payments/${d.invoice_id}`} className="flex min-h-16 items-center gap-3 px-4 py-3 hover:bg-surface-muted md:px-5" data-testid="debtor-row" data-child={d.full_name}>
                 <Avatar name={d.full_name} />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span data-user-content className="truncate font-bold">{d.full_name}</span>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <span data-user-content className="line-clamp-2 min-w-0 font-bold break-words">{d.full_name}</span>
                     {d.child_status === "archived" ? <Badge className="shrink-0">{t("archived")}</Badge> : null}
                   </div>
                   <div className="truncate text-sm text-muted">{d.group_id ? <span data-user-content>{gName.get(d.group_id)}</span> : t("noGroup")}</div>

@@ -73,7 +73,7 @@ export default async function ChildrenPage({ searchParams }: { searchParams: Pro
             className="h-11 w-full rounded-xl border border-border bg-surface pr-3 pl-10 text-sm focus:border-brand focus:outline-none"
           />
         </form>
-        <div className="scrollbar-none flex gap-1.5 overflow-x-auto">
+        <div className="scrollbar-none edge-fade-x -mx-4 flex scroll-px-4 gap-1.5 overflow-x-auto px-4 md:mx-0 md:min-w-0 md:scroll-px-0 md:px-0 md:[mask-image:none]">
           <Link href={qs({ group: undefined })} className={cn("flex h-10 pointer-coarse:h-11 shrink-0 items-center rounded-full px-4 text-sm font-semibold", !sp.group ? "bg-text text-white" : "bg-surface text-muted border border-border")}>
             {t("allGroups")}
           </Link>

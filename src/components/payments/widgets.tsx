@@ -26,10 +26,14 @@ const monthNumbers = cache(async (kgId: string, timezone: string) => {
   return { sum, percent: collectedPercent(sum), debt: debtors.reduce((s, d) => s + d.debt, 0), debtors, month: today.slice(0, 7) };
 });
 
-/** Owner top row: «Оплаты месяца» — paid % of accrued + total debt (red only when there is debt). */
+/**
+ * Owner top row: «Оплаты месяца» — paid % of accrued + the total debt of all months, labelled as such (it is not
+ * this month's debt). Before the first payment of the month (or before accrual) the ring is neutral, not a red-flag 0%.
+ */
 async function OwnerPaymentsStat({ ctx }: { ctx: KgContext }) {
   const t = await getTranslations("payments");
   const n = await monthNumbers(ctx.kg.id, ctx.settings.timezone);
+  const pending = n.sum.paid === 0;
   return (
     <Link href="/payments?tab=month" className="block h-full">
       <Card className="flex h-full items-center justify-between gap-3 hover:shadow-md">
@@ -37,12 +41,19 @@ async function OwnerPaymentsStat({ ctx }: { ctx: KgContext }) {
           value={<span className="text-[24px] whitespace-nowrap" data-testid="dash-payments-paid">{formatMoney(n.sum.paid)}</span>}
           label={t("widgets.month")}
           sub={
-            <span className={n.debt > 0 ? "font-semibold text-danger" : undefined} data-testid="dash-payments" data-debt={n.debt}>
-              {n.debt > 0 ? t("widgets.debts", { amount: formatMoney(n.debt) }) : t("widgets.noDebts")}
-            </span>
+            <>
+              {pending ? (
+                <span className="block" data-testid="dash-payments-pending">
+                  {n.sum.accrued === 0 ? t("widgets.notAccrued") : t("widgets.noPaymentsYet")}
+                </span>
+              ) : null}
+              <span className={n.debt > 0 ? "font-semibold text-danger" : undefined} data-testid="dash-payments" data-debt={n.debt}>
+                {n.debt > 0 ? t("widgets.debts", { amount: formatMoney(n.debt) }) : t("widgets.noDebts")}
+              </span>
+            </>
           }
         />
-        <Ring value={n.percent} color="var(--success)" label={t("widgets.paidOfAccrued")} />
+        <Ring value={n.percent} color="var(--success)" pending={pending} label={t("widgets.paidOfAccrued")} />
       </Card>
     </Link>
   );
@@ -104,13 +115,16 @@ async function AccruedPaid({ ctx }: { ctx: KgContext }) {
           <Stat value={<span className="text-[22px]">{formatMoney(n.sum.accrued)}</span>} label={t("accrued")} />
           <Stat value={<span className="text-[22px]">{formatMoney(n.sum.paid)}</span>} label={t("paid")} />
         </div>
-        <Ring value={n.percent} color="var(--success)" label={t("widgets.paidOfAccrued")} />
+        <Ring value={n.percent} color="var(--success)" pending={n.sum.paid === 0} label={t("widgets.paidOfAccrued")} />
       </div>
     </Card>
   );
 }
 
-/** Accountant: «Должники» — total debt and the biggest debts (red: debts are the one place for it, SPEC §8). */
+/**
+ * Accountant: «Должники» — total debt of all months and the biggest debts (red: debts are the one place for it,
+ * SPEC §8). The caption says it covers all months, so it is not confused with this month's numbers next to it.
+ */
 async function DebtorsWidget({ ctx }: { ctx: KgContext }) {
   const t = await getTranslations("payments");
   const n = await monthNumbers(ctx.kg.id, ctx.settings.timezone);
@@ -126,7 +140,9 @@ async function DebtorsWidget({ ctx }: { ctx: KgContext }) {
             <span className="text-[26px] leading-none font-extrabold whitespace-nowrap text-danger" data-testid="dash-debtors-total">
               {formatMoney(n.debt)}
             </span>
-            <span className="text-[13px] font-medium text-muted">{t("widgets.debtors", { count: n.debtors.length })}</span>
+            <span className="text-[13px] font-medium text-muted" data-testid="dash-debtors-caption">
+              {t("widgets.allMonths")} · {t("widgets.debtors", { count: n.debtors.length })}
+            </span>
           </div>
           <ul className="space-y-1">
             {top.map((d) => (

@@ -55,7 +55,7 @@ export default async function WaitlistPage({ searchParams }: { searchParams: Pro
           ) : null
         }
       />
-      <nav className="scrollbar-none mb-4 flex gap-1.5 overflow-x-auto" aria-label={t("title")}>
+      <nav className="scrollbar-none edge-fade-x -mx-4 mb-4 flex scroll-px-4 gap-1.5 overflow-x-auto px-4 md:mx-0 md:scroll-px-0 md:px-0 md:[mask-image:none]" aria-label={t("title")}>
         {WAITLIST_TABS.map((key) => (
           <Link
             key={key}

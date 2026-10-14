@@ -74,11 +74,12 @@ async function AttendanceSection(p: SectionProps) {
   const pp = t("delta.pp");
   const [days, groups, reasons] = buildTables("attendance", cur, { t, range: p.cur });
   const series = attendanceSeries(cur, p.cur);
+  // `better` — the good direction of each KPI's change, decided here per KPI (fill: more children is good).
   const kpis: KpiProps[] = [
-    { label: t("kpi.attendance"), value: pctText(tc.rate), change: change(tc.rate, tp.rate, "points"), unit: pp, testId: "kpi-attendance" },
-    { label: t("kpi.fill"), value: pctText(tc.fill), sub: `${tc.children} / ${tc.capacity}`, change: change(tc.fill, tp.fill, "points"), unit: pp, testId: "kpi-fill" },
-    { label: t("kpi.sickness"), value: pctText(tc.sickShare), change: change(tc.sickShare, tp.sickShare, "points"), unit: pp, testId: "kpi-sickness" },
-    { label: t("kpi.absences"), value: String(tc.absent), sub: t("kpi.absencesSub", { count: tc.absent }), change: change(tc.absent, tp.absent, "relative"), unit: "%", testId: "kpi-absences" },
+    { label: t("kpi.attendance"), value: pctText(tc.rate), change: change(tc.rate, tp.rate, "points"), unit: pp, better: "up", testId: "kpi-attendance" },
+    { label: t("kpi.fill"), value: pctText(tc.fill), sub: `${tc.children} / ${tc.capacity}`, change: change(tc.fill, tp.fill, "points"), unit: pp, better: "up", testId: "kpi-fill" },
+    { label: t("kpi.sickness"), value: pctText(tc.sickShare), change: change(tc.sickShare, tp.sickShare, "points"), unit: pp, better: "down", testId: "kpi-sickness" },
+    { label: t("kpi.absences"), value: String(tc.absent), sub: t("kpi.absencesSub", { count: tc.absent }), change: change(tc.absent, tp.absent, "relative"), unit: "%", better: "down", testId: "kpi-absences" },
   ];
   const rated = cur.groups.map((g) => ({ name: g.name, value: pct(g.present, g.present + g.absent) }));
   const fills = cur.groups.map((g) => ({ name: g.name, value: pct(g.children, g.capacity) }));
@@ -158,11 +159,12 @@ async function StaffSection(p: SectionProps) {
   const ph = { ...phrases(p), than: periodThan(t, p.period.kind, prevRange ?? p.prev) };
   const pp = t("delta.pp");
   const [table] = buildTables("staff", cur, { t, range: p.cur });
+  // Neutral (no `better`): hours vs schedule (overtime is not «better») and manual edits (corrections are normal work).
   const kpis: KpiProps[] = [
-    { label: t("kpi.late"), value: String(tc.late), sub: t("kpi.daysSub", { count: tc.late }), change: has ? change(tc.late, tp.late, "relative") : null, unit: "%", testId: "kpi-late" },
-    { label: t("kpi.missed"), value: String(tc.missed), sub: t("kpi.missedSub"), change: has ? change(tc.missed, tp.missed, "relative") : null, unit: "%", testId: "kpi-missed" },
+    { label: t("kpi.late"), value: String(tc.late), sub: t("kpi.daysSub", { count: tc.late }), change: has ? change(tc.late, tp.late, "relative") : null, unit: "%", better: "down", testId: "kpi-late" },
+    { label: t("kpi.missed"), value: String(tc.missed), sub: t("kpi.missedSub"), change: has ? change(tc.missed, tp.missed, "relative") : null, unit: "%", better: "down", testId: "kpi-missed" },
     { label: t("kpi.hours"), value: pctText(tc.hoursRate), sub: `${Math.round(tc.worked / 60)} / ${Math.round(tc.planned / 60)}`, change: change(tc.hoursRate, tp.hoursRate, "points"), unit: pp, testId: "kpi-hours" },
-    { label: t("kpi.autoClosed"), value: String(tc.autoClosed), sub: t("kpi.daysSub", { count: tc.autoClosed }), change: has ? change(tc.autoClosed, tp.autoClosed, "relative") : null, unit: "%", testId: "kpi-auto" },
+    { label: t("kpi.autoClosed"), value: String(tc.autoClosed), sub: t("kpi.daysSub", { count: tc.autoClosed }), change: has ? change(tc.autoClosed, tp.autoClosed, "relative") : null, unit: "%", better: "down", testId: "kpi-auto" },
     { label: t("kpi.edited"), value: String(tc.edited), sub: t("kpi.daysSub", { count: tc.edited }), change: has ? change(tc.edited, tp.edited, "relative") : null, unit: "%", testId: "kpi-edited" },
   ];
   const hoursRows = cur
@@ -207,18 +209,19 @@ async function FinanceSection(p: SectionProps) {
   const ph = phrases(p);
   const pp = t("delta.pp");
   const [months, debtors] = buildTables("finance", cur, { t, range: p.cur });
+  // Charged is neutral (it follows the number of children); a growing debt is the one bad trend shown in red.
   const kpis: KpiProps[] = [
     { label: t("kpi.charged"), value: formatMoney(tc.charged), change: change(tc.charged, tp.charged, "relative"), unit: "%", testId: "kpi-charged" },
-    { label: t("kpi.paid"), value: formatMoney(tc.paid), change: change(tc.paid, tp.paid, "relative"), unit: "%", testId: "kpi-paid" },
-    { label: t("kpi.debt"), value: formatMoney(tc.debt), change: change(tc.debt, tp.debt, "relative"), unit: "%", danger: tc.debt > 0, testId: "kpi-debt" },
-    { label: t("kpi.collection"), value: pctText(tc.collection), change: change(tc.collection, tp.collection, "points"), unit: pp, testId: "kpi-collection" },
+    { label: t("kpi.paid"), value: formatMoney(tc.paid), change: change(tc.paid, tp.paid, "relative"), unit: "%", better: "up", testId: "kpi-paid" },
+    { label: t("kpi.debt"), value: formatMoney(tc.debt), sub: t("kpi.debtSub"), change: change(tc.debt, tp.debt, "relative"), unit: "%", danger: tc.debt > 0, better: "down", debt: true, testId: "kpi-debt" },
+    { label: t("kpi.collection"), value: pctText(tc.collection), change: change(tc.collection, tp.collection, "points"), unit: pp, better: "up", testId: "kpi-collection" },
     {
       label: t("kpi.payDays"),
       value: tc.avgDays == null ? "—" : String(Math.round(tc.avgDays)),
       sub: t("kpi.payDaysSub"),
       change: change(tc.avgDays, tp.avgDays, "points"),
       unit: t("delta.days"),
-      testId: "kpi-paydays",
+      better: "down", testId: "kpi-paydays",
     },
   ];
   const years = new Set(cur.months.map((m) => m.period.slice(0, 4)));
@@ -255,11 +258,11 @@ async function FunnelSection(p: SectionProps) {
   const ph = phrases(p);
   const [funnel, churn, active] = buildTables("funnel", cur, { t, range: p.cur });
   const kpis: KpiProps[] = [
-    { label: t("kpi.applications"), value: String(cur.applications), change: change(cur.applications, prev.applications, "relative"), unit: "%", testId: "kpi-applications" },
-    { label: t("kpi.conversion"), value: pctText(tc.conversion), change: change(tc.conversion, tp.conversion, "points"), unit: t("delta.pp"), testId: "kpi-conversion" },
-    { label: t("kpi.joined"), value: String(cur.joined), change: change(cur.joined, prev.joined, "relative"), unit: "%", testId: "kpi-joined" },
-    { label: t("kpi.left"), value: String(cur.left), change: change(cur.left, prev.left, "relative"), unit: "%", testId: "kpi-left" },
-    { label: t("kpi.active"), value: tc.activeEnd == null ? "—" : String(tc.activeEnd), change: change(tc.activeEnd, tp.activeEnd, "relative"), unit: "%", testId: "kpi-active" },
+    { label: t("kpi.applications"), value: String(cur.applications), change: change(cur.applications, prev.applications, "relative"), unit: "%", better: "up", testId: "kpi-applications" },
+    { label: t("kpi.conversion"), value: pctText(tc.conversion), change: change(tc.conversion, tp.conversion, "points"), unit: t("delta.pp"), better: "up", testId: "kpi-conversion" },
+    { label: t("kpi.joined"), value: String(cur.joined), change: change(cur.joined, prev.joined, "relative"), unit: "%", better: "up", testId: "kpi-joined" },
+    { label: t("kpi.left"), value: String(cur.left), change: change(cur.left, prev.left, "relative"), unit: "%", better: "down", testId: "kpi-left" },
+    { label: t("kpi.active"), value: tc.activeEnd == null ? "—" : String(tc.activeEnd), change: change(tc.activeEnd, tp.activeEnd, "relative"), unit: "%", better: "up", testId: "kpi-active" },
   ];
   const stages = funnel.rows.map((r) => ({ name: String(r.stage), value: Number(r.applications) }));
   const reasons = Object.entries(cur.left_reasons)

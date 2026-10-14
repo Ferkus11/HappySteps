@@ -90,34 +90,39 @@ export default async function TimesheetPage({ searchParams }: { searchParams: Pr
         </Card>
       ) : (
         <Card className="min-w-0 p-0">
-          <div className="overflow-x-auto" data-testid="timesheet-scroll">
+          {/* desktop: short names and 24px day cells, so all 31 days and the month totals fit 1440 without scrolling;
+              when they do not (tablets, phones) the edge shadow shows there is more to the right */}
+          <div className="scroll-shadow-x overflow-x-auto" data-testid="timesheet-scroll">
             <table className="w-max min-w-full border-separate border-spacing-0 text-[12px]" data-testid="timesheet">
               <thead>
                 <tr className="text-faint">
-                  <th className="sticky left-0 z-10 min-w-40 border-b border-border bg-surface px-3 py-2 text-left text-[12px] font-semibold md:min-w-56">{t("employee")}</th>
+                  <th className="sticky left-0 z-10 min-w-40 border-b border-border bg-surface px-3 py-2 text-left text-[12px] font-semibold md:min-w-0 md:px-2">{t("employee")}</th>
                   {days.map((d) => {
                     const wd = isoWeekday(d);
                     return (
-                      <th key={d} className={cn("min-w-8 border-b border-border px-0.5 py-2 text-center font-semibold", wd > 5 && "text-brand", d === today && "text-brand")}>
+                      <th key={d} className={cn("min-w-8 border-b border-border px-0.5 py-2 text-center font-semibold md:w-6 md:min-w-6 md:px-0", wd > 5 && "text-brand", d === today && "text-brand")}>
                         <div className="text-text">{Number(d.slice(8))}</div>
                         <div className="text-[10px] font-medium">{t(`weekdays.${wd}`)}</div>
                       </th>
                     );
                   })}
-                  <th className="border-b border-l border-border px-2 py-2 text-right font-semibold">{t("totals.hoursShort")}</th>
-                  <th className="border-b border-border px-2 py-2 text-right font-semibold">{t("totals.latesShort")}</th>
-                  <th className="border-b border-border px-2 py-2 text-right font-semibold">{t("totals.absencesShort")}</th>
-                  <th className="border-b border-border px-2 py-2 text-right font-semibold">{t("totals.missedShort")}</th>
+                  <th className="border-b border-l border-border px-2 py-2 text-right font-semibold md:px-1.5">{t("totals.hoursShort")}</th>
+                  <th className="border-b border-border px-2 py-2 text-right font-semibold md:px-1.5">{t("totals.latesShort")}</th>
+                  <th className="border-b border-border px-2 py-2 text-right font-semibold md:px-1.5">{t("totals.absencesShort")}</th>
+                  <th className="border-b border-border px-2 py-2 text-right font-semibold md:px-1.5">{t("totals.missedShort")}</th>
                 </tr>
               </thead>
               <tbody>
                 {people.map((p) => (
                   <tr key={p.userId} data-testid={`ts-row-${p.userId}`}>
-                    <th scope="row" className="sticky left-0 z-10 border-b border-border bg-surface px-3 py-1.5 text-left font-semibold">
+                    <th scope="row" className="sticky left-0 z-10 border-b border-border bg-surface px-3 py-1.5 text-left font-semibold md:px-2">
                       <div className="flex items-center gap-1">
-                        <Link href={`/worktime/people/${p.userId}?month=${month}`} className="max-w-36 truncate hover:text-brand md:max-w-48 pointer-coarse:flex pointer-coarse:min-h-11 pointer-coarse:items-center" title={p.fullName}>
-                          <span className="truncate" data-user-content>
+                        <Link href={`/worktime/people/${p.userId}?month=${month}`} className="max-w-36 truncate whitespace-nowrap hover:text-brand pointer-coarse:flex pointer-coarse:min-h-11 pointer-coarse:items-center" title={p.fullName}>
+                          <span className="truncate md:hidden" data-user-content>
                             {p.fullName}
+                          </span>
+                          <span className="hidden md:inline" data-user-content>
+                            {shortName(p.fullName)}
                           </span>
                         </Link>
                         {canEdit ? (
@@ -140,12 +145,12 @@ export default async function TimesheetPage({ searchParams }: { searchParams: Pr
                     {days.map((d) => (
                       <Cell key={d} row={p.days[d]} t={t} />
                     ))}
-                    <td className="border-b border-l border-border px-2 text-right font-bold tabular-nums" data-testid="ts-hours">
+                    <td className="border-b border-l border-border px-2 text-right font-bold tabular-nums md:px-1.5" data-testid="ts-hours">
                       {formatHours(p.totals.minutes)}
                     </td>
-                    <td className="border-b border-border px-2 text-right tabular-nums">{p.totals.lates || "—"}</td>
-                    <td className="border-b border-border px-2 text-right tabular-nums">{p.totals.absences || "—"}</td>
-                    <td className="border-b border-border px-2 text-right tabular-nums">{p.totals.missed || "—"}</td>
+                    <td className="border-b border-border px-2 text-right tabular-nums md:px-1.5">{p.totals.lates || "—"}</td>
+                    <td className="border-b border-border px-2 text-right tabular-nums md:px-1.5">{p.totals.absences || "—"}</td>
+                    <td className="border-b border-border px-2 text-right tabular-nums md:px-1.5">{p.totals.missed || "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -174,9 +179,15 @@ export default async function TimesheetPage({ searchParams }: { searchParams: Pr
 
 type T = Awaited<ReturnType<typeof getTranslations<"worktime">>>;
 
+/** «Нурланова Асель Ериковна» → «Нурланова А.» for the desktop grid (the full name is in the tooltip and on phones). */
+function shortName(full: string) {
+  const [last, first] = full.trim().split(/\s+/);
+  return first ? `${last} ${first[0]}.` : last;
+}
+
 function Cell({ row, t }: { row: DayRow | undefined; t: T }) {
   const kind = cellKind(row);
-  const base = "h-10 border-b border-border px-0.5 text-center tabular-nums";
+  const base = "h-10 border-b border-border px-0.5 text-center tabular-nums md:px-0 md:text-[11px]";
   if (!row || kind === "empty") return <td className={base} />;
   if (kind === "hours") {
     const late = row.status === "late";

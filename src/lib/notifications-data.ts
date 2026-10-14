@@ -23,6 +23,12 @@ export interface NotificationItem {
 
 const COLUMNS = "id, type, params, url, read_at, created_at";
 
+/**
+ * Rows of deleted chat messages (`params.deleted = "yes"`, D-033) carry nothing but «Сообщение удалено»: the centre
+ * and the badge leave them out (PostgREST `not.cs` on the jsonb params).
+ */
+const DELETED = ["params", "cs", JSON.stringify({ deleted: "yes" })] as const;
+
 /** PostgREST filter for the context's scope. */
 export function scopeOr(ctx: AppContext): string {
   return ctx.kind === "kindergarten" ? `kindergarten_id.eq.${ctx.kg.id},kindergarten_id.is.null` : "kindergarten_id.is.null";
@@ -40,6 +46,7 @@ export async function loadNotifications(supabase: SupabaseClient, ctx: AppContex
     .from("notifications")
     .select(COLUMNS)
     .eq("user_id", ctx.userId)
+    .not(...DELETED)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(PAGE_SIZE + 1);
@@ -61,6 +68,7 @@ export async function unreadCount(supabase: SupabaseClient, ctx: AppContext): Pr
     .from("notifications")
     .select("id", { count: "exact", head: true })
     .eq("user_id", ctx.userId)
+    .not(...DELETED)
     .is("read_at", null)
     .or(scopeOr(ctx));
   return count ?? 0;
@@ -75,6 +83,7 @@ export async function unreadElsewhere(supabase: SupabaseClient, ctx: AppContext)
     .from("notifications")
     .select("id", { count: "exact", head: true })
     .eq("user_id", ctx.userId)
+    .not(...DELETED)
     .is("read_at", null)
     .in("kindergarten_id", others);
   return count ?? 0;
