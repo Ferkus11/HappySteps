@@ -96,6 +96,27 @@ body {
   outline-offset: 2px;
 }
 
+/* Toasts sit under the sticky app header (64px) and, while offline, under the «Нет подключения» banner too,
+   so they never cover the logo, bell or avatar (UX review #12). Outside the app shell: the top gutter. */
+:root {
+  --hs-toast-top: max(16px, env(safe-area-inset-top));
+}
+:root:has([data-testid="sidebar-column"]) {
+  --hs-toast-top: calc(env(safe-area-inset-top) + 76px);
+}
+:root[data-offline="true"]:has([data-testid="sidebar-column"]) {
+  --hs-toast-top: calc(env(safe-area-inset-top) + 120px);
+}
+
+/* Offline: actions are blocked (SPEC §8), so primary and destructive buttons look disabled. A tap still
+   explains why with the offline toast; navigation links stay as they are. */
+:root[data-offline="true"] :is(main, [role="dialog"]) button:is([data-variant="primary"], [data-variant="danger"]) {
+  opacity: 0.45;
+  filter: grayscale(0.4);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
 @layer utilities {
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);

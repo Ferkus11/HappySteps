@@ -7,7 +7,7 @@ import { ChevronLeft, ChevronRight, Copy, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input, inputClass } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Confirm } from "@/components/common/confirm";
 import { useAction } from "@/hooks/use-action";
@@ -51,7 +51,7 @@ export function MenuEditor({
 
   React.useEffect(() => {
     if (!focusNext.current) return;
-    formRef.current?.querySelector<HTMLInputElement>(`[data-field="${focusNext.current}"]`)?.focus();
+    formRef.current?.querySelector<HTMLElement>(`[data-field="${focusNext.current}"]`)?.focus();
     focusNext.current = null;
   });
 
@@ -90,12 +90,12 @@ export function MenuEditor({
     void save.run({ date, items: out });
   };
 
-  const onKey = (meal: MealKey, index: number, field: "dish" | "composition") => (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const onKey = (meal: MealKey, index: number, field: "dish" | "composition") => (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
     if (e.ctrlKey || e.metaKey) return submit();
     const list = rows[meal];
-    const focus = (target: string) => formRef.current?.querySelector<HTMLInputElement>(`[data-field="${target}"]`)?.focus();
+    const focus = (target: string) => formRef.current?.querySelector<HTMLElement>(`[data-field="${target}"]`)?.focus();
     if (field === "dish") focus(`composition-${list[index].id}`);
     else if (index < list.length - 1) focus(`dish-${list[index + 1].id}`);
     else addRow(meal);
@@ -172,14 +172,14 @@ export function MenuEditor({
                         onChange={(e) => update(meal, r.id, { dish: e.target.value })}
                         onKeyDown={onKey(meal, i, "dish")}
                       />
-                      <Input
+                      <AutoGrowText
                         value={r.composition}
                         maxLength={500}
                         placeholder={t("compositionPlaceholder")}
                         aria-label={`${t(`meals.${meal}`)}: ${t("composition")} ${i + 1}`}
                         data-field={`composition-${r.id}`}
                         data-testid={`composition-${meal}-${i}`}
-                        onChange={(e) => update(meal, r.id, { composition: e.target.value })}
+                        onChange={(e) => update(meal, r.id, { composition: e.target.value.replace(/\s*\n\s*/g, " ") })}
                         onKeyDown={onKey(meal, i, "composition")}
                       />
                     </div>
@@ -278,5 +278,33 @@ function CopyDialog({ date, dateLabel, recent, overwrite }: { date: string; date
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * The ingredient line: one row that grows as the cook types, so the end of a long list stays visible on a
+ * phone (UX review #22). Enter still moves to the next field (onKey), so the value stays one line.
+ */
+function AutoGrowText({ className, value, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { value: string }) {
+  const ref = React.useRef<HTMLTextAreaElement>(null);
+  const fit = React.useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
+  }, []);
+  React.useLayoutEffect(fit, [fit, value]);
+  React.useEffect(() => {
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [fit]);
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={value}
+      className={cn(inputClass, "block h-auto min-h-11 resize-none overflow-hidden py-2.5 leading-snug", className)}
+      {...props}
+    />
   );
 }

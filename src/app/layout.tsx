@@ -37,14 +37,20 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <NextIntlClientProvider>
           {children}
           <PwaRoot />
-          {/* Phones: the 16px page gutter on the sides, below the notch/status bar on top. */}
+          {/* Below the app header (and the offline banner) — `--hs-toast-top` in globals.css; phones keep the
+              16px page gutter on the sides. The close button sits inside the toast on the right. */}
           <Toaster
             position="top-center"
             richColors
             closeButton
             customAriaLabel={t("toasts")}
-            mobileOffset={{ top: "max(16px, env(safe-area-inset-top))", left: 16, right: 16, bottom: "max(16px, env(safe-area-inset-bottom))" }}
-            toastOptions={{ className: "!rounded-2xl !font-sans", closeButtonAriaLabel: t("close") }}
+            offset={{ top: "var(--hs-toast-top)" }}
+            mobileOffset={{ top: "var(--hs-toast-top)", left: 16, right: 16, bottom: "max(16px, env(safe-area-inset-bottom))" }}
+            toastOptions={{
+              className: "!rounded-2xl !font-sans !pr-11 !shadow-lg !text-sm",
+              classNames: { closeButton: "!left-auto !right-2 !top-1/2 !size-8 !transform-none !-translate-y-1/2 !border-0 !bg-transparent" },
+              closeButtonAriaLabel: t("close"),
+            }}
           />
         </NextIntlClientProvider>
       </body>

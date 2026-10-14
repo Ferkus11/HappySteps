@@ -123,6 +123,11 @@ test("head finds the child, deletes the photo (audited)", async ({ page }) => {
   expect(a.rows[0].details).toMatchObject({ title: PHOTO_TITLE, category: "medical" });
   await page.goto("/audit");
   await expect(page.getByText("Удалён документ").first()).toBeVisible();
+  // Details are translated sentences: the title, the category's name, the child — never ids, keys or JSON.
+  const auditRow = page.getByTestId("audit-row").filter({ hasText: PHOTO_TITLE }).first();
+  await expect(auditRow.getByTestId("audit-detail")).toContainText(`«${PHOTO_TITLE}» · Медицинские справки · Ахметов Алихан`);
+  const details = await page.getByTestId("audit-detail").allInnerTexts();
+  expect(details.filter((d) => /[0-9a-f]{8}-[0-9a-f]{4}-|\bnull\b|\b[a-z_]+: /.test(d))).toEqual([]);
 });
 
 test("other parents and the Звёздочки teacher cannot open the folder (UI, URL, file link, forged upload)", async ({ page }) => {

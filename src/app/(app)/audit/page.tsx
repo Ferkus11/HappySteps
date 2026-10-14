@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
 import { formatDateTime } from "@/lib/format";
+import { auditRefs, describeAudit, type AuditNames, type AuditTranslator } from "@/lib/audit-details";
 
 export async function generateMetadata() {
   return { title: (await getTranslations("audit"))("title") };
@@ -39,6 +40,8 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   const labels = t.raw("actions") as Record<string, string>;
   const actionLabel = (a: string) => labels[a] ?? a;
   const tz = ctx.settings.timezone;
+  const auditNames = await loadAuditNames(supabase, ctx.kg.id, rows ?? [], names);
+  const tAll = (await getTranslations()) as unknown as AuditTranslator;
 
   return (
     <>
@@ -80,9 +83,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                 <span className="text-sm text-muted">{formatDateTime(r.created_at, tz)}</span>
                 <span className="min-w-0">
                   <span className="font-semibold">{actionLabel(r.action)}</span>
-                  {r.details && Object.keys(r.details).length ? (
-                    <span className="block truncate text-xs text-faint" data-user-content>{summarize(r.details as Record<string, unknown>, names)}</span>
-                  ) : null}
+                  <AuditDetail text={describeAudit(r, tAll, auditNames, tz)} />
                 </span>
                 <span className="truncate text-sm" data-user-content={r.actor_id ? "" : undefined}>{r.actor_id ? (names.get(r.actor_id) ?? "—") : t("system")}</span>
               </li>
@@ -94,8 +95,39 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   );
 }
 
-function summarize(d: Record<string, unknown>, names: Map<string, string>): string {
-  return Object.entries(d)
-    .map(([k, v]) => `${k}: ${typeof v === "string" && names.has(v) ? names.get(v) : typeof v === "object" ? JSON.stringify(v) : String(v)}`)
-    .join(" · ");
+function AuditDetail({ text }: { text: string | null }) {
+  if (!text) return null;
+  return (
+    <span className="mt-0.5 line-clamp-2 block text-xs text-muted" data-user-content data-testid="audit-detail">
+      {text}
+    </span>
+  );
+}
+
+/**
+ * Names for the ids the rows refer to (people, children, groups). One query each over the garden — no
+ * `in (…)` with up to 200 ids in the URL; a garden has a few hundred people at most. RLS applies.
+ */
+async function loadAuditNames(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  kgId: string,
+  rows: Parameters<typeof auditRefs>[0],
+  staff: Map<string, string>,
+): Promise<AuditNames> {
+  const ids = auditRefs(rows);
+  const people = new Map(staff);
+  const children = new Map<string, string>();
+  const groups = new Map<string, string>();
+  if (!ids.length) return { people, children, groups };
+  const [{ data: kids }, { data: gs }, { data: members }] = await Promise.all([
+    supabase.from("children").select("id, full_name").eq("kindergarten_id", kgId),
+    supabase.from("groups").select("id, name").eq("kindergarten_id", kgId),
+    supabase.from("memberships").select("user_id, profiles(full_name)").eq("kindergarten_id", kgId).eq("role", "parent"),
+  ]);
+  for (const k of kids ?? []) children.set(k.id as string, k.full_name as string);
+  for (const g of gs ?? []) groups.set(g.id as string, g.name as string);
+  for (const m of (members ?? []) as unknown as { user_id: string; profiles: { full_name: string } | null }[]) {
+    if (m.profiles) people.set(m.user_id, m.profiles.full_name);
+  }
+  return { people, children, groups };
 }
