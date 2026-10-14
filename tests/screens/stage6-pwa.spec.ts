@@ -59,6 +59,7 @@ for (const locale of ["ru", "kk"] as const) {
     await goOffline(context);
     await page.locator('form button[type="submit"]').click();
     await expect(page.locator("[data-sonner-toast]")).toBeVisible();
+    await page.waitForTimeout(500); // let the toast finish its fade-in, or the capture shows it half transparent
     await snap(page, STAGE, `pwa-offline-action-${locale}`);
   });
 

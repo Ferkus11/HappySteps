@@ -51,14 +51,23 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
       ) : (
         <Card className="p-0">
           <ul className="divide-y divide-border">
-            {shown.map((p) => (
+            {shown.map((p) => {
+              const roles = p.roles.filter((r) => (archive ? r.status === "archived" : r.status === "active"));
+              return (
               <li key={p.userId}>
                 <Link href={`/staff/${p.userId}`} className="flex min-h-16 items-center gap-3 px-4 py-3 hover:bg-surface-muted md:px-5" data-testid={`staff-${p.phone}`}>
                   <Avatar name={p.fullName} />
                   <div className="min-w-0 flex-1">
                     <div data-user-content className="truncate font-bold">{p.fullName}</div>
                     <div className="truncate text-sm text-muted">
-                      {formatPhone(p.phone)}
+                      {roles.length ? (
+                        // Phones: the role badges on the right are hidden, so the role leads the sub-line.
+                        <span className="font-semibold text-sky-strong sm:hidden" data-testid="staff-role-mobile">
+                          {roles.map((r) => tr(r.role)).join(", ")}
+                          {" · "}
+                        </span>
+                      ) : null}
+                      <span className="whitespace-nowrap">{formatPhone(p.phone)}</span>
                       {p.groups.length ? (
                         <>
                           {" · "}
@@ -66,20 +75,24 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
                         </>
                       ) : null}
                     </div>
+                    {!p.activated ? (
+                      <Badge tone="warning" className="mt-1.5 sm:hidden">
+                        {t("notActivated")}
+                      </Badge>
+                    ) : null}
                   </div>
                   <div className="hidden flex-wrap justify-end gap-1.5 sm:flex">
-                    {p.roles
-                      .filter((r) => (archive ? r.status === "archived" : r.status === "active"))
-                      .map((r) => (
-                        <Badge key={r.membershipId} tone="sky">
-                          {tr(r.role)}
-                        </Badge>
-                      ))}
+                    {roles.map((r) => (
+                      <Badge key={r.membershipId} tone="sky">
+                        {tr(r.role)}
+                      </Badge>
+                    ))}
                     {!p.activated ? <Badge tone="warning">{t("notActivated")}</Badge> : null}
                   </div>
                 </Link>
               </li>
-            ))}
+              );
+            })}
           </ul>
         </Card>
       )}

@@ -124,10 +124,7 @@ export default async function ChildPage({ params }: { params: Promise<{ id: stri
               </div>
             </dl>
           </Card>
-        </div>
-        <div className="space-y-4">
-          <ChildAttendanceCard ctx={ctx} child={child} />
-          <ChildDocumentsCard ctx={ctx} childId={child.id} />
+          {/* Payment and parents live in the wide column so the two columns end at about the same height (UX #21). */}
           <ChildPaymentCard ctx={ctx} childId={child.id} />
           <Card>
             <CardHeader title={t("parents")} action={isAdmin && child.status === "active" ? <AddGuardian childId={child.id} /> : null} />
@@ -149,6 +146,10 @@ export default async function ChildPage({ params }: { params: Promise<{ id: stri
               <p className="text-sm text-muted">{t("noParents")}</p>
             )}
           </Card>
+        </div>
+        <div className="space-y-4">
+          <ChildAttendanceCard ctx={ctx} child={child} />
+          <ChildDocumentsCard ctx={ctx} childId={child.id} />
           {ctx.role !== "parent" && history?.length ? (
             <Card>
               <CardHeader title={t("history")} />

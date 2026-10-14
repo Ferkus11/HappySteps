@@ -52,6 +52,22 @@ export async function ChildAttendanceCard({ ctx, child }: { ctx: KgContext; chil
         ))}
       </div>
       <p className="mt-2 text-xs text-faint">{t("lastTwoWeeks")}</p>
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted" data-testid="attendance-legend">
+        <span className="flex items-center gap-1.5">
+          <span className="size-3 rounded bg-tile-work" aria-hidden />
+          {t("presentShort")}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="size-3 rounded bg-tile-absent" aria-hidden />
+          {t("absentShort")}
+        </span>
+        {cells.some((c) => c.e.status === "none") ? (
+          <span className="flex items-center gap-1.5 lowercase">
+            <span className="size-3 rounded bg-surface-muted ring-1 ring-border" aria-hidden />
+            {t("notMarkedShort")}
+          </span>
+        ) : null}
+      </div>
       {upcoming.length ? (
         <div className="mt-4">
           <div className="mb-2 text-xs font-semibold text-faint">{t("reportedAbsences")}</div>

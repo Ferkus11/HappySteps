@@ -34,5 +34,6 @@ export interface ButtonProps
 
 export function Button({ className, variant, size, asChild, ...props }: ButtonProps) {
   const Comp = asChild ? Slot.Root : "button";
-  return <Comp className={cn(buttonVariants({ variant, size }), className)} {...props} />;
+  // data-variant: offline styling dims real buttons that would run an action (globals.css); links don't get it.
+  return <Comp className={cn(buttonVariants({ variant, size }), className)} data-variant={asChild ? undefined : (variant ?? "primary")} {...props} />;
 }

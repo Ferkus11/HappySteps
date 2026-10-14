@@ -55,25 +55,26 @@ export default async function AdminPage() {
                   {k.subscription_status ? <Badge tone="sky">{t(`subscriptionStatus.${k.subscription_status}`)}</Badge> : null}
                 </div>
                 <p className="mt-1 text-sm text-muted">
-                  {t("owner")}: {k.owner_name ?? "—"} {k.owner_phone ? `· ${formatPhone(k.owner_phone)}` : ""}
+                  {t("owner")}: <span data-user-content>{k.owner_name ?? "—"}</span>
+                  {k.owner_phone ? <span className="block whitespace-nowrap">{formatPhone(k.owner_phone)}</span> : null}
                 </p>
               </div>
-              <dl className="grid grid-cols-4 gap-4 text-sm md:w-[420px]">
-                <div>
-                  <dt className="text-xs text-faint">{t("children")}</dt>
-                  <dd className="font-bold">{k.children_count}</dd>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-4 md:w-[440px] md:shrink-0">
+                <div className="flex flex-col justify-between">
+                  <dt className="text-xs leading-tight text-faint">{t("children")}</dt>
+                  <dd className="mt-0.5 font-bold tabular-nums">{k.children_count}</dd>
                 </div>
-                <div>
-                  <dt className="text-xs text-faint">{t("staff")}</dt>
-                  <dd className="font-bold">{k.staff_count}</dd>
+                <div className="flex flex-col justify-between">
+                  <dt className="text-xs leading-tight text-faint">{t("staff")}</dt>
+                  <dd className="mt-0.5 font-bold tabular-nums">{k.staff_count}</dd>
                 </div>
-                <div>
-                  <dt className="text-xs text-faint">{t("createdAt")}</dt>
-                  <dd className="font-bold">{formatDate(k.created_at)}</dd>
+                <div className="flex flex-col justify-between">
+                  <dt className="text-xs leading-tight text-faint">{t("createdAt")}</dt>
+                  <dd className="mt-0.5 font-bold tabular-nums">{formatDate(k.created_at)}</dd>
                 </div>
-                <div>
-                  <dt className="text-xs text-faint">{t("subscriptionUntil")}</dt>
-                  <dd className="font-bold">{k.current_period_end ? formatDate(k.current_period_end) : "—"}</dd>
+                <div className="flex flex-col justify-between">
+                  <dt className="text-xs leading-tight text-faint">{t("subscriptionUntil")}</dt>
+                  <dd className="mt-0.5 font-bold tabular-nums">{k.current_period_end ? formatDate(k.current_period_end) : "—"}</dd>
                 </div>
               </dl>
               <KindergartenRowActions
