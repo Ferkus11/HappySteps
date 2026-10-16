@@ -126,7 +126,7 @@ export function ReviewDialog({
                   required
                 />
               </Field>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col-reverse gap-2 sm:grid sm:grid-cols-2">
                 <Button type="button" variant="outline" size="lg" onClick={() => setMode("reject")} data-testid="receipt-reject">
                   <XCircle /> {t("reject")}
                 </Button>
@@ -154,7 +154,7 @@ export function ReviewDialog({
                   autoFocus
                 />
               </Field>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col-reverse gap-2 sm:grid sm:grid-cols-2">
                 <Button type="button" variant="outline" size="lg" onClick={() => setMode("confirm")}>
                   {t("confirm")}
                 </Button>

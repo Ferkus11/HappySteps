@@ -243,3 +243,29 @@ test("scenario 12 · ru → kk → ru keeps the page and what was typed", async 
   expect(new URL(page.url()).pathname).toBe("/children");
   expect(await page.evaluate(() => (window as unknown as { __hsSameDocument?: boolean }).__hsSameDocument)).toBe(true);
 });
+
+test("scenario 12 · the header switch saves the profile language; profile and date fields follow it", async ({ page }) => {
+  const db = new Pool({ connectionString: process.env.SUPABASE_DB_URL, max: 1 });
+  const saved = async () => (await db.query("select locale from profiles where phone = $1", [PHONES.parent])).rows[0]?.locale;
+  try {
+    await login(page, PHONES.parent);
+    await page.goto("/profile");
+    await settle(page);
+    await switchLanguage(page, "kk");
+    await expect(page.getByTestId("profile-locale")).toHaveValue("kk");
+    await expect.poll(saved).toBe("kk");
+    // The date field is the app's own: Kazakh mask, no browser "dd.mm.yyyy".
+    const bd = page.locator("#p-bd");
+    await expect(bd).toHaveAttribute("placeholder", "кк.аа.жжжж");
+    await expect(page.locator('input[type="date"], input[type="month"]')).toHaveCount(0);
+    await bd.locator("..").getByTestId("date-field-calendar").click();
+    await expect(page.getByTestId("date-field-month")).toContainText(" ж. ");
+    await page.keyboard.press("Escape");
+    await switchLanguage(page, "ru");
+    await expect(page.getByTestId("profile-locale")).toHaveValue("ru");
+    await expect(bd).toHaveAttribute("placeholder", "дд.мм.гггг");
+    await expect.poll(saved).toBe("ru");
+  } finally {
+    await db.end();
+  }
+});

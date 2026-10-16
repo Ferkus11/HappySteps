@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { ChevronLeft, ChevronRight, FileSpreadsheet, FileText, Pencil, Table2 } from "lucide-react";
+import { FileSpreadsheet, FileText, Pencil, Table2 } from "lucide-react";
 import { requireKg } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
 import { loadDays } from "@/lib/queries/worktime";
@@ -12,7 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { NavPicker } from "@/components/worktime/nav-pickers";
+import { MonthStepper } from "@/components/ui/month-stepper";
 
 export async function generateMetadata() {
   return { title: (await getTranslations("worktime"))("timesheet") };
@@ -55,19 +55,15 @@ export default async function TimesheetPage({ searchParams }: { searchParams: Pr
           </>
         }
       />
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Button asChild variant="outline" size="icon" aria-label={t("prevMonth")}>
-          <Link href={`/worktime/timesheet?month=${shiftMonth(month, -1)}`} data-testid="ts-prev">
-            <ChevronLeft />
-          </Link>
-        </Button>
-        <NavPicker type="month" value={month} param="month" path="/worktime/timesheet" label={t("month")} />
-        <Button asChild variant="outline" size="icon" aria-label={t("nextMonth")}>
-          <Link href={`/worktime/timesheet?month=${shiftMonth(month, 1)}`}>
-            <ChevronRight />
-          </Link>
-        </Button>
-      </div>
+      <MonthStepper
+        className="mb-4"
+        label={t("timesheetFor", { month: t(`months.${Number(m)}`), year: y })}
+        prevHref={`/worktime/timesheet?month=${shiftMonth(month, -1)}`}
+        nextHref={`/worktime/timesheet?month=${shiftMonth(month, 1)}`}
+        prevLabel={t("prevMonth")}
+        nextLabel={t("nextMonth")}
+        testId="ts"
+      />
       <div className="mb-4 grid grid-cols-3 gap-3">
         <Card className="p-4">
           <div className="text-[24px] leading-none font-extrabold tabular-nums md:text-[28px]" data-testid="ts-total-hours">

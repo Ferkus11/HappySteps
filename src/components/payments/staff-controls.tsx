@@ -7,7 +7,7 @@ import { CalendarPlus } from "lucide-react";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { Confirm } from "@/components/common/confirm";
 import { cn } from "@/lib/utils";
-import { Input, Select } from "@/components/ui/input";
+import { Select } from "@/components/ui/input";
 import { useAction } from "@/hooks/use-action";
 import { accrueMonthAction } from "@/app/(app)/payments/actions";
 
@@ -53,34 +53,6 @@ function usePushParam() {
     else q.delete(key);
     router.push(`/payments?${q.toString()}`);
   };
-}
-
-/**
- * Month picker. On phones the native input is laid invisibly over the localized label ("Октябрь 2026"), so a tap
- * still opens the system picker but nobody sees a raw "2026-10"; from sm up the input itself is shown.
- */
-export function MonthInput({ params, value, label }: { params: Record<string, string>; value: string; label: string }) {
-  const t = useTranslations("payments");
-  const push = usePushParam();
-  return (
-    <div className="relative min-w-0 flex-1 sm:flex-none">
-      <div
-        className="flex h-11 items-center justify-center rounded-xl border border-border bg-surface px-3 text-[15px] font-bold sm:hidden"
-        aria-hidden
-        data-testid="month-label-phone"
-      >
-        <span className="truncate">{label}</span>
-      </div>
-      <Input
-        type="month"
-        value={value}
-        aria-label={t("month")}
-        className="absolute inset-0 h-full w-full opacity-0 sm:static sm:w-48 sm:opacity-100"
-        data-testid="pick-month"
-        onChange={(e) => e.target.value && push(params, "month", e.target.value)}
-      />
-    </div>
-  );
 }
 
 export function FilterSelect({

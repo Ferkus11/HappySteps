@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import {
   Bar,
   BarChart,
@@ -177,7 +178,7 @@ export function HPairBars({
   );
 }
 
-/** Vertical stacked bars per month: paid + debt = charged. Money is shortened on the axis («120k»). */
+/** Vertical stacked bars per month: paid + debt = charged. Money is shortened on the axis («120 тыс.» / «120 мың», from the translation files). */
 export function MoneyStack({
   label,
   rows,
@@ -189,14 +190,17 @@ export function MoneyStack({
   names: { paid: string; debt: string };
   testId?: string;
 }) {
-  const short = (v: number) => (Math.abs(v) >= 1_000_000 ? `${Math.round(v / 100_000) / 10}M` : Math.abs(v) >= 1000 ? `${Math.round(v / 1000)}k` : String(v));
+  const t = useTranslations("analytics.axis");
+  const dec = (n: number) => String(n).replace(".", ",");
+  const short = (v: number) =>
+    Math.abs(v) >= 1_000_000 ? t("million", { value: dec(Math.round(v / 100_000) / 10) }) : Math.abs(v) >= 1000 ? t("thousand", { value: dec(Math.round(v / 1000)) }) : String(v);
   const money = (v: unknown) => `${Math.round(Number(v ?? 0)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")} ₸`;
   return (
     <Frame label={label} height={240} testId={testId}>
       <BarChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: -8 }} barCategoryGap="28%" accessibilityLayer>
         <CartesianGrid vertical={false} stroke={CHART.grid} />
         <XAxis dataKey="name" tick={axisTick} tickLine={false} axisLine={{ stroke: CHART.grid }} interval="preserveStartEnd" minTickGap={8} />
-        <YAxis tick={axisTick} tickLine={false} axisLine={false} width={48} tickFormatter={(v) => short(Number(v))} />
+        <YAxis tick={axisTick} tickLine={false} axisLine={false} width={64} tickFormatter={(v) => short(Number(v))} />
         <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "#f2f5f9" }} formatter={(v, n) => [money(v), n]} />
         <Legend itemSorter={null} iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12 }} formatter={legendText} />
         <Bar dataKey="paid" name={names.paid} stackId="m" fill={CHART.primary} maxBarSize={48} isAnimationActive={false} />

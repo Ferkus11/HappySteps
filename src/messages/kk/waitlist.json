@@ -10,7 +10,7 @@
   "copyLink": "Көшіру",
   "linkCopied": "Сілтеме көшірілді",
   "openForm": "Нысанды ашу",
-  "downloadQr": "QR-кодты жүктеу",
+  "downloadQr": "QR-кодты жүктеп алу",
   "qrAlt": "Өтінім нысанының QR-коды",
   "tabs": { "waiting": "Күтуде", "accepted": "Қабылданды", "declined": "Бас тартты", "all": "Барлығы" },
   "status": { "new": "Жаңа", "contacted": "Хабарластық", "accepted": "Қабылданды", "declined": "Бас тартты" },

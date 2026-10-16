@@ -10,6 +10,7 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { InviteLink } from "@/components/common/invite-link";
 import { useAction } from "@/hooks/use-action";
 import { createChildAction, type ParentInviteResult } from "./actions";
+import { DateField } from "@/components/ui/date-field";
 
 interface ParentDraft {
   key: number;
@@ -106,10 +107,10 @@ export function AddChildButton({ groups, today }: { groups: { id: string; name: 
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label={t("birthDate")} htmlFor="ch-bd" error={fieldError("birthDate")}>
-                <Input id="ch-bd" name="birthDate" type="date" required max={today} />
+                <DateField id="ch-bd" name="birthDate" required max={today} />
               </Field>
               <Field label={t("enrolledOn")} htmlFor="ch-en">
-                <Input id="ch-en" name="enrolledOn" type="date" defaultValue={today} required />
+                <DateField id="ch-en" name="enrolledOn" defaultValue={today} required />
               </Field>
             </div>
             <div className="grid grid-cols-2 gap-3">

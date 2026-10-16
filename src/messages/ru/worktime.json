@@ -23,7 +23,7 @@
   "durationHm": "{h} ч {m} мин",
   "durationH": "{h} ч",
   "durationM": "{m} мин",
-  "intervals": "{count, plural, one {# интервал} few {# интервала} many {# интервалов} other {# интервала}}",
+  "intervals": "{count, plural, one {# приход за день} few {# прихода за день} many {# приходов за день} other {# прихода за день}}",
   "lateBy": "Опоздание {count, plural, one {# минута} few {# минуты} many {# минут} other {# минуты}}",
   "outsideSchedule": "Вне графика",
   "openSince": "Не закрыт день {date}",

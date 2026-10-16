@@ -55,8 +55,7 @@ async function ChildrenStat({ ctx }: { ctx: KgContext }) {
       <Card className="h-full hover:shadow-md">
         <Stat
           value={<span data-testid="dash-children">{children}</span>}
-          label={t("children")}
-          sub={t("activeChildren")}
+          label={t("activeChildren", { count: children })}
         />
       </Card>
     </Link>
@@ -78,8 +77,8 @@ async function GroupsStat({ ctx }: { ctx: KgContext }) {
       <Card className="flex h-full items-center justify-between gap-2 hover:shadow-md">
         <Stat
           value={<span data-testid="dash-groups">{groups.length}</span>}
-          label={t("groups")}
-          sub={t("fill")}
+          label={t("groups", { count: groups.length })}
+          sub={t("fill", { fill: capacity ? Math.round((children / capacity) * 100) : 0 })}
         />
         <Ring
           value={capacity ? (children / capacity) * 100 : 0}

@@ -9,6 +9,7 @@ import { Field, Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/switch";
 import { useAction } from "@/hooks/use-action";
 import { setTeacherGroupsAction, updatePersonAction } from "@/lib/actions/people-actions";
+import { DateField } from "@/components/ui/date-field";
 
 export function EditPerson({ userId, fullName, birthDate, position, showPosition = true }: { userId: string; fullName: string; birthDate: string | null; position: string; showPosition?: boolean }) {
   const t = useTranslations("staff");
@@ -35,7 +36,7 @@ export function EditPerson({ userId, fullName, birthDate, position, showPosition
             <Input id="ep-name" name="fullName" defaultValue={fullName} required />
           </Field>
           <Field label={t("birthDate")} htmlFor="ep-bd">
-            <Input id="ep-bd" name="birthDate" type="date" defaultValue={birthDate ?? ""} />
+            <DateField id="ep-bd" name="birthDate" defaultValue={birthDate ?? ""} />
           </Field>
           {showPosition ? (
             <Field label={t("position")} htmlFor="ep-pos">

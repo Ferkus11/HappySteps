@@ -6,7 +6,10 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-/** Confirmation dialog; optionally requires typing a phrase (e.g. the kindergarten name). */
+/**
+ * Confirmation dialog; optionally requires typing a phrase (e.g. the kindergarten name). Without `trigger` it is
+ * opened from outside (`open` / `onOpenChange`), e.g. from a «…» menu item.
+ */
 export function Confirm({
   trigger,
   title,
@@ -15,8 +18,12 @@ export function Confirm({
   danger,
   requireText,
   onConfirm,
+  open: openProp,
+  onOpenChange,
 }: {
-  trigger: React.ReactNode;
+  trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   title: string;
   description?: React.ReactNode;
   confirmLabel: string;
@@ -25,13 +32,18 @@ export function Confirm({
   onConfirm: () => Promise<unknown> | void;
 }) {
   const tc = useTranslations("common");
-  const [open, setOpen] = React.useState(false);
+  const [openState, setOpenState] = React.useState(false);
+  const open = openProp ?? openState;
+  const setOpen = (v: boolean) => {
+    setOpenState(v);
+    onOpenChange?.(v);
+  };
   const [text, setText] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const ok = !requireText || text.trim() === requireText.trim();
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); setText(""); }}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
       <DialogContent title={title} description={description}>
         {requireText ? (
           <Input value={text} onChange={(e) => setText(e.target.value)} placeholder={requireText} aria-label={requireText} data-testid="confirm-text" />

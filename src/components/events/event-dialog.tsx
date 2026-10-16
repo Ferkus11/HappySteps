@@ -11,6 +11,7 @@ import { useAction } from "@/hooks/use-action";
 import { EVENT_KINDS, type EventKind } from "@/lib/events";
 import { createEventAction, updateEventAction } from "@/app/(app)/events/actions";
 import { AudienceFields, readAudience, type Audience, type TargetGroup } from "@/components/announcements/audience-fields";
+import { DateField } from "@/components/ui/date-field";
 
 export interface EventFormValue {
   id: string;
@@ -120,7 +121,7 @@ export function EventDialog({
           </Field>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-[1.4fr_1fr_1fr]">
             <Field label={t("date")} htmlFor="e-date" error={fieldError("date")} className="col-span-2 sm:col-span-1">
-              <Input id="e-date" name="date" type="date" defaultValue={event?.date ?? defaultDate} required data-testid="event-date" />
+              <DateField id="e-date" name="date" defaultValue={event?.date ?? defaultDate} required data-testid="event-date" />
             </Field>
             <Field label={t("start")} htmlFor="e-start" error={fieldError("startTime")}>
               <Input id="e-start" name="startTime" type="time" defaultValue={event?.start_time ?? ""} data-testid="event-start" />

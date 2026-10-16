@@ -1,4 +1,5 @@
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
+import { isLocale } from "@/i18n/config";
 import { requireAnyContext } from "@/lib/auth/context";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
@@ -14,6 +15,9 @@ export async function generateMetadata() {
 export default async function ProfilePage() {
   const ctx = await requireAnyContext();
   const t = await getTranslations("profile");
+  // The language the person sees right now (header switch, cookie) — the header switch saves it to the profile too.
+  const active = await getLocale();
+  const locale = isLocale(active) ? active : ctx.profile.locale;
   return (
     <>
       <PageHeader title={t("title")} />
@@ -27,7 +31,7 @@ export default async function ProfilePage() {
             </div>
           </div>
           <p className="mt-3 text-sm text-faint">{t("nameHint")}</p>
-          <ProfileForm locale={ctx.profile.locale} birthDate={ctx.profile.birth_date} />
+          <ProfileForm key={locale} locale={locale} birthDate={ctx.profile.birth_date} />
         </Card>
         {profileSections.map((S, i) => (
           <S key={i} />

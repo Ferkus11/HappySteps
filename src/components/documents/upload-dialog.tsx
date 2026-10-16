@@ -18,6 +18,7 @@ import {
 } from "@/app/(app)/documents/actions";
 import { directUpload } from "@/lib/upload-client";
 import { useOfflineGuard } from "@/lib/pwa/offline-guard";
+import { DateField } from "@/components/ui/date-field";
 
 type Props =
   | { kind: "child"; childId: string; defaultCategory?: string; who?: string }
@@ -193,7 +194,7 @@ export function UploadDocumentButton(props: Props & { size?: "sm" | "md"; classN
                 </Select>
               </Field>
               <Field label={t("expiresOn")} htmlFor="doc-expires" hint={t("expiresOnHint")}>
-                <Input id="doc-expires" name="expiresOn" type="date" data-testid="doc-expires" />
+                <DateField id="doc-expires" name="expiresOn" data-testid="doc-expires" />
               </Field>
             </div>
           )}

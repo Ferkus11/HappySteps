@@ -78,7 +78,9 @@ test("scenario 7: public application → «Принять» → the child and th
   await expect(page.getByTestId("wl-title")).toHaveText(CHILD);
   await page.getByTestId("wl-accept").click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByTestId("wl-accept-enrolled")).toHaveValue(inDays(20));
+  // The date field shows dd.mm.yyyy and submits the ISO value.
+  await expect(dialog.getByTestId("wl-accept-enrolled")).toHaveValue(inDays(20).split("-").reverse().join("."));
+  await expect(dialog.locator('input[type="hidden"][name="enrolledOn"]')).toHaveValue(inDays(20));
   await dialog.getByTestId("wl-accept-group").selectOption({ label: (await dialog.locator("option", { hasText: "Солнышко" }).innerText()).trim() });
   await dialog.getByTestId("wl-accept-submit").click();
   await expect(dialog.getByTestId("wl-accepted")).toBeVisible();

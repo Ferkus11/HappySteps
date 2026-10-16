@@ -6,7 +6,8 @@ import { useTranslations } from "next-intl";
 import { CalendarX2, FileHeart, PartyPopper } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { Field, Input, Select, Textarea } from "@/components/ui/input";
+import { Field, Select, Textarea } from "@/components/ui/input";
+import { DateField } from "@/components/ui/date-field";
 import { useAction } from "@/hooks/use-action";
 import { ABSENCE_REASONS, type AbsenceReason } from "@/lib/attendance-logic";
 import { addDays } from "@/lib/format";
@@ -128,14 +129,13 @@ export function ReportAbsenceButton({
             </div>
             <div className={cn("grid gap-3", mode === "period" && "grid-cols-2")}>
               <Field label={mode === "day" ? t("date") : t("from")} htmlFor="ab-from" error={fieldError("from")}>
-                <Input
+                <DateField
                   id="ab-from"
-                  type="date"
                   min={today}
                   value={from}
-                  onChange={(e) => {
-                    setFrom(e.target.value);
-                    if (to < e.target.value) setTo(e.target.value);
+                  onChange={(v) => {
+                    setFrom(v);
+                    if (v && to < v) setTo(v);
                   }}
                   required
                   data-testid="absence-from"
@@ -143,7 +143,7 @@ export function ReportAbsenceButton({
               </Field>
               {mode === "period" ? (
                 <Field label={t("to")} htmlFor="ab-to" error={fieldError("to")}>
-                  <Input id="ab-to" type="date" min={from} value={to} onChange={(e) => setTo(e.target.value)} required data-testid="absence-to" />
+                  <DateField id="ab-to" min={from || today} value={to} onChange={setTo} required data-testid="absence-to" />
                 </Field>
               ) : null}
             </div>

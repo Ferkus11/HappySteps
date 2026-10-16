@@ -3,14 +3,16 @@
 import * as React from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
-import { ArrowRightLeft, Trash2 } from "lucide-react";
+import { ArrowRightLeft, MoreHorizontal, Trash2 } from "lucide-react";
+import { Dropdown, DropdownContent, DropdownItem, DropdownTrigger } from "@/components/ui/dropdown";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { Field, Input, Select } from "@/components/ui/input";
+import { Field, Select } from "@/components/ui/input";
 import { Confirm } from "@/components/common/confirm";
 import { useAction } from "@/hooks/use-action";
 import { deleteGroupAction, transferGroupAction } from "../actions";
+import { DateField } from "@/components/ui/date-field";
 
 export function TransferGroup({ fromId, groups, today }: { fromId: string; groups: { id: string; name: string }[]; today: string }) {
   const t = useTranslations("groups");
@@ -48,7 +50,7 @@ export function TransferGroup({ fromId, groups, today }: { fromId: string; group
             </Select>
           </Field>
           <Field label={t("transferDate")} htmlFor="tg-date">
-            <Input id="tg-date" name="date" type="date" defaultValue={today} required />
+            <DateField id="tg-date" name="date" defaultValue={today} required />
           </Field>
           <Button type="submit" className="w-full" disabled={pending}>
             {t("transfer")}
@@ -63,18 +65,32 @@ export function DeleteGroup({ id }: { id: string }) {
   const t = useTranslations("groups");
   const router = useRouter();
   const { run } = useAction(deleteGroupAction, { refresh: false, onSuccess: () => router.push("/groups") });
+  const tc = useTranslations("common");
+  const [confirm, setConfirm] = React.useState(false);
+  // A rare, destructive action: behind a labelled «…» menu instead of a bare red icon next to the main actions.
   return (
-    <Confirm
-      trigger={
-        <Button variant="ghost" className="text-danger" aria-label={t("delete")}>
-          <Trash2 />
-        </Button>
-      }
-      title={t("delete")}
-      description={t("deleteConfirm")}
-      confirmLabel={t("delete")}
-      danger
-      onConfirm={() => run(id)}
-    />
+    <>
+      <Dropdown modal={false}>
+        <DropdownTrigger asChild>
+          <Button variant="outline" size="icon" aria-label={tc("more")} data-testid="group-more">
+            <MoreHorizontal />
+          </Button>
+        </DropdownTrigger>
+        <DropdownContent>
+          <DropdownItem onSelect={() => setConfirm(true)} className="text-danger [&_svg]:text-danger" data-testid="group-delete">
+            <Trash2 /> {t("delete")}
+          </DropdownItem>
+        </DropdownContent>
+      </Dropdown>
+      <Confirm
+        open={confirm}
+        onOpenChange={setConfirm}
+        title={t("delete")}
+        description={t("deleteConfirm")}
+        confirmLabel={t("delete")}
+        danger
+        onConfirm={() => run(id)}
+      />
+    </>
   );
 }

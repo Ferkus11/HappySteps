@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAction } from "@/hooks/use-action";
 import { formatDate } from "@/lib/format";
 import { addHolidayAction, fillKzHolidaysAction, removeHolidayAction } from "./actions";
+import { DateField } from "@/components/ui/date-field";
 
 type Item = { id: string; date: string; name: string; kind: "holiday" | "day_off" | "working_day" };
 
@@ -39,7 +40,7 @@ export function HolidaysEditor({ year, items }: { year: number; items: Item[] })
           if (r?.ok) formRef.current?.reset();
         }}
       >
-        <Input type="date" name="date" required aria-label={t("date")} />
+        <DateField name="date" required aria-label={t("date")} />
         <Input name="name" required placeholder={t("name")} aria-label={t("name")} />
         <Select name="kind" aria-label={t("kind")} defaultValue="day_off">
           {(["holiday", "day_off", "working_day"] as const).map((k) => (

@@ -6,8 +6,8 @@ import { changeTone, formatCell, type ChangeTone, type Column, type DataTable, t
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { DateField } from "@/components/ui/date-field";
 
 /** First-column values that are user content (names) — not translated. */
 const USER_COLUMNS = ["group", "employee", "child"];
@@ -99,11 +99,11 @@ export function PeriodPicker({
             <input type="hidden" name="p" value="custom" />
             <label className="min-w-0 flex-1 sm:flex-none">
               <span className="mb-1 block text-xs font-semibold text-muted">{t("period.from")}</span>
-              <Input type="date" name="from" defaultValue={period.from} required className="sm:w-40" data-testid="custom-from" />
+              <DateField name="from" defaultValue={period.from} required className="sm:w-44" data-testid="custom-from" />
             </label>
             <label className="min-w-0 flex-1 sm:flex-none">
               <span className="mb-1 block text-xs font-semibold text-muted">{t("period.to")}</span>
-              <Input type="date" name="to" defaultValue={period.to} required className="sm:w-40" data-testid="custom-to" />
+              <DateField name="to" defaultValue={period.to} required className="sm:w-44" data-testid="custom-to" />
             </label>
             <Button type="submit" variant="secondary" className="w-full sm:w-auto" data-testid="custom-apply">
               {t("period.apply")}
@@ -142,8 +142,8 @@ export interface KpiProps {
   value: string;
   sub?: string;
   change: Change | null;
-  /** «%» for amounts and counts, « п.п.» for rates (percentage points), « дн.» for days */
-  unit: string;
+  /** «%» for amounts and counts (relative change), «pp» for rates (percentage points), «days» for days */
+  unit: KpiUnit;
   danger?: boolean;
   /**
    * Which direction of change is good news for this KPI — decided per KPI by the section (e.g. attendance «up»,
@@ -155,6 +155,13 @@ export interface KpiProps {
   testId?: string;
 }
 
+export type KpiUnit = "%" | "pp" | "days";
+
+/** "5%", "5 пунктов", "5 дней" — written out, no "п.п." (delta.amount.*). */
+export function deltaAmount(t: T, unit: KpiUnit, value: number): string {
+  return t(`delta.amount.${unit === "%" ? "pct" : unit}`, { value });
+}
+
 const TONE_CLASS: Record<ChangeTone, string> = { good: "text-success", bad: "text-warning", neutral: "text-muted" };
 
 /**
@@ -163,7 +170,7 @@ const TONE_CLASS: Record<ChangeTone, string> = { good: "text-success", bad: "tex
  */
 export function Kpi({ t, k }: { t: T; k: KpiProps }) {
   const c = k.change;
-  const arrow = c ? (c.dir === "up" ? "▲" : c.dir === "down" ? "▼" : "=") : "";
+  const arrow = c ? (c.dir === "up" ? "▲" : c.dir === "down" ? "▼" : "") : "";
   const tone = changeTone(c, k.better);
   return (
     <div className="min-w-0 rounded-2xl border border-border/70 bg-surface p-4 shadow-card" data-testid={k.testId}>
@@ -178,11 +185,9 @@ export function Kpi({ t, k }: { t: T; k: KpiProps }) {
             data-testid={k.testId ? `${k.testId}-delta` : undefined}
             data-tone={tone}
           >
-            <span aria-hidden>
-              {arrow} {c.dir === "same" ? "" : `${c.value}${k.unit}`}
-            </span>
+            <span aria-hidden>{c.dir === "same" ? t("delta.unchanged") : `${arrow} ${deltaAmount(t, k.unit, c.value)}`}</span>
             <span className="sr-only">
-              {c.dir === "same" ? t("delta.same") : t(`delta.${c.dir}`, { value: c.value, unit: k.unit })}
+              {c.dir === "same" ? t("delta.same") : t(`delta.${c.dir}`, { amount: deltaAmount(t, k.unit, c.value) })}
               {tone !== "neutral" ? ` (${t(tone === "good" ? "kpi.better" : "kpi.worse")})` : ""}
             </span>
           </span>

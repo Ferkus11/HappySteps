@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { ChevronLeft, ChevronRight, Download, Inbox, PartyPopper, Search } from "lucide-react";
+import { Download, Inbox, PartyPopper, Search } from "lucide-react";
 import type { KgContext } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
 import { listGroups } from "@/lib/queries/people";
@@ -12,10 +12,11 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { MonthStepper } from "@/components/ui/month-stepper";
 import { cn } from "@/lib/utils";
 import { InvoiceStatusBadge } from "./status-badge";
 import { ReviewDialog } from "./review-dialog";
-import { AccrueButton, FilterSelect, MonthInput } from "./staff-controls";
+import { AccrueButton, FilterSelect } from "./staff-controls";
 import { monthLabel, monthPhrase } from "./month";
 
 export const STAFF_TABS = ["review", "month", "debtors"] as const;
@@ -50,8 +51,7 @@ export async function StaffPayments({ ctx, sp }: { ctx: KgContext; sp: StaffPara
               tab === k && "bg-surface text-text shadow-sm",
             )}
           >
-            <span className="sm:hidden">{t(`tabsShort.${k}`)}</span>
-            <span className="hidden sm:inline">{t(`tabs.${k}`)}</span>
+            <span>{t(`tabs.${k}`)}</span>
             {k === "review" && pending.length ? (
               <span className="grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1.5 text-[11px] font-bold text-brand-fg" data-testid="pending-count">
                 {pending.length}
@@ -151,20 +151,14 @@ async function MonthList({ ctx, sp, canManage }: { ctx: KgContext; sp: StaffPara
     <>
       <Card className="mb-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Button asChild variant="outline" size="icon" aria-label={t("prevMonth")}>
-            <Link href={q(shiftMonth(month, -1))} data-testid="prev-month">
-              <ChevronLeft />
-            </Link>
-          </Button>
-          <MonthInput params={params} value={month} label={monthLabel(t, month)} />
-          <Button asChild variant="outline" size="icon" aria-label={t("nextMonth")}>
-            <Link href={q(shiftMonth(month, 1))} data-testid="next-month">
-              <ChevronRight />
-            </Link>
-          </Button>
-          <span className="hidden text-sm font-semibold text-muted sm:inline" data-testid="month-label" aria-hidden>
-            {monthLabel(t, month)}
-          </span>
+          <MonthStepper
+            className="w-full sm:w-auto"
+            label={monthLabel(t, month)}
+            prevHref={q(shiftMonth(month, -1))}
+            nextHref={q(shiftMonth(month, 1))}
+            prevLabel={t("prevMonth")}
+            nextLabel={t("nextMonth")}
+          />
           <div className="flex w-full gap-2 sm:ml-auto sm:w-auto">
             {canAccrue && rows.length > 0 ? <AccrueButton {...accrueProps} variant="outline" className="flex-1 sm:flex-none" /> : null}
             <Button asChild variant="secondary" className="flex-1 sm:flex-none">

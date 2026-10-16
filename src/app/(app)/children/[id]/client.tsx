@@ -24,6 +24,7 @@ import {
   type ParentInviteResult,
 } from "../actions";
 import { ParentInvites } from "../add-child";
+import { DateField } from "@/components/ui/date-field";
 
 export function EditChild({
   child,
@@ -63,10 +64,10 @@ export function EditChild({
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label={t("birthDate")} htmlFor="ec-bd">
-              <Input id="ec-bd" name="birthDate" type="date" defaultValue={child.birthDate} required />
+              <DateField id="ec-bd" name="birthDate" defaultValue={child.birthDate} required />
             </Field>
             <Field label={t("enrolledOn")} htmlFor="ec-en">
-              <Input id="ec-en" name="enrolledOn" type="date" defaultValue={child.enrolledOn} required />
+              <DateField id="ec-en" name="enrolledOn" defaultValue={child.enrolledOn} required />
             </Field>
           </div>
           <Field label={t("monthlyFee")} htmlFor="ec-fee" error={fieldError("monthlyFee")}>
@@ -140,7 +141,7 @@ export function ChildAdminActions({
                 </Select>
               </Field>
               <Field label={t("transferDate")} htmlFor="tc-d">
-                <Input id="tc-d" name="date" type="date" defaultValue={today} required />
+                <DateField id="tc-d" name="date" defaultValue={today} required />
               </Field>
               <Button type="submit" className="w-full" disabled={transfer.pending}>
                 {t("transfer")}

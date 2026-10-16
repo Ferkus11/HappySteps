@@ -11,6 +11,7 @@ import { InviteLink, type InviteLinkData } from "@/components/common/invite-link
 import { Confirm } from "@/components/common/confirm";
 import { useAction } from "@/hooks/use-action";
 import { createKindergartenAction, setKindergartenStatusAction, updateSubscriptionAction } from "./actions";
+import { DateField } from "@/components/ui/date-field";
 
 function slugify(s: string) {
   const map: Record<string, string> = { а:"a",б:"b",в:"v",г:"g",д:"d",е:"e",ё:"e",ж:"zh",з:"z",и:"i",й:"y",к:"k",л:"l",м:"m",н:"n",о:"o",п:"p",р:"r",с:"s",т:"t",у:"u",ф:"f",х:"h",ц:"c",ч:"ch",ш:"sh",щ:"sch",ъ:"",ы:"y",ь:"",э:"e",ю:"yu",я:"ya",ә:"a",ғ:"g",қ:"k",ң:"n",ө:"o",ұ:"u",ү:"u",һ:"h",і:"i" };
@@ -159,7 +160,7 @@ export function KindergartenRowActions({
               </Select>
             </Field>
             <Field label={t("subscriptionUntil")} htmlFor={`end-${id}`}>
-              <Input id={`end-${id}`} name="periodEnd" type="date" defaultValue={periodEnd ?? ""} />
+              <DateField id={`end-${id}`} name="periodEnd" defaultValue={periodEnd ?? ""} />
             </Field>
             <Button type="submit" className="w-full" disabled={sub.pending}>
               {tc("save")}

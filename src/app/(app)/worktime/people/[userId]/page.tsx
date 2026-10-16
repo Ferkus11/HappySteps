@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { ChevronLeft, ChevronRight, MessageSquareText } from "lucide-react";
+import { MessageSquareText } from "lucide-react";
 import { requireKg } from "@/lib/auth/context";
 import { createClient } from "@/lib/supabase/server";
 import { listStaff, isActivePerson } from "@/lib/queries/people";
@@ -22,9 +21,8 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { DayMarkers, DayStatusBadge } from "@/components/worktime/day-bits";
-import { NavPicker } from "@/components/worktime/nav-pickers";
+import { MonthStepper } from "@/components/ui/month-stepper";
 import {
   AbsenceForm,
   AddSessionButton,
@@ -155,33 +153,17 @@ export default async function WorktimePerson({
                 <h2 className="mr-auto text-[15px] font-bold">
                   {t("monthDays")}
                 </h2>
-                <Button
-                  asChild
-                  variant="outline"
-                  size="icon"
-                  aria-label={t("prevMonth")}
-                >
-                  <Link href={`${base}?month=${shiftMonth(month, -1)}`}>
-                    <ChevronLeft />
-                  </Link>
-                </Button>
-                <NavPicker
-                  type="month"
-                  value={month}
-                  param="month"
-                  path={base}
-                  label={t("month")}
+                <MonthStepper
+                  label={t("timesheetFor", {
+                    month: t(`months.${Number(month.slice(5, 7))}`),
+                    year: month.slice(0, 4),
+                  })}
+                  prevHref={`${base}?month=${shiftMonth(month, -1)}`}
+                  nextHref={`${base}?month=${shiftMonth(month, 1)}`}
+                  prevLabel={t("prevMonth")}
+                  nextLabel={t("nextMonth")}
+                  testId="person-month"
                 />
-                <Button
-                  asChild
-                  variant="outline"
-                  size="icon"
-                  aria-label={t("nextMonth")}
-                >
-                  <Link href={`${base}?month=${shiftMonth(month, 1)}`}>
-                    <ChevronRight />
-                  </Link>
-                </Button>
                 {canEdit ? (
                   <AddSessionButton
                     userId={userId}

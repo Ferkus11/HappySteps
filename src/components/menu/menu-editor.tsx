@@ -15,6 +15,7 @@ import { addDays } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { clearMenuAction, copyMenuAction, saveMenuAction } from "@/app/(app)/menu/actions";
 import type { MealKey, MenuItem } from "./meals";
+import { DateField } from "@/components/ui/date-field";
 
 type Row = { id: number; dish: string; composition: string };
 
@@ -116,13 +117,12 @@ export function MenuEditor({
           <Button type="button" variant="outline" size="icon" aria-label={t("prevDay")} onClick={() => goTo(addDays(date, -1))}>
             <ChevronLeft />
           </Button>
-          <Input
-            type="date"
+          <DateField
             value={date}
             aria-label={t("date")}
             className="w-[170px]"
             data-testid="menu-date"
-            onChange={(e) => e.target.value && goTo(e.target.value)}
+            onChange={(v) => v && v !== date && goTo(v)}
           />
           <Button type="button" variant="outline" size="icon" aria-label={t("nextDay")} onClick={() => goTo(addDays(date, 1))}>
             <ChevronRight />
@@ -234,7 +234,7 @@ function CopyDialog({ date, dateLabel, recent, overwrite }: { date: string; date
         <label className="mb-1.5 block text-[13px] font-semibold text-muted" htmlFor="menu-copy-from">
           {t("copyFrom")}
         </label>
-        <Input id="menu-copy-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} data-testid="menu-copy-from" />
+        <DateField id="menu-copy-from" value={from} onChange={setFrom} data-testid="menu-copy-from" />
         {recent.length ? (
           <div className="mt-4">
             <p className="mb-2 text-[13px] font-semibold text-muted">{t("copyRecent")}</p>

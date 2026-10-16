@@ -236,13 +236,20 @@ describe("analytics · fair comparison while the period runs (review stage 5)", 
     expect(formatCell(33, "int")).toBe("33");
   });
 
-  it("KPI captions use plurals (no «1 дни»); rate changes are points", () => {
-    expect(tRu("kpi.daysSub", { count: 1 })).toBe("день");
-    expect(tRu("kpi.daysSub", { count: 3 })).toBe("дня");
-    expect(tRu("kpi.daysSub", { count: 5 })).toBe("дней");
-    expect(tRu("kpi.absencesSub", { count: 21 })).toBe("детодень");
-    expect(tKk("kpi.daysSub", { count: 1 })).toBe("күн");
-    expect(tRu("delta.pp")).toBe(" п.п.");
+  it("KPI captions use plurals and plain words (no «детодни», no «п.п.»); rate changes are points", () => {
+    expect(tRu("kpi.daysSub", { count: 1 })).toBe("раз");
+    expect(tRu("kpi.daysSub", { count: 3 })).toBe("раза");
+    expect(tRu("kpi.daysSub", { count: 5 })).toBe("раз");
+    expect(tRu("kpi.absencesSub", { count: 21 })).toBe("пропущенный день");
+    expect(tRu("kpi.absencesSub", { count: 56 })).toBe("пропущенных дней");
+    expect(tKk("kpi.daysSub", { count: 1 })).toBe("рет");
+    expect(tRu("delta.amount.pp", { value: 1 })).toBe("1 пункт");
+    expect(tRu("delta.amount.pp", { value: 25 })).toBe("25 пунктов");
+    expect(tKk("delta.amount.pp", { value: 25 })).toBe("25 пайыздық тармақ");
+    expect(tRu("delta.amount.days", { value: 3 })).toBe("3 дня");
+    expect(tRu("delta.unchanged")).toBe("без изменений");
+    expect(tRu("axis.thousand", { value: 260 })).toBe("260 тыс.");
+    expect(tKk("axis.thousand", { value: 260 })).toBe("260 мың");
     expect(tKk("kpi.collection")).toBe("Жинау деңгейі");
   });
 });
@@ -253,9 +260,9 @@ describe("analytics · insights (ru + kk, plurals)", () => {
   const ph = (t: T) => ({ when: periodWhen(t, "month", oct), than: periodThan(t, "month", sep) });
 
   it("the spec example: attendance in October vs September", () => {
-    expect(insightText(tRu, rateInsight("attendance", 87.2, 83.1), ph(tRu))).toBe("Посещаемость в октябре — 87%, на 4 п.п. выше сентября");
+    expect(insightText(tRu, rateInsight("attendance", 87.2, 83.1), ph(tRu))).toBe("Посещаемость в октябре — 87%, на 4 пункта выше сентября");
     expect(insightText(tKk, rateInsight("attendance", 87.2, 83.1), ph(tKk))).toBe("Қатысу қазанда — 87%, қыркүйектен 4 пайыздық тармаққа жоғары");
-    expect(insightText(tRu, rateInsight("attendance", 80, 83), ph(tRu))).toBe("Посещаемость в октябре — 80%, на 3 п.п. ниже сентября");
+    expect(insightText(tRu, rateInsight("attendance", 80, 83), ph(tRu))).toBe("Посещаемость в октябре — 80%, на 3 пункта ниже сентября");
     expect(insightText(tRu, rateInsight("attendance", 80, 80.2), ph(tRu))).toBe("Посещаемость в октябре — 80%, на уровне сентября");
     expect(insightText(tRu, rateInsight("attendance", 80, null), ph(tRu))).toBe("Посещаемость в октябре — 80%");
     expect(rateInsight("attendance", null, 80)).toBeNull();
@@ -265,7 +272,7 @@ describe("analytics · insights (ru + kk, plurals)", () => {
     const q = calendarPeriod("quarter", "2026-10-01");
     const prevQ = shiftPeriod(q, -1);
     expect(insightText(tRu, rateInsight("attendance", 90, 85), { when: periodWhen(tRu, "quarter", q), than: periodThan(tRu, "quarter", prevQ) })).toBe(
-      "Посещаемость в 4 квартале — 90%, на 5 п.п. выше 3 квартала",
+      "Посещаемость в 4 квартале — 90%, на 5 пунктов выше 3 квартала",
     );
     expect(insightText(tKk, rateInsight("attendance", 90, 85), { when: periodWhen(tKk, "year", q), than: periodThan(tKk, "year", { from: "2025-01-01", to: "2025-12-31" }) })).toBe(
       "Қатысу 2026 жылы — 90%, 2025 жылдан 5 пайыздық тармаққа жоғары",
@@ -284,7 +291,7 @@ describe("analytics · insights (ru + kk, plurals)", () => {
     expect(insightText(tRu, fillInsight([group({ capacity: 10, children: 5 })]), ph(tRu))).toBe("Сад заполнен на 50%: свободно 5 мест");
     expect(insightText(tRu, fillInsight([group({ name: "А", capacity: 2, children: 3 })]), ph(tRu))).toBe("Сад заполнен на 150%; сверх вместимости 1 группа, например «А»");
     expect(insightText(tKk, fillInsight([group({ capacity: 10, children: 10 })]), ph(tKk))).toBe("Балабақша 100% толы: бос орын жоқ");
-    expect(insightText(tRu, topAbsenceInsight(gs), ph(tRu))).toBe("Больше всего пропусков — в группе «Звёздочки»: 20 детодней");
+    expect(insightText(tRu, topAbsenceInsight(gs), ph(tRu))).toBe("Больше всего пропусков — в группе «Звёздочки»: 20 пропущенных дней");
     expect(topAbsenceInsight([group({})])).toBeNull();
     expect(groupsInsight([group({})])).toBeNull();
   });
@@ -324,7 +331,7 @@ describe("analytics · insights (ru + kk, plurals)", () => {
     ];
     expect(insightText(tRu, debtorsInsight(debtors, "2026-10-13"), ph(tRu))).toBe(`2 должника на ${formatMoney(140000)}; дольше всех — Бекова Сабина, просрочка 33 дня`);
     expect(insightText(tRu, debtorsInsight([], "2026-10-13"), ph(tRu))).toBe("Должников нет — все счета оплачены");
-    expect(insightText(tRu, payDaysInsight(5.4, 8), ph(tRu))).toBe("В среднем платят через 5 дней после начала месяца, на 3 дн. раньше сентября");
+    expect(insightText(tRu, payDaysInsight(5.4, 8), ph(tRu))).toBe("В среднем платят через 5 дней после начала месяца, на 3 дня раньше сентября");
     const f: FunnelData = { applications: 21, contacted: 10, accepted: 5, declined: 2, joined: 4, left: 1, left_reasons: { school: 1 }, active: [{ d: "2026-10-01", n: 100 }, { d: "2026-10-13", n: 103 }] };
     expect(insightText(tRu, funnelInsight(f), ph(tRu))).toBe("Из 21 заявки приняты 5: конверсия 24%");
     expect(insightText(tRu, churnInsight(f), ph(tRu))).toBe("Новых детей — 4, выбывших — 1; чаще всего причина — «Ушёл в школу»");

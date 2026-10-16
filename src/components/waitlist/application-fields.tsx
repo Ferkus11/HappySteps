@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { DateField } from "@/components/ui/date-field";
 
 /** Fields of an application — the public form and «Добавить заявку» use the same set. */
 export function ApplicationFields({
@@ -26,7 +27,7 @@ export function ApplicationFields({
         <Input id={`${idPrefix}-child`} name="childName" required autoComplete="off" className={big} data-testid="wl-child-name" />
       </Field>
       <Field label={t("childBirthDate")} htmlFor={`${idPrefix}-birth`} error={fieldError("childBirthDate")}>
-        <Input id={`${idPrefix}-birth`} name="childBirthDate" type="date" required min={minBirth} max={today} className={big} data-testid="wl-child-birth" />
+        <DateField id={`${idPrefix}-birth`} name="childBirthDate" required min={minBirth} max={today} inputClassName={big} data-testid="wl-child-birth" />
       </Field>
       <Field label={t("parentName")} htmlFor={`${idPrefix}-parent`} error={fieldError("parentName")}>
         <Input id={`${idPrefix}-parent`} name="parentName" required autoComplete="name" className={big} data-testid="wl-parent-name" />
@@ -44,7 +45,7 @@ export function ApplicationFields({
         htmlFor={`${idPrefix}-desired`}
         error={fieldError("desiredDate")}
       >
-        <Input id={`${idPrefix}-desired`} name="desiredDate" type="date" min={today} className={big} data-testid="wl-desired" />
+        <DateField id={`${idPrefix}-desired`} name="desiredDate" min={today} inputClassName={big} data-testid="wl-desired" />
       </Field>
       <Field
         label={

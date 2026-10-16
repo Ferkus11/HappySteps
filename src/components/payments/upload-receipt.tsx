@@ -17,12 +17,15 @@ import { useOfflineGuard } from "@/lib/pwa/offline-guard";
 export function UploadReceiptButton({
   invoiceId,
   again,
+  another,
   className,
   variant = "primary",
   size = "lg",
 }: {
   invoiceId: string;
   again?: boolean;
+  /** A receipt is already waiting for review: «Загрузить другой чек». */
+  another?: boolean;
   className?: string;
   variant?: ButtonProps["variant"];
   size?: ButtonProps["size"];
@@ -90,7 +93,7 @@ export function UploadReceiptButton({
         onClick={() => input.current?.click()}
       >
         {busy ? <Loader2 className="animate-spin" /> : <Upload />}
-        {busy ? t("uploading") : again ? t("uploadAgain") : t("uploadReceipt")}
+        {busy ? t("uploading") : again ? t("uploadAgain") : another ? t("uploadAnother") : t("uploadReceipt")}
       </Button>
     </>
   );

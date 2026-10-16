@@ -1,10 +1,9 @@
 {
   "title": "Басты бет",
   "hello": "Сәлеметсіз бе, {name}!",
-  "children": "Балалар",
-  "activeChildren": "белсенді",
-  "groups": "Топтар",
-  "fill": "толымдылық",
+  "activeChildren": "{count, plural, one {белсенді бала} other {белсенді бала}}",
+  "groups": "{count, plural, one {топ} other {топ}}",
+  "fill": "{fill}% толы",
   "fillLabel": "Топтардың толымдылығы",
   "myChildren": "Менің балаларым",
   "noChildren": "Аккаунтыңызға әзірге балалар байланыстырылмаған",

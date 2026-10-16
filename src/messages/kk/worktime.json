@@ -23,7 +23,7 @@
   "durationHm": "{h} сағ {m} мин",
   "durationH": "{h} сағ",
   "durationM": "{m} мин",
-  "intervals": "{count, plural, one {# аралық} other {# аралық}}",
+  "intervals": "{count, plural, one {күніне # рет келді} other {күніне # рет келді}}",
   "lateBy": "Кешігу {count, plural, one {# минут} other {# минут}}",
   "outsideSchedule": "Кестеден тыс",
   "openSince": "{date} күні жабылмаған",

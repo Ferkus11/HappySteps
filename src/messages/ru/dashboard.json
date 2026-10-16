@@ -1,10 +1,9 @@
 {
   "title": "Главная",
   "hello": "Здравствуйте, {name}!",
-  "children": "Дети",
-  "activeChildren": "активных",
-  "groups": "Группы",
-  "fill": "заполненность",
+  "activeChildren": "{count, plural, one {активный ребёнок} few {активных ребёнка} many {активных детей} other {активного ребёнка}}",
+  "groups": "{count, plural, one {группа} few {группы} many {групп} other {группы}}",
+  "fill": "заполнено {fill}%",
   "fillLabel": "Заполненность групп",
   "myChildren": "Мои дети",
   "noChildren": "К вашему аккаунту пока не привязаны дети",

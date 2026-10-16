@@ -69,7 +69,7 @@ async function AdminView({ ctx, date: rawDate, status: rawStatus }: { ctx: KgCon
               <ChevronLeft />
             </Link>
           </Button>
-          <NavPicker type="date" value={date} param="date" path="/worktime" label={t("date")} />
+          <NavPicker value={date} param="date" path="/worktime" label={t("date")} />
           <Button asChild variant="outline" size="icon" aria-label={t("nextDay")}>
             <Link href={q(addDays(date, 1), status)}>
               <ChevronRight />

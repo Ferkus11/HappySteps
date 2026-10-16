@@ -7,8 +7,9 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
-import { Input, Select } from "@/components/ui/input";
+import { Select } from "@/components/ui/input";
 import { formatDateTime } from "@/lib/format";
+import { DateField } from "@/components/ui/date-field";
 import { auditRefs, describeAudit, type AuditNames, type AuditTranslator } from "@/lib/audit-details";
 
 export async function generateMetadata() {
@@ -64,8 +65,8 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
               </option>
             ))}
           </Select>
-          <Input type="date" name="from" defaultValue={sp.from} aria-label={t("fromDate")} />
-          <Input type="date" name="to" defaultValue={sp.to} aria-label={t("toDate")} />
+          <DateField name="from" defaultValue={sp.from} aria-label={t("fromDate")} />
+          <DateField name="to" defaultValue={sp.to} aria-label={t("toDate")} />
           <Button type="submit" variant="secondary">
             {t("filter")}
           </Button>

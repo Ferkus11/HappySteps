@@ -29,27 +29,32 @@
   "monthThan": { "1": "қаңтардан", "2": "ақпаннан", "3": "наурыздан", "4": "сәуірден", "5": "мамырдан", "6": "маусымнан", "7": "шілдеден", "8": "тамыздан", "9": "қыркүйектен", "10": "қазаннан", "11": "қарашадан", "12": "желтоқсаннан" },
   "when": { "week": "аптада", "quarter": "{q}-тоқсанда", "year": "{year} жылы", "custom": "кезеңде" },
   "than": { "week": "алдыңғы аптадан", "quarter": "{q}-тоқсаннан", "year": "{year} жылдан", "custom": "алдыңғы кезеңнен" },
+  "axis": { "thousand": "{value} мың", "million": "{value} млн" },
   "delta": {
-    "up": "өткен кезеңнен {value}{unit} көп",
-    "down": "өткен кезеңнен {value}{unit} аз",
+    "up": "өткен кезеңнен {amount} көп",
+    "down": "өткен кезеңнен {amount} аз",
     "same": "өткен кезеңдегідей",
     "none": "өткен кезең бойынша дерек жоқ",
-    "days": " күн",
-    "pp": " п.т."
+    "unchanged": "өзгеріссіз",
+    "amount": {
+      "pct": "{value}%",
+      "pp": "{value, plural, other {# пайыздық тармақ}}",
+      "days": "{value, plural, other {# күн}}"
+    }
   },
   "kpi": {
     "attendance": "Қатысу",
     "fill": "Толымдылық",
     "sickness": "Аурушаңдық",
     "absences": "Келмеу",
-    "absencesSub": "{count, plural, other {бала-күн}}",
+    "absencesSub": "{count, plural, other {келмеген күн}}",
     "late": "Кешігу",
     "missed": "Келмеу",
     "missedSub": "болмау және белгісіз",
     "hours": "Кестедегі сағаттан",
     "autoClosed": "Автоматты жабылды",
     "edited": "Қолмен түзету",
-    "daysSub": "{count, plural, other {күн}}",
+    "daysSub": "{count, plural, other {рет}}",
     "charged": "Есептелді",
     "paid": "Төленді",
     "debt": "Қарыз",
@@ -161,7 +166,7 @@
     "groupsEven": "Барлық топта қатысу — {rate}%",
     "fill": "Балабақша {fill}% толы: {free, plural, =0 {бос орын жоқ} other {# бос орын бар}}",
     "fillOver": "Балабақша {fill}% толы; {count, plural, other {# топта}} орын саны асып кетті, мысалы «{group}»",
-    "topAbsences": "Ең көп келмеу — «{group}» тобында: {count, plural, other {# бала-күн}}",
+    "topAbsences": "Ең көп келмеу — «{group}» тобында: {count, plural, other {# келмеген күн}}",
     "staffLate": "{late, plural, other {# кешігу}} және {missed, plural, other {# келмеу}}; жиі кешігетін — {name} ({days, plural, other {# рет}})",
     "staffMissed": "Кешігу болған жоқ, {missed, plural, other {# келмеу}}",
     "staffClean": "Кешігу де, келмеу де болған жоқ",
@@ -193,8 +198,8 @@
     "chart": "График үшін дерек жоқ",
     "noGroups": "Әзірге топ жоқ"
   },
-  "export": ".xlsx жүктеу",
-  "exportShort": "Жүктеу",
+  "export": ".xlsx жүктеп алу",
+  "exportShort": "Жүктеп алу",
   "showTable": "Кестені көрсету",
   "total": "Барлығы",
   "xlsx": { "period": "Кезең: {range}", "generated": "Жасалған күні: {date}" }

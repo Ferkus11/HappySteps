@@ -18,6 +18,7 @@ import {
   saveScheduleAction,
   setOverrideAction,
 } from "../../actions";
+import { DateField } from "@/components/ui/date-field";
 
 type Day = { weekday: number; start: string; end: string };
 const WEEK = [1, 2, 3, 4, 5, 6, 7];
@@ -103,7 +104,7 @@ export function OverrideForm({ userId, defaultDate }: { userId: string; defaultD
         });
       }}
     >
-      <Input type="date" name="date" defaultValue={defaultDate} required aria-label={t("date")} />
+      <DateField name="date" defaultValue={defaultDate} required aria-label={t("date")} />
       <Select value={kind} onChange={(e) => setKind(e.target.value as "shift" | "day_off")} aria-label={t("overrideKind")} data-testid="override-kind">
         <option value="shift">{t("overrideShift")}</option>
         <option value="day_off">{t("dayOff")}</option>
@@ -150,10 +151,10 @@ export function AbsenceForm({ userId, defaultDate }: { userId: string; defaultDa
         ))}
       </Select>
       <Field label={tc("from")}>
-        <Input type="date" name="from" defaultValue={defaultDate} required data-testid="absence-from" />
+        <DateField name="from" defaultValue={defaultDate} required data-testid="absence-from" />
       </Field>
       <Field label={tc("to")} error={fieldError("to")}>
-        <Input type="date" name="to" defaultValue={defaultDate} required data-testid="absence-to" />
+        <DateField name="to" defaultValue={defaultDate} required data-testid="absence-to" />
       </Field>
       <Input name="note" placeholder={t("notePlaceholder")} aria-label={t("note")} className="col-span-2" />
       <Button type="submit" variant="outline" className="col-span-2" disabled={pending} data-testid="absence-save">
@@ -200,7 +201,7 @@ function SessionFields({
   return (
     <>
       <Field label={t("date")} htmlFor="ws-date" error={fieldError("date")}>
-        <Input id="ws-date" type="date" name="date" defaultValue={date} required />
+        <DateField id="ws-date" name="date" defaultValue={date} required />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label={t("start")} htmlFor="ws-start" error={fieldError("start")}>

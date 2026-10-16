@@ -71,7 +71,7 @@ async function AttendanceSection(p: SectionProps) {
   const tp = attendanceTotals(prev.days, prev.groups);
   if (tc.marked === 0 && tc.children === 0) return <SectionEmpty title={t("empty.title")} hint={t("empty.attendance")} />;
   const ph = phrases(p);
-  const pp = t("delta.pp");
+  const pp = "pp" as const;
   const [days, groups, reasons] = buildTables("attendance", cur, { t, range: p.cur });
   const series = attendanceSeries(cur, p.cur);
   // `better` — the good direction of each KPI's change, decided here per KPI (fill: more children is good).
@@ -157,7 +157,7 @@ async function StaffSection(p: SectionProps) {
   const tp = staffTotals(prev);
   const has = prev.length > 0;
   const ph = { ...phrases(p), than: periodThan(t, p.period.kind, prevRange ?? p.prev) };
-  const pp = t("delta.pp");
+  const pp = "pp" as const;
   const [table] = buildTables("staff", cur, { t, range: p.cur });
   // Neutral (no `better`): hours vs schedule (overtime is not «better») and manual edits (corrections are normal work).
   const kpis: KpiProps[] = [
@@ -207,7 +207,7 @@ async function FinanceSection(p: SectionProps) {
   const tp = financeTotals(prev.months);
   if (!tc.invoices && !cur.debtors.length) return <SectionEmpty title={t("empty.title")} hint={t("empty.finance")} />;
   const ph = phrases(p);
-  const pp = t("delta.pp");
+  const pp = "pp" as const;
   const [months, debtors] = buildTables("finance", cur, { t, range: p.cur });
   // Charged is neutral (it follows the number of children); a growing debt is the one bad trend shown in red.
   const kpis: KpiProps[] = [
@@ -220,7 +220,7 @@ async function FinanceSection(p: SectionProps) {
       value: tc.avgDays == null ? "—" : String(Math.round(tc.avgDays)),
       sub: t("kpi.payDaysSub"),
       change: change(tc.avgDays, tp.avgDays, "points"),
-      unit: t("delta.days"),
+      unit: "days",
       better: "down", testId: "kpi-paydays",
     },
   ];
@@ -259,7 +259,7 @@ async function FunnelSection(p: SectionProps) {
   const [funnel, churn, active] = buildTables("funnel", cur, { t, range: p.cur });
   const kpis: KpiProps[] = [
     { label: t("kpi.applications"), value: String(cur.applications), change: change(cur.applications, prev.applications, "relative"), unit: "%", better: "up", testId: "kpi-applications" },
-    { label: t("kpi.conversion"), value: pctText(tc.conversion), change: change(tc.conversion, tp.conversion, "points"), unit: t("delta.pp"), better: "up", testId: "kpi-conversion" },
+    { label: t("kpi.conversion"), value: pctText(tc.conversion), change: change(tc.conversion, tp.conversion, "points"), unit: "pp", better: "up", testId: "kpi-conversion" },
     { label: t("kpi.joined"), value: String(cur.joined), change: change(cur.joined, prev.joined, "relative"), unit: "%", better: "up", testId: "kpi-joined" },
     { label: t("kpi.left"), value: String(cur.left), change: change(cur.left, prev.left, "relative"), unit: "%", better: "down", testId: "kpi-left" },
     { label: t("kpi.active"), value: tc.activeEnd == null ? "—" : String(tc.activeEnd), change: change(tc.activeEnd, tp.activeEnd, "relative"), unit: "%", better: "up", testId: "kpi-active" },

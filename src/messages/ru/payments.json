@@ -3,11 +3,6 @@
   "subtitleStaff": "Счета, чеки родителей и долги",
   "subtitleParent": "Сумма к оплате, реквизиты и история",
   "tabs": {
-    "review": "На проверке",
-    "month": "Счета за месяц",
-    "debtors": "Должники"
-  },
-  "tabsShort": {
     "review": "Чеки",
     "month": "Счета",
     "debtors": "Должники"
@@ -71,6 +66,7 @@
   "allPaid": "Всё оплачено",
   "uploadReceipt": "Загрузить чек",
   "uploadAgain": "Загрузить чек заново",
+  "uploadAnother": "Загрузить другой чек",
   "uploading": "Отправляем чек…",
   "uploaded": "Чек отправлен на проверку",
   "uploadHint": "Фото, скриншот или PDF до 15 МБ",
@@ -104,7 +100,7 @@
   "pdfFile": "PDF-документ",
   "confirmedLabel": "Подтверждённая сумма, ₸",
   "confirmedHint": "К оплате по счёту: {amount}",
-  "confirm": "Оплачено",
+  "confirm": "Подтвердить оплату",
   "reject": "Отклонить",
   "rejectSubmit": "Отклонить чек",
   "reasonLabel": "Причина отклонения",

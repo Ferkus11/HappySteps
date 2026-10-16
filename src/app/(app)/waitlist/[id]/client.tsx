@@ -15,6 +15,7 @@ import type { ParentInviteResult } from "@/lib/children";
 import { useAction } from "@/hooks/use-action";
 import { MANUAL_STATUSES, type WaitlistStatus } from "@/lib/waitlist";
 import { acceptApplicationAction, addApplicationCommentAction, deleteApplicationAction, setApplicationStatusAction } from "../actions";
+import { DateField } from "@/components/ui/date-field";
 
 export function StatusButtons({ id, status }: { id: string; status: WaitlistStatus }) {
   const t = useTranslations("waitlist");
@@ -149,7 +150,7 @@ export function AcceptDialog({
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label={tch("enrolledOn")} htmlFor="acc-enrolled" error={fieldError("enrolledOn")}>
-                <Input id="acc-enrolled" name="enrolledOn" type="date" defaultValue={enrolledDefault} required data-testid="wl-accept-enrolled" />
+                <DateField id="acc-enrolled" name="enrolledOn" defaultValue={enrolledDefault} required data-testid="wl-accept-enrolled" />
               </Field>
               <Field label={tch("monthlyFee")} htmlFor="acc-fee" error={fieldError("monthlyFee")}>
                 <Input id="acc-fee" name="monthlyFee" type="number" min={0} step={500} inputMode="numeric" defaultValue={defaultFee} />
@@ -161,7 +162,7 @@ export function AcceptDialog({
                 <Input id="acc-child" name="childName" defaultValue={app.childName} required />
               </Field>
               <Field label={tch("birthDate")} htmlFor="acc-birth" error={fieldError("childBirthDate")}>
-                <Input id="acc-birth" name="childBirthDate" type="date" defaultValue={app.childBirthDate} max={today} required />
+                <DateField id="acc-birth" name="childBirthDate" defaultValue={app.childBirthDate} max={today} required />
               </Field>
             </div>
             <div className="space-y-3 border-t border-border pt-4">
